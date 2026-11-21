@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2019-2024 Connor McLaughlin <stenzek@gmail.com>
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #include "gpu_device.h"
 #include "core/host.h"     // TODO: Remove, needed for getting fullscreen mode.
@@ -229,34 +229,40 @@ GPUDevice::GPUDevice()
 
 GPUDevice::~GPUDevice() = default;
 
+static RenderAPI s_preferred_api = RenderAPI::None;
+
 RenderAPI GPUDevice::GetPreferredAPI()
 {
-  static RenderAPI preferred_renderer = RenderAPI::None;
-  if (preferred_renderer == RenderAPI::None) [[unlikely]]
+  if (s_preferred_api == RenderAPI::None) [[unlikely]]
   {
 #if defined(_WIN32) && !defined(_M_ARM64)
     // Perfer DX11 on Windows, except ARM64, where QCom has slow DX11 drivers.
-    preferred_renderer = RenderAPI::D3D11;
+    s_preferred_api = RenderAPI::D3D11;
 #elif defined(_WIN32) && defined(_M_ARM64)
-    preferred_renderer = RenderAPI::D3D12;
+    s_preferred_api = RenderAPI::D3D12;
 #elif defined(__APPLE__)
     // Prefer Metal on MacOS.
-    preferred_renderer = RenderAPI::Metal;
+    s_preferred_api = RenderAPI::Metal;
 #elif defined(ENABLE_OPENGL) && defined(ENABLE_VULKAN)
     // On Linux, if we have both GL and Vulkan, prefer VK if the driver isn't software.
-    preferred_renderer = VulkanDevice::IsSuitableDefaultRenderer() ? RenderAPI::Vulkan : RenderAPI::OpenGL;
+    s_preferred_api = VulkanDevice::IsSuitableDefaultRenderer() ? RenderAPI::Vulkan : RenderAPI::OpenGL;
 #elif defined(ENABLE_OPENGL)
-    preferred_renderer = RenderAPI::OpenGL;
+    s_preferred_api = RenderAPI::OpenGL;
 #elif defined(ENABLE_VULKAN)
-    preferred_renderer = RenderAPI::Vulkan;
+    s_preferred_api = RenderAPI::Vulkan;
 #else
     // Uhhh, what?
     ERROR_LOG("Somehow don't have any renderers available...");
-    preferred_renderer = RenderAPI::None;
+    s_preferred_api = RenderAPI::None;
 #endif
   }
 
-  return preferred_renderer;
+  return s_preferred_api;
+}
+
+void GPUDevice::SetPreferredAPI(RenderAPI api)
+{
+  s_preferred_api = api;
 }
 
 const char* GPUDevice::RenderAPIToString(RenderAPI api)
@@ -601,13 +607,10 @@ void GPUDevice::DestroyResources()
   m_shader_cache.Close();
 }
 
-void GPUDevice::RenderImGui()
+void GPUDevice::RenderImGui(const ImDrawData* draw_data)
 {
   GL_SCOPE("RenderImGui");
 
-  ImGui::Render();
-
-  const ImDrawData* draw_data = ImGui::GetDrawData();
   if (draw_data->CmdListsCount == 0)
     return;
 
@@ -904,69 +907,71 @@ std::unique_ptr<GPUTexture> GPUDevice::FetchTexture(u32 width, u32 height, u32 l
                                                     GPUTexture::Type type, GPUTexture::Format format,
                                                     const void* data /*= nullptr*/, u32 data_stride /*= 0*/)
 {
-  std::unique_ptr<GPUTexture> ret;
+  return GPUDevice::CallOnDeviceThread([&]() -> std::unique_ptr<GPUTexture> {
+    std::unique_ptr<GPUTexture> ret;
 
-  const TexturePoolKey key = {static_cast<u16>(width),
-                              static_cast<u16>(height),
-                              static_cast<u8>(layers),
-                              static_cast<u8>(levels),
-                              static_cast<u8>(samples),
-                              type,
-                              format,
-                              0u};
+    const TexturePoolKey key = {static_cast<u16>(width),
+                                static_cast<u16>(height),
+                                static_cast<u8>(layers),
+                                static_cast<u8>(levels),
+                                static_cast<u8>(samples),
+                                type,
+                                format,
+                                0u};
 
-  const bool is_texture = IsTexturePoolType(type);
-  TexturePool& pool = is_texture ? m_texture_pool : m_target_pool;
-  const u32 pool_size = (is_texture ? MAX_TEXTURE_POOL_SIZE : MAX_TARGET_POOL_SIZE);
+    const bool is_texture = IsTexturePoolType(type);
+    TexturePool& pool = is_texture ? m_texture_pool : m_target_pool;
+    const u32 pool_size = (is_texture ? MAX_TEXTURE_POOL_SIZE : MAX_TARGET_POOL_SIZE);
 
-  TexturePool::iterator it;
+    TexturePool::iterator it;
 
-  if (is_texture && m_features.prefer_unused_textures)
-  {
-    // Try to find a texture that wasn't used this frame first.
-    for (it = m_texture_pool.begin(); it != m_texture_pool.end(); ++it)
+    if (is_texture && m_features.prefer_unused_textures)
     {
-      if (it->use_counter == m_texture_pool_counter)
+      // Try to find a texture that wasn't used this frame first.
+      for (it = m_texture_pool.begin(); it != m_texture_pool.end(); ++it)
       {
-        // We're into textures recycled this frame, not going to find anything newer.
-        // But prefer reuse over creating a new texture.
-        if (m_texture_pool.size() < pool_size)
+        if (it->use_counter == m_texture_pool_counter)
         {
-          it = m_texture_pool.end();
-          break;
+          // We're into textures recycled this frame, not going to find anything newer.
+          // But prefer reuse over creating a new texture.
+          if (m_texture_pool.size() < pool_size)
+          {
+            it = m_texture_pool.end();
+            break;
+          }
         }
+
+        if (it->key == key)
+          break;
       }
-
-      if (it->key == key)
-        break;
-    }
-  }
-  else
-  {
-    for (it = pool.begin(); it != pool.end(); ++it)
-    {
-      if (it->key == key)
-        break;
-    }
-  }
-
-  if (it != pool.end())
-  {
-    if (!data || it->texture->Update(0, 0, width, height, data, data_stride, 0, 0))
-    {
-      ret = std::move(it->texture);
-      pool.erase(it);
-      return ret;
     }
     else
     {
-      // This shouldn't happen...
-      ERROR_LOG("Failed to upload {}x{} to pooled texture", width, height);
+      for (it = pool.begin(); it != pool.end(); ++it)
+      {
+        if (it->key == key)
+          break;
+      }
     }
-  }
 
-  ret = CreateTexture(width, height, layers, levels, samples, type, format, data, data_stride);
-  return ret;
+    if (it != pool.end())
+    {
+      if (!data || it->texture->Update(0, 0, width, height, data, data_stride, 0, 0))
+      {
+        ret = std::move(it->texture);
+        pool.erase(it);
+        return ret;
+      }
+      else
+      {
+        // This shouldn't happen...
+        ERROR_LOG("Failed to upload {}x{} to pooled texture", width, height);
+      }
+    }
+
+    ret = CreateTexture(width, height, layers, levels, samples, type, format, data, data_stride);
+    return ret;
+  });
 }
 
 std::unique_ptr<GPUTexture, GPUDevice::PooledTextureDeleter>
@@ -981,28 +986,30 @@ GPUDevice::FetchAutoRecycleTexture(u32 width, u32 height, u32 layers, u32 levels
 
 void GPUDevice::RecycleTexture(std::unique_ptr<GPUTexture> texture)
 {
-  if (!texture)
-    return;
+  GPUDevice::RunOnDeviceThread([&]() {
+    if (!texture)
+      return;
 
-  const TexturePoolKey key = {static_cast<u16>(texture->GetWidth()),
-                              static_cast<u16>(texture->GetHeight()),
-                              static_cast<u8>(texture->GetLayers()),
-                              static_cast<u8>(texture->GetLevels()),
-                              static_cast<u8>(texture->GetSamples()),
-                              texture->GetType(),
-                              texture->GetFormat(),
-                              0u};
+    const TexturePoolKey key = {static_cast<u16>(texture->GetWidth()),
+                                static_cast<u16>(texture->GetHeight()),
+                                static_cast<u8>(texture->GetLayers()),
+                                static_cast<u8>(texture->GetLevels()),
+                                static_cast<u8>(texture->GetSamples()),
+                                texture->GetType(),
+                                texture->GetFormat(),
+                                0u};
 
-  const bool is_texture = IsTexturePoolType(texture->GetType());
-  TexturePool& pool = is_texture ? m_texture_pool : m_target_pool;
-  pool.push_back({std::move(texture), m_texture_pool_counter, key});
+    const bool is_texture = IsTexturePoolType(texture->GetType());
+    TexturePool& pool = is_texture ? m_texture_pool : m_target_pool;
+    pool.push_back({std::move(texture), m_texture_pool_counter, key});
 
-  const u32 max_size = is_texture ? MAX_TEXTURE_POOL_SIZE : MAX_TARGET_POOL_SIZE;
-  while (pool.size() > max_size)
-  {
-    DEBUG_LOG("Trim {}x{} texture from pool", pool.front().texture->GetWidth(), pool.front().texture->GetHeight());
-    pool.pop_front();
-  }
+    const u32 max_size = is_texture ? MAX_TEXTURE_POOL_SIZE : MAX_TARGET_POOL_SIZE;
+    while (pool.size() > max_size)
+    {
+      DEBUG_LOG("Trim {}x{} texture from pool", pool.front().texture->GetWidth(), pool.front().texture->GetHeight());
+      pool.pop_front();
+    }
+  });
 }
 
 void GPUDevice::PurgeTexturePool()
@@ -1259,9 +1266,14 @@ SPIRV_CROSS_MSL_FUNCTIONS(ADD_FUNC)
 
 bool dyn_libs::OpenShaderc(Error* error)
 {
-  if (s_shaderc_library.IsOpen())
+  if (s_shaderc_compiler)
     return true;
 
+#ifdef SHADER_COMPILERS_LINKED
+#define LOAD_FUNC(F) F = &::F;
+  SHADERC_FUNCTIONS(LOAD_FUNC)
+#undef LOAD_FUNC
+#else
   const std::string libname = DynamicLibrary::GetVersionedFilename("shaderc_shared");
   if (!s_shaderc_library.Open(libname.c_str(), error))
   {
@@ -1279,6 +1291,7 @@ bool dyn_libs::OpenShaderc(Error* error)
 
   SHADERC_FUNCTIONS(LOAD_FUNC)
 #undef LOAD_FUNC
+#endif
 
   s_shaderc_compiler = shaderc_compiler_initialize();
   if (!s_shaderc_compiler)
@@ -1314,6 +1327,16 @@ void dyn_libs::CloseShaderc()
 
 bool dyn_libs::OpenSpirvCross(Error* error)
 {
+#ifdef SHADER_COMPILERS_LINKED
+  if (spvc_context_create)
+    return true;
+
+#define LOAD_FUNC(F) F = &::F;
+  SPIRV_CROSS_FUNCTIONS(LOAD_FUNC)
+  SPIRV_CROSS_HLSL_FUNCTIONS(LOAD_FUNC)
+  SPIRV_CROSS_MSL_FUNCTIONS(LOAD_FUNC)
+#undef LOAD_FUNC
+#else
   if (s_spirv_cross_library.IsOpen())
     return true;
 
@@ -1341,6 +1364,7 @@ bool dyn_libs::OpenSpirvCross(Error* error)
   SPIRV_CROSS_HLSL_FUNCTIONS(LOAD_FUNC)
   SPIRV_CROSS_MSL_FUNCTIONS(LOAD_FUNC)
 #undef LOAD_FUNC
+#endif
 
   if (!s_close_registered)
   {
@@ -1712,4 +1736,41 @@ std::unique_ptr<GPUShader> GPUDevice::TranspileAndCreateShaderFromSource(
   // TODO: MSL needs entry point suffixed.
 
   return CreateShaderFromSource(stage, target_language, dest_source, entry_point, out_binary, error);
+}
+
+void GPUDevice::ReleaseThread()
+{
+}
+
+bool GPUDevice::AcquireThread()
+{
+  return true;
+}
+
+static GPUDevice::DeviceThreadRunner s_device_thread_runner;
+
+void GPUDevice::SetDeviceThreadRunner(DeviceThreadRunner runner)
+{
+  s_device_thread_runner = std::move(runner);
+}
+
+bool GPUDevice::HasDeviceThread()
+{
+  return static_cast<bool>(s_device_thread_runner);
+}
+
+void GPUDevice::RunOnDeviceThread(std::function<void()> func)
+{
+  if (s_device_thread_runner)
+    s_device_thread_runner(std::move(func), true);
+  else
+    func();
+}
+
+void GPUDevice::QueueOnDeviceThread(std::function<void()> func)
+{
+  if (s_device_thread_runner)
+    s_device_thread_runner(std::move(func), false);
+  else
+    func();
 }

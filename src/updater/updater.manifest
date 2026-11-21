@@ -3,10 +3,10 @@
 <assemblyIdentity
     version="1.0.0.0"
     processorArchitecture="*"
-    name="com.github.stenzek.duckstation.updater"
+    name="io.github.thenotoriousfox.riverhorse.updater"
     type="win32"
 />
-<description>DuckStation Updater</description>
+<description>Riverhorse Updater</description>
 <dependency>
     <dependentAssembly>
         <assemblyIdentity

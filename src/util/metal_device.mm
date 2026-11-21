@@ -158,7 +158,7 @@ void MetalDevice::SetVSyncMode(GPUVSyncMode mode, bool allow_present_throttle)
 
   m_vsync_mode = mode;
   if (m_layer != nil)
-    [m_layer setDisplaySyncEnabled:m_vsync_mode == GPUVSyncMode::FIFO];
+    [m_layer setDisplaySyncEnabled:IsVSyncModeBlocking()];
 }
 
 bool MetalDevice::CreateDevice(std::string_view adapter, bool threaded_presentation,
@@ -418,7 +418,7 @@ bool MetalDevice::CreateLayer()
 
     // Metal does not support mailbox mode.
     m_vsync_mode = (m_vsync_mode == GPUVSyncMode::Mailbox) ? GPUVSyncMode::FIFO : m_vsync_mode;
-    [m_layer setDisplaySyncEnabled:m_vsync_mode == GPUVSyncMode::FIFO];
+    [m_layer setDisplaySyncEnabled:IsVSyncModeBlocking()];
 
     DebugAssert(m_layer_pass_desc == nil);
     m_layer_pass_desc = [[MTLRenderPassDescriptor renderPassDescriptor] retain];

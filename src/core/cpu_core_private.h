@@ -1,9 +1,11 @@
 // SPDX-FileCopyrightText: 2019-2022 Connor McLaughlin <stenzek@gmail.com>
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #pragma once
 #include "bus.h"
 #include "cpu_core.h"
+
+#include <algorithm>
 
 namespace CPU {
 
@@ -94,7 +96,7 @@ ALWAYS_INLINE static Segment GetSegmentForAddress(VirtualMemoryAddress address)
 
 ALWAYS_INLINE static constexpr PhysicalMemoryAddress VirtualAddressToPhysical(VirtualMemoryAddress address)
 {
-  return (address & PHYSICAL_MEMORY_ADDRESS_MASK);
+  return (address & ((address & 0x80000000u) ? KSEG_MASK : KUSEG_MASK));
 }
 
 ALWAYS_INLINE static VirtualMemoryAddress PhysicalAddressToVirtual(PhysicalMemoryAddress address, Segment segment)
@@ -121,6 +123,29 @@ ALWAYS_INLINE static void StallUntilGTEComplete()
   g_state.pending_ticks =
     (g_state.gte_completion_tick > g_state.pending_ticks) ? g_state.gte_completion_tick : g_state.pending_ticks;
 }
+
+ALWAYS_INLINE static void StallUntilMulDivComplete()
+{
+  g_state.pending_ticks = std::max(g_state.pending_ticks, g_state.muldiv_completion_tick);
+}
+
+ALWAYS_INLINE static void StartMulDiv(TickCount ticks)
+{
+  StallUntilMulDivComplete();
+  g_state.muldiv_completion_tick = g_state.pending_ticks + ticks - 1;
+}
+
+ALWAYS_INLINE static constexpr TickCount GetMultTicks(u32 operand_magnitude)
+{
+  return (operand_magnitude < 0x800u) ? 6 : ((operand_magnitude < 0x100000u) ? 9 : 13);
+}
+
+ALWAYS_INLINE static constexpr TickCount GetSignedMultTicks(s32 operand)
+{
+  return GetMultTicks(static_cast<u32>((operand < 0) ? ~operand : operand));
+}
+
+static constexpr TickCount DIV_TICKS = 36;
 
 // kernel call interception
 void HandleA0Syscall();

@@ -1,8 +1,9 @@
 // SPDX-FileCopyrightText: 2019-2024 Connor McLaughlin <stenzek@gmail.com>
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #include "spu.h"
 #include "cdrom.h"
+#include "cpu_core.h"
 #include "dma.h"
 #include "host.h"
 #include "imgui.h"
@@ -54,6 +55,7 @@ enum : u32
   SYSCLK_TICKS_PER_SPU_TICK = static_cast<u32>(System::MASTER_CLOCK) / static_cast<u32>(SAMPLE_RATE), // 0x300
   CAPTURE_BUFFER_SIZE_PER_CHANNEL = 0x400,
   MINIMUM_TICKS_BETWEEN_KEY_ON_OFF = 2,
+  KEY_ON_START_DELAY_SAMPLES = 4,
   NUM_REVERB_REGS = 32,
   FIFO_SIZE_IN_HALFWORDS = 32
 };
@@ -64,7 +66,8 @@ enum : s16
 };
 enum : TickCount
 {
-  TRANSFER_TICKS_PER_HALFWORD = 16
+  TRANSFER_READ_TICKS_PER_HALFWORD = 16,
+  TRANSFER_WRITE_TICKS_PER_HALFWORD = 32,
 };
 
 enum class RAMTransferMode : u8
@@ -192,7 +195,7 @@ struct ADPCMBlock
     u8 bits;
 
     BitField<u8, u8, 0, 4> shift;
-    BitField<u8, u8, 4, 3> filter;
+    BitField<u8, u8, 4, 4> filter;
   } shift_filter;
   ADPCMFlags flags;
   u8 data[NUM_SAMPLES_PER_ADPCM_BLOCK / 2];
@@ -204,7 +207,7 @@ struct ADPCMBlock
     return (shift > 12) ? 9 : shift;
   }
 
-  u8 GetFilter() const { return std::min<u8>(shift_filter.filter, 4); }
+  u8 GetFilter() const { return shift_filter.filter; }
 
   u8 GetNibble(u32 index) const { return (data[index / 2] >> ((index % 2) * 4)) & 0x0F; }
 };
@@ -219,6 +222,7 @@ struct VolumeEnvelope
 
   void Reset(u8 rate_, bool decreasing_, bool exponential_, bool phase_invert_);
   s16 Tick(s16 current_level);
+  bool IsValid() const;
 };
 
 struct VolumeSweep
@@ -229,6 +233,7 @@ struct VolumeSweep
 
   void Reset(VolumeRegister reg);
   void Tick();
+  bool IsValid() const;
 };
 
 enum class ADSRPhase : u8
@@ -246,7 +251,6 @@ struct Voice
   VoiceRegisters regs;
   VoiceCounter counter;
   ADPCMFlags current_block_flags;
-  bool is_first_block;
   std::array<s16, NUM_SAMPLES_FROM_LAST_ADPCM_BLOCK + NUM_SAMPLES_PER_ADPCM_BLOCK> current_block_samples;
   std::array<s16, 2> adpcm_last_samples;
   s32 last_volume;
@@ -259,6 +263,7 @@ struct Voice
   s16 adsr_target;
   bool has_samples;
   bool ignore_loop_address;
+  u8 key_on_delay;
 
   bool IsOn() const { return adsr_phase != ADSRPhase::Off; }
 
@@ -350,19 +355,28 @@ static void ExecuteFIFOWriteToRAM(TickCount& ticks);
 static void ExecuteFIFOReadFromRAM(TickCount& ticks);
 static void ExecuteTransfer(void* param, TickCount ticks, TickCount ticks_late);
 static void ManualTransferWrite(u16 value);
-static void UpdateTransferEvent();
+static void UpdateTransferEvent(bool keep_progress = false);
 static void UpdateDMARequest();
+static void UpdateDMARequestInTransfer(TickCount* ticks);
+static bool IsTransferBlocked();
+static TickCount GetTransferTicksPerHalfword();
+static void RunTransfer(TickCount ticks, bool count_dma_time);
+static void RunTransferUntilFrame(u32 remaining_frames);
+static void StartTransferEvent(u32 ticks, bool keep_progress);
+static bool IsLoadedStateValid();
 
 static void CreateOutputStream();
 
 namespace {
 struct SPUState
 {
-  TimingEvent transfer_event{"SPU Transfer", TRANSFER_TICKS_PER_HALFWORD, TRANSFER_TICKS_PER_HALFWORD,
+  TimingEvent transfer_event{"SPU Transfer", TRANSFER_READ_TICKS_PER_HALFWORD, TRANSFER_READ_TICKS_PER_HALFWORD,
                              &SPU::ExecuteTransfer, nullptr};
   TimingEvent tick_event{"SPU Sample", SYSCLK_TICKS_PER_SPU_TICK, SYSCLK_TICKS_PER_SPU_TICK, &SPU::Execute, nullptr};
 
   TickCount ticks_carry = 0;
+  TickCount transfer_ticks_carry = 0;
+  TickCount transfer_ticks_consumed = 0;
   TickCount cpu_ticks_per_spu_tick = 0;
   TickCount cpu_tick_divider = 0;
 
@@ -405,6 +419,9 @@ struct SPUState
   s32 reverb_resample_buffer_position = 0;
 
   ALIGN_TO_CACHE_LINE std::array<Voice, NUM_VOICES> voices{};
+
+  std::array<u16, 2> unused_registers_dbc{};
+  std::array<u16, 16> unused_registers_e60{};
 
   InlineFIFOQueue<u16, FIFO_SIZE_IN_HALFWORDS> transfer_fifo;
 
@@ -534,6 +551,8 @@ void SPU::Reset()
   s_state.cd_audio_volume_right = 0;
   s_state.external_volume_left = 0;
   s_state.external_volume_right = 0;
+  s_state.unused_registers_dbc = {};
+  s_state.unused_registers_e60 = {};
   s_state.key_on_register = 0;
   s_state.key_off_register = 0;
   s_state.endx_register = 0;
@@ -558,7 +577,6 @@ void SPU::Reset()
     std::fill_n(v.regs.index, NUM_VOICE_REGISTERS, u16(0));
     v.counter.bits = 0;
     v.current_block_flags.bits = 0;
-    v.is_first_block = 0;
     v.current_block_samples.fill(s16(0));
     v.adpcm_last_samples.fill(s32(0));
     v.adsr_envelope.Reset(0, false, false, false);
@@ -566,6 +584,7 @@ void SPU::Reset()
     v.adsr_target = 0;
     v.has_samples = false;
     v.ignore_loop_address = false;
+    v.key_on_delay = 0;
   }
 
   s_state.tick_event.Deactivate();
@@ -619,7 +638,8 @@ bool SPU::DoState(StateWrapper& sw)
     sw.DoArray(v.regs.index, NUM_VOICE_REGISTERS);
     sw.Do(&v.counter.bits);
     sw.Do(&v.current_block_flags.bits);
-    sw.DoEx(&v.is_first_block, 47, false);
+    if (sw.IsReading() && sw.GetVersion() >= 47 && sw.GetVersion() < 75)
+      sw.SkipBytes(sizeof(bool));
     sw.DoArray(&v.current_block_samples[NUM_SAMPLES_FROM_LAST_ADPCM_BLOCK], NUM_SAMPLES_PER_ADPCM_BLOCK);
     sw.DoArray(&v.current_block_samples[0], NUM_SAMPLES_FROM_LAST_ADPCM_BLOCK);
     sw.Do(&v.adpcm_last_samples);
@@ -631,15 +651,32 @@ bool SPU::DoState(StateWrapper& sw)
     sw.Do(&v.adsr_target);
     sw.Do(&v.has_samples);
     sw.Do(&v.ignore_loop_address);
+    sw.DoEx(&v.key_on_delay, 73, static_cast<u8>(0));
   }
 
   sw.Do(&s_state.transfer_fifo);
+  sw.DoEx(&s_state.transfer_ticks_carry, 90, static_cast<TickCount>(0));
+  sw.DoEx(&s_state.transfer_ticks_consumed, 90, static_cast<TickCount>(0));
+  if (sw.GetVersion() >= 76)
+  {
+    sw.Do(&s_state.unused_registers_dbc);
+    sw.Do(&s_state.unused_registers_e60);
+  }
+  else
+  {
+    s_state.unused_registers_dbc = {};
+    s_state.unused_registers_e60 = {};
+  }
   sw.DoBytes(s_ram.data(), RAM_SIZE);
+
+  if (sw.IsReading() && !IsLoadedStateValid())
+    return false;
 
   if (sw.IsReading())
   {
+    s_state.ticks_carry %= std::max<TickCount>(s_state.cpu_tick_divider, SYSCLK_TICKS_PER_SPU_TICK);
     UpdateEventInterval();
-    UpdateTransferEvent();
+    UpdateTransferEvent(true);
   }
 
   return !sw.HasError();
@@ -692,9 +729,11 @@ u16 SPU::ReadRegister(u32 offset)
       return Truncate16(s_state.reverb_on_register >> 16);
 
     case 0x1F801D9C - SPU_BASE:
+      GeneratePendingSamples();
       return Truncate16(s_state.endx_register);
 
     case 0x1F801D9E - SPU_BASE:
+      GeneratePendingSamples();
       return Truncate16(s_state.endx_register >> 16);
 
     case 0x1F801DA2 - SPU_BASE:
@@ -758,10 +797,15 @@ u16 SPU::ReadRegister(u32 offset)
         const u32 voice_index = (offset - (0x1F801E00 - SPU_BASE)) / 4;
         GeneratePendingSamples();
         if (offset & 0x02)
-          return s_state.voices[voice_index].left_volume.current_level;
-        else
           return s_state.voices[voice_index].right_volume.current_level;
+        else
+          return s_state.voices[voice_index].left_volume.current_level;
       }
+
+      if (offset >= (0x1F801DBC - SPU_BASE) && offset < (0x1F801DC0 - SPU_BASE))
+        return s_state.unused_registers_dbc[(offset - (0x1F801DBC - SPU_BASE)) / 2];
+      if (offset >= (0x1F801E60 - SPU_BASE) && offset < (0x1F801E80 - SPU_BASE))
+        return s_state.unused_registers_e60[(offset - (0x1F801E60 - SPU_BASE)) / 2];
 
       DEV_LOG("Unknown SPU register read: offset 0x{:X} (address 0x{:08X})", offset, offset | SPU_BASE);
       return UINT16_C(0xFFFF);
@@ -980,9 +1024,11 @@ void SPU::WriteRegister(u32 offset, u16 value)
         s_state.SPUSTAT.irq9_flag = false;
         InterruptController::SetLineState(InterruptController::IRQ::SPU, false);
       }
-      else if (IsRAMIRQTriggerable())
+      else if (IsRAMIRQTriggerable() && CheckRAMIRQ(s_state.transfer_address))
       {
-        CheckForLateRAMIRQs();
+        DEBUG_LOG("Trigger IRQ @ {:08X} {:04X} from transfer on IRQ enable", s_state.transfer_address,
+                  s_state.transfer_address / 8);
+        TriggerRAMIRQ();
       }
 
       UpdateEventInterval();
@@ -1030,6 +1076,22 @@ void SPU::WriteRegister(u32 offset, u16 value)
     }
     break;
 
+    case 0x1F801DB8 - SPU_BASE:
+    {
+      DEBUG_LOG("SPU current main left volume register <- 0x{:04X}", value);
+      GeneratePendingSamples();
+      s_state.main_volume_left.current_level = static_cast<s16>(value);
+    }
+    break;
+
+    case 0x1F801DBA - SPU_BASE:
+    {
+      DEBUG_LOG("SPU current main right volume register <- 0x{:04X}", value);
+      GeneratePendingSamples();
+      s_state.main_volume_right.current_level = static_cast<s16>(value);
+    }
+    break;
+
       // read-only registers
     case 0x1F801DAE - SPU_BASE:
     {
@@ -1053,6 +1115,17 @@ void SPU::WriteRegister(u32 offset, u16 value)
         return;
       }
 
+      if (offset >= (0x1F801DBC - SPU_BASE) && offset < (0x1F801DC0 - SPU_BASE))
+      {
+        s_state.unused_registers_dbc[(offset - (0x1F801DBC - SPU_BASE)) / 2] = value;
+        return;
+      }
+      if (offset >= (0x1F801E60 - SPU_BASE) && offset < (0x1F801E80 - SPU_BASE))
+      {
+        s_state.unused_registers_e60[(offset - (0x1F801E60 - SPU_BASE)) / 2] = value;
+        return;
+      }
+
       DEV_LOG("Unknown SPU register write: offset 0x{:X} (address 0x{:08X}) value 0x{:04X}", offset, offset | SPU_BASE,
               value);
       return;
@@ -1068,7 +1141,7 @@ u16 SPU::ReadVoiceRegister(u32 offset)
 
   // ADSR volume needs to be updated when reading. A voice might be off as well, but key on is pending.
   const Voice& voice = s_state.voices[voice_index];
-  if (reg_index >= 6 && (voice.IsOn() || s_state.key_on_register & (1u << voice_index)))
+  if (reg_index >= 6 && (voice.IsOn() || s_state.key_on_register & (1u << voice_index) || s_state.SPUCNT.irq9_enable))
     GeneratePendingSamples();
 
   TRACE_LOG("Read voice {} register {} -> 0x{:02X}", voice_index, reg_index, voice.regs.index[reg_index]);
@@ -1083,7 +1156,7 @@ void SPU::WriteVoiceRegister(u32 offset, u16 value)
   DebugAssert(voice_index < 24);
 
   Voice& voice = s_state.voices[voice_index];
-  if (voice.IsOn() || s_state.key_on_register & (1u << voice_index))
+  if (voice.IsOn() || s_state.key_on_register & (1u << voice_index) || s_state.SPUCNT.irq9_enable)
     GeneratePendingSamples();
 
   switch (reg_index)
@@ -1145,22 +1218,9 @@ void SPU::WriteVoiceRegister(u32 offset, u16 value)
 
     case 0x0E: // repeat address
     {
-      // There is a short window of time here between the voice being keyed on and the first block finishing decoding
-      // where setting the repeat address will *NOT* ignore the block/loop start flag. Games sensitive to this are:
-      //  - The Misadventures of Tron Bonne
-      //  - Re-Loaded - The Hardcore Sequel
-      //  - Valkyrie Profile
-
-      const bool ignore_loop_address = voice.IsOn() && !voice.is_first_block;
       DEBUG_LOG("SPU voice {} ADPCM repeat address <- 0x{:04X}", voice_index, value);
       voice.regs.adpcm_repeat_address = value;
-      voice.ignore_loop_address |= ignore_loop_address;
-
-      if (!ignore_loop_address)
-      {
-        DEV_LOG("Not ignoring loop address, the ADPCM repeat address of 0x{:04X} for voice {} will be overwritten",
-                value, voice_index);
-      }
+      voice.ignore_loop_address = true;
     }
     break;
 
@@ -1258,13 +1318,13 @@ void SPU::IncrementCaptureBufferPosition()
 
 ALWAYS_INLINE_RELEASE void SPU::ExecuteFIFOReadFromRAM(TickCount& ticks)
 {
-  while (ticks > 0 && !s_state.transfer_fifo.IsFull())
+  while (ticks >= TRANSFER_READ_TICKS_PER_HALFWORD && !s_state.transfer_fifo.IsFull())
   {
     u16 value;
     std::memcpy(&value, &s_ram[s_state.transfer_address], sizeof(u16));
     s_state.transfer_address = (s_state.transfer_address + sizeof(u16)) & RAM_MASK;
     s_state.transfer_fifo.Push(value);
-    ticks -= TRANSFER_TICKS_PER_HALFWORD;
+    ticks -= TRANSFER_READ_TICKS_PER_HALFWORD;
 
     if (IsRAMIRQTriggerable() && CheckRAMIRQ(s_state.transfer_address))
     {
@@ -1277,12 +1337,12 @@ ALWAYS_INLINE_RELEASE void SPU::ExecuteFIFOReadFromRAM(TickCount& ticks)
 
 ALWAYS_INLINE_RELEASE void SPU::ExecuteFIFOWriteToRAM(TickCount& ticks)
 {
-  while (ticks > 0 && !s_state.transfer_fifo.IsEmpty())
+  while (ticks >= TRANSFER_WRITE_TICKS_PER_HALFWORD && !s_state.transfer_fifo.IsEmpty())
   {
     u16 value = s_state.transfer_fifo.Pop();
     std::memcpy(&s_ram[s_state.transfer_address], &value, sizeof(u16));
     s_state.transfer_address = (s_state.transfer_address + sizeof(u16)) & RAM_MASK;
-    ticks -= TRANSFER_TICKS_PER_HALFWORD;
+    ticks -= TRANSFER_WRITE_TICKS_PER_HALFWORD;
 
     if (IsRAMIRQTriggerable() && CheckRAMIRQ(s_state.transfer_address))
     {
@@ -1293,68 +1353,102 @@ ALWAYS_INLINE_RELEASE void SPU::ExecuteFIFOWriteToRAM(TickCount& ticks)
   }
 }
 
-void SPU::ExecuteTransfer(void* param, TickCount ticks, TickCount ticks_late)
+bool SPU::IsTransferBlocked()
 {
-  const RAMTransferMode mode = s_state.SPUCNT.ram_transfer_mode;
-  DebugAssert(mode != RAMTransferMode::Stopped);
-  InternalGeneratePendingSamples();
+  return (s_state.SPUCNT.ram_transfer_mode == RAMTransferMode::DMARead) ? s_state.transfer_fifo.IsFull() :
+                                                                          s_state.transfer_fifo.IsEmpty();
+}
 
-  if (mode == RAMTransferMode::DMARead)
+TickCount SPU::GetTransferTicksPerHalfword()
+{
+  return (s_state.SPUCNT.ram_transfer_mode == RAMTransferMode::DMARead) ? TRANSFER_READ_TICKS_PER_HALFWORD :
+                                                                          TRANSFER_WRITE_TICKS_PER_HALFWORD;
+}
+
+void SPU::RunTransfer(TickCount ticks, bool count_dma_time)
+{
+  const bool reading = (s_state.SPUCNT.ram_transfer_mode == RAMTransferMode::DMARead);
+  ticks += s_state.transfer_ticks_carry;
+  while (ticks >= GetTransferTicksPerHalfword() && !IsTransferBlocked())
   {
-    while (ticks > 0 && !s_state.transfer_fifo.IsFull())
-    {
+    if (reading)
       ExecuteFIFOReadFromRAM(ticks);
+    else
+      ExecuteFIFOWriteToRAM(ticks);
 
-      // this can result in the FIFO being emptied, hence double the while loop
+    if (count_dma_time)
+      UpdateDMARequestInTransfer(&ticks);
+    else
       UpdateDMARequest();
-    }
+  }
 
-    // we're done if we have no more data to read
-    if (s_state.transfer_fifo.IsFull())
-    {
-      s_state.SPUSTAT.transfer_busy = false;
-      s_state.transfer_event.Deactivate();
-      return;
-    }
+  s_state.transfer_ticks_carry = IsTransferBlocked() ? 0 : std::max<TickCount>(ticks, 0);
+}
 
-    s_state.SPUSTAT.transfer_busy = true;
-    const TickCount ticks_until_complete =
-      TickCount(s_state.transfer_fifo.GetSpace() * u32(TRANSFER_TICKS_PER_HALFWORD)) + ((ticks < 0) ? -ticks : 0);
-    s_state.transfer_event.Schedule(ticks_until_complete);
+void SPU::RunTransferUntilFrame(u32 remaining_frames)
+{
+  TickCount frame_ticks_before_now;
+  if (g_settings.cpu_overclock_active)
+  {
+    const u64 sub_ticks = static_cast<u64>(remaining_frames - 1) * static_cast<u32>(s_state.cpu_tick_divider) +
+                          static_cast<u32>(s_state.ticks_carry);
+    frame_ticks_before_now = static_cast<TickCount>(sub_ticks / g_settings.cpu_overclock_denominator);
   }
   else
   {
-    // write the fifo to ram, request dma again when empty
-    while (ticks > 0 && !s_state.transfer_fifo.IsEmpty())
-    {
-      ExecuteFIFOWriteToRAM(ticks);
-
-      // similar deal here, the FIFO can be written out in a long slice
-      UpdateDMARequest();
-    }
-
-    // we're done if we have no more data to write
-    if (s_state.transfer_fifo.IsEmpty())
-    {
-      s_state.SPUSTAT.transfer_busy = false;
-      s_state.transfer_event.Deactivate();
-      return;
-    }
-
-    s_state.SPUSTAT.transfer_busy = true;
-    const TickCount ticks_until_complete =
-      TickCount(s_state.transfer_fifo.GetSize() * u32(TRANSFER_TICKS_PER_HALFWORD)) + ((ticks < 0) ? -ticks : 0);
-    s_state.transfer_event.Schedule(ticks_until_complete);
+    frame_ticks_before_now =
+      static_cast<TickCount>((remaining_frames - 1) * SYSCLK_TICKS_PER_SPU_TICK) + s_state.ticks_carry;
   }
+
+  const TickCount target = s_state.transfer_event.GetTicksSinceLastExecution() - frame_ticks_before_now;
+  if (target <= s_state.transfer_ticks_consumed)
+    return;
+
+  RunTransfer(target - s_state.transfer_ticks_consumed, false);
+  s_state.transfer_ticks_consumed = target;
+}
+
+void SPU::ExecuteTransfer(void* param, TickCount ticks, TickCount ticks_late)
+{
+  DebugAssert(s_state.SPUCNT.ram_transfer_mode != RAMTransferMode::Stopped);
+  InternalGeneratePendingSamples();
+
+  RunTransfer(std::max<TickCount>(ticks - s_state.transfer_ticks_consumed, 0), true);
+  s_state.transfer_ticks_consumed = 0;
+
+  const bool reading = (s_state.SPUCNT.ram_transfer_mode == RAMTransferMode::DMARead);
+  if (IsTransferBlocked())
+  {
+    s_state.SPUSTAT.transfer_busy = false;
+    s_state.transfer_event.Deactivate();
+    return;
+  }
+
+  s_state.SPUSTAT.transfer_busy = reading;
+  const u32 halfwords_left = reading ? s_state.transfer_fifo.GetSpace() : s_state.transfer_fifo.GetSize();
+  s_state.transfer_event.Schedule(std::max<TickCount>(
+    static_cast<TickCount>(halfwords_left * static_cast<u32>(GetTransferTicksPerHalfword())) -
+      s_state.transfer_ticks_carry,
+    1));
 }
 
 void SPU::ManualTransferWrite(u16 value)
 {
+  InternalGeneratePendingSamples();
+
   if (!s_state.transfer_fifo.IsEmpty() && s_state.SPUCNT.ram_transfer_mode != RAMTransferMode::DMARead)
   {
     WARNING_LOG("FIFO not empty on manual SPU write, draining to hopefully avoid corruption. Game is silly.");
     if (s_state.SPUCNT.ram_transfer_mode != RAMTransferMode::Stopped)
-      ExecuteTransfer(nullptr, std::numeric_limits<s32>::max(), 0);
+    {
+      TickCount ticks = std::numeric_limits<TickCount>::max();
+      while (!s_state.transfer_fifo.IsEmpty())
+      {
+        ExecuteFIFOWriteToRAM(ticks);
+        UpdateDMARequest();
+      }
+      UpdateTransferEvent();
+    }
   }
 
   std::memcpy(&s_ram[s_state.transfer_address], &value, sizeof(u16));
@@ -1368,7 +1462,17 @@ void SPU::ManualTransferWrite(u16 value)
   }
 }
 
-void SPU::UpdateTransferEvent()
+void SPU::StartTransferEvent(u32 ticks, bool keep_progress)
+{
+  if (!keep_progress)
+  {
+    s_state.transfer_ticks_carry = 0;
+    s_state.transfer_ticks_consumed = 0;
+  }
+  s_state.transfer_event.Schedule(static_cast<TickCount>(ticks));
+}
+
+void SPU::UpdateTransferEvent(bool keep_progress)
 {
   const RAMTransferMode mode = s_state.SPUCNT.ram_transfer_mode;
   if (mode == RAMTransferMode::Stopped)
@@ -1381,7 +1485,7 @@ void SPU::UpdateTransferEvent()
     if (s_state.transfer_fifo.IsFull())
       s_state.transfer_event.Deactivate();
     else if (!s_state.transfer_event.IsActive())
-      s_state.transfer_event.Schedule(TickCount(s_state.transfer_fifo.GetSpace() * u32(TRANSFER_TICKS_PER_HALFWORD)));
+      StartTransferEvent(s_state.transfer_fifo.GetSpace() * u32(TRANSFER_READ_TICKS_PER_HALFWORD), keep_progress);
   }
   else
   {
@@ -1389,10 +1493,17 @@ void SPU::UpdateTransferEvent()
     if (s_state.transfer_fifo.IsEmpty())
       s_state.transfer_event.Deactivate();
     else if (!s_state.transfer_event.IsActive())
-      s_state.transfer_event.Schedule(TickCount(s_state.transfer_fifo.GetSize() * u32(TRANSFER_TICKS_PER_HALFWORD)));
+      StartTransferEvent(s_state.transfer_fifo.GetSize() * u32(TRANSFER_WRITE_TICKS_PER_HALFWORD), keep_progress);
   }
 
-  s_state.SPUSTAT.transfer_busy = s_state.transfer_event.IsActive();
+  s_state.SPUSTAT.transfer_busy = (mode == RAMTransferMode::DMARead) && s_state.transfer_event.IsActive();
+}
+
+void SPU::UpdateDMARequestInTransfer(TickCount* ticks)
+{
+  const TickCount pending_before = CPU::GetPendingTicks();
+  UpdateDMARequest();
+  *ticks -= CPU::GetPendingTicks() - pending_before;
 }
 
 void SPU::UpdateDMARequest()
@@ -1472,7 +1583,7 @@ void SPU::DMARead(u32* words, u32 word_count)
   u32 halfword_count = word_count * 2;
 
   const u32 size = s_state.transfer_fifo.GetSize();
-  if (word_count > size)
+  if (halfword_count > size)
   {
     u16 fill_value = 0;
     if (size > 0)
@@ -1528,8 +1639,7 @@ void SPU::InternalGeneratePendingSamples()
   }
   else
   {
-    frames_to_execute =
-      (s_state.tick_event.GetTicksSinceLastExecution() + s_state.ticks_carry) / SYSCLK_TICKS_PER_SPU_TICK;
+    frames_to_execute = (ticks_pending + s_state.ticks_carry) / SYSCLK_TICKS_PER_SPU_TICK;
   }
 
   const bool force_exec = (frames_to_execute > 0);
@@ -1565,6 +1675,7 @@ void SPU::Voice::KeyOn()
 {
   current_address = regs.adpcm_start_address & ~u16(1);
   counter.bits = 0;
+  counter.sample_index = 3;
   regs.adsr_volume = 0;
   adpcm_last_samples.fill(0);
 
@@ -1573,8 +1684,8 @@ void SPU::Voice::KeyOn()
               static_cast<s16>(0));
 
   has_samples = false;
-  is_first_block = true;
   ignore_loop_address = false;
+  key_on_delay = KEY_ON_START_DELAY_SAMPLES;
   adsr_phase = ADSRPhase::Attack;
   UpdateADSREnvelope();
 }
@@ -1590,6 +1701,7 @@ void SPU::Voice::KeyOff()
 
 void SPU::Voice::ForceOff()
 {
+  key_on_delay = 0;
   if (adsr_phase == ADSRPhase::Off)
     return;
 
@@ -1664,6 +1776,45 @@ static constexpr ADSRTableEntries ComputeADSRTableEntries()
 
 static constexpr ADSRTableEntries s_adsr_table = ComputeADSRTableEntries();
 
+static bool IsValidBoolByte(const bool& value)
+{
+  u8 byte;
+  std::memcpy(&byte, &value, sizeof(byte));
+  return (byte <= 1);
+}
+
+bool SPU::VolumeEnvelope::IsValid() const
+{
+  return (rate < NUM_ADSR_TABLE_ENTRIES && IsValidBoolByte(decreasing) && IsValidBoolByte(exponential) &&
+          IsValidBoolByte(phase_invert));
+}
+
+bool SPU::VolumeSweep::IsValid() const
+{
+  return (envelope.IsValid() && IsValidBoolByte(envelope_active));
+}
+
+bool SPU::IsLoadedStateValid()
+{
+  if (s_state.ticks_carry < 0 || s_state.transfer_address >= RAM_SIZE || (s_state.transfer_address & 1u) != 0 ||
+      static_cast<u32>(s_state.reverb_resample_buffer_position) > 0x3F || !s_state.main_volume_left.IsValid() ||
+      !s_state.main_volume_right.IsValid())
+  {
+    return false;
+  }
+
+  for (const Voice& v : s_state.voices)
+  {
+    if (v.counter.sample_index >= NUM_SAMPLES_PER_ADPCM_BLOCK || !v.left_volume.IsValid() ||
+        !v.right_volume.IsValid() || !v.adsr_envelope.IsValid())
+    {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 void SPU::VolumeEnvelope::Reset(u8 rate_, bool decreasing_, bool exponential_, bool phase_invert_)
 {
   rate = rate_;
@@ -1712,7 +1863,12 @@ s16 SPU::VolumeEnvelope::Tick(s16 current_level)
     }
   }
 
-  if (phase_invert) [[unlikely]]
+  if (phase_invert && exponential && decreasing && current_level < 0) [[unlikely]]
+  {
+    return static_cast<s16>(
+      std::clamp<s32>(static_cast<s32>(current_level) + this_step, -ENVELOPE_MAX_VOLUME, ENVELOPE_MIN_VOLUME));
+  }
+  else if (phase_invert && !(exponential && decreasing)) [[unlikely]]
   {
     return static_cast<s16>(
       std::clamp<s32>(static_cast<s32>(current_level) - this_step, -ENVELOPE_MAX_VOLUME, ENVELOPE_MIN_VOLUME));
@@ -1733,8 +1889,7 @@ void SPU::VolumeSweep::Reset(VolumeRegister reg)
     return;
   }
 
-  envelope.Reset(reg.sweep_rate, reg.sweep_direction_decrease, reg.sweep_exponential,
-                 !(reg.sweep_exponential && reg.sweep_direction_decrease) && reg.sweep_phase_negative);
+  envelope.Reset(reg.sweep_rate, reg.sweep_direction_decrease, reg.sweep_exponential, reg.sweep_phase_negative);
   envelope_active = true;
 }
 
@@ -1744,8 +1899,18 @@ void SPU::VolumeSweep::Tick()
     return;
 
   current_level = envelope.Tick(current_level);
-  envelope_active =
-    (envelope.decreasing ? (current_level > ENVELOPE_MIN_VOLUME) : (current_level < ENVELOPE_MAX_VOLUME));
+  if (envelope.phase_invert && envelope.exponential && envelope.decreasing && current_level < 0)
+  {
+    const s32 table_step = s_adsr_table[1][envelope.rate].step;
+    envelope_active = ((table_step * current_level) >> 15) != 0;
+  }
+  else if (envelope.phase_invert && !(envelope.exponential && envelope.decreasing))
+  {
+    envelope_active = (envelope.decreasing ? (current_level < 0) : (current_level > -ENVELOPE_MAX_VOLUME));
+  }
+  else
+    envelope_active =
+      (envelope.decreasing ? (current_level > ENVELOPE_MIN_VOLUME) : (current_level < ENVELOPE_MAX_VOLUME));
 }
 
 void SPU::Voice::UpdateADSREnvelope()
@@ -1790,8 +1955,9 @@ void SPU::Voice::TickADSR()
 
   if (adsr_phase != ADSRPhase::Sustain)
   {
-    const bool reached_target =
-      adsr_envelope.decreasing ? (regs.adsr_volume <= adsr_target) : (regs.adsr_volume >= adsr_target);
+    const bool reached_target = (adsr_phase == ADSRPhase::Decay) ? (regs.adsr_volume < adsr_target) :
+                                adsr_envelope.decreasing         ? (regs.adsr_volume <= adsr_target) :
+                                                                   (regs.adsr_volume >= adsr_target);
     if (reached_target)
     {
       adsr_phase = GetNextADSRPhase(adsr_phase);
@@ -1802,8 +1968,8 @@ void SPU::Voice::TickADSR()
 
 void SPU::Voice::DecodeBlock(const ADPCMBlock& block)
 {
-  static constexpr std::array<s32, 5> filter_table_pos = {{0, 60, 115, 98, 122}};
-  static constexpr std::array<s32, 5> filter_table_neg = {{0, 0, -52, -55, -60}};
+  static constexpr std::array<s32, 16> filter_table_pos = {{0, 60, 115, 98, 122, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}};
+  static constexpr std::array<s32, 16> filter_table_neg = {{0, 0, -52, -55, -60, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}};
 
   // store samples needed for interpolation
   current_block_samples[2] = current_block_samples[NUM_SAMPLES_FROM_LAST_ADPCM_BLOCK + NUM_SAMPLES_PER_ADPCM_BLOCK - 1];
@@ -1905,11 +2071,11 @@ s32 SPU::Voice::Interpolate() const
   const u8 i = counter.interpolation_index;
   const u32 s = NUM_SAMPLES_FROM_LAST_ADPCM_BLOCK + ZeroExtend32(counter.sample_index.GetValue());
 
-  s32 out = s32(gauss[0x0FF - i]) * s32(current_block_samples[s - 3]);
-  out += s32(gauss[0x1FF - i]) * s32(current_block_samples[s - 2]);
-  out += s32(gauss[0x100 + i]) * s32(current_block_samples[s - 1]);
-  out += s32(gauss[0x000 + i]) * s32(current_block_samples[s - 0]);
-  return out >> 15;
+  s32 out = (s32(gauss[0x0FF - i]) * s32(current_block_samples[s - 3])) >> 14;
+  out += (s32(gauss[0x1FF - i]) * s32(current_block_samples[s - 2])) >> 14;
+  out += (s32(gauss[0x100 + i]) * s32(current_block_samples[s - 1])) >> 14;
+  out += (s32(gauss[0x000 + i]) * s32(current_block_samples[s - 0])) >> 14;
+  return out >> 1;
 }
 
 void SPU::ReadADPCMBlock(u16 address, ADPCMBlock* block)
@@ -1959,6 +2125,24 @@ ALWAYS_INLINE_RELEASE std::tuple<s32, s32> SPU::SampleVoice(u32 voice_index)
 
   if (!voice.has_samples)
   {
+    if (voice.key_on_delay > 0)
+    {
+      if (voice.key_on_delay == KEY_ON_START_DELAY_SAMPLES)
+        s_state.endx_register &= ~(1u << voice_index);
+
+      if (voice.key_on_delay >= 2)
+      {
+        voice.ignore_loop_address = false;
+        const ADPCMFlags first_block_flags{s_ram[(ZeroExtend32(voice.current_address) * 8 + 1) & RAM_MASK]};
+        if (first_block_flags.loop_start)
+          voice.regs.adpcm_repeat_address = voice.current_address;
+      }
+
+      voice.key_on_delay--;
+      voice.last_volume = 0;
+      return {};
+    }
+
     ADPCMBlock block;
     ReadADPCMBlock(voice.current_address, &block);
     voice.DecodeBlock(block);
@@ -2014,7 +2198,6 @@ ALWAYS_INLINE_RELEASE std::tuple<s32, s32> SPU::SampleVoice(u32 voice_index)
     // next block
     voice.counter.sample_index -= NUM_SAMPLES_PER_ADPCM_BLOCK;
     voice.has_samples = false;
-    voice.is_first_block = false;
     voice.current_address += 2;
 
     // handle flags
@@ -2062,27 +2245,24 @@ ALWAYS_INLINE_RELEASE std::tuple<s32, s32> SPU::SampleVoice(u32 voice_index)
 
 void SPU::UpdateNoise()
 {
-  // Dr Hell's noise waveform, implementation borrowed from pcsx-r.
-  static constexpr std::array<u8, 64> noise_wave_add = {
-    {1, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0,
-     0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1}};
-  static constexpr std::array<u8, 5> noise_freq_add = {{0, 84, 140, 180, 210}};
+  // Clock slots within the eight eighths of a noise period, by step: quarter starts plus extra halfway points.
+  static constexpr std::array<u8, 4> clocked_eighths_by_step = {{0b01010101, 0b01010111, 0b01110111, 0b01111111}};
 
   const u32 noise_clock = s_state.SPUCNT.noise_clock;
-  const u32 level = (0x8000u >> (noise_clock >> 2)) << 16;
-
-  s_state.noise_count += 0x10000u + noise_freq_add[noise_clock & 3u];
-  if ((s_state.noise_count & 0xFFFFu) >= noise_freq_add[4])
+  const u32 shift = noise_clock >> 2;
+  const u32 position = s_state.noise_count++;
+  if (shift < 15)
   {
-    s_state.noise_count += 0x10000;
-    s_state.noise_count -= noise_freq_add[noise_clock & 3u];
+    const u32 eighth_shift = 14 - shift;
+    const bool at_eighth_boundary = (position & ((1u << eighth_shift) - 1u)) == 0;
+    const u32 eighth = (position >> eighth_shift) & 7u;
+    if (!at_eighth_boundary || !(clocked_eighths_by_step[noise_clock & 3u] & (1u << eighth)))
+      return;
   }
 
-  if (s_state.noise_count < level)
-    return;
-
-  s_state.noise_count %= level;
-  s_state.noise_level = (s_state.noise_level << 1) | noise_wave_add[(s_state.noise_level >> 10) & 63u];
+  const u32 level = s_state.noise_level;
+  const u32 feedback = ((level >> 15) ^ (level >> 12) ^ (level >> 11) ^ (level >> 10) ^ 1u) & 1u;
+  s_state.noise_level = (level << 1) | feedback;
 }
 
 /************************************************************************/
@@ -2309,7 +2489,12 @@ void SPU::Execute(void* param, TickCount ticks, TickCount ticks_late)
     output_stream->BeginWrite(&output_frame_start, &output_frame_space);
 
     s16* output_frame = output_frame_start;
-    const u32 frames_in_this_batch = std::min(remaining_frames, output_frame_space);
+    u32 frames_in_this_batch = std::min(remaining_frames, output_frame_space);
+    if (s_state.transfer_event.IsActive()) [[unlikely]]
+    {
+      RunTransferUntilFrame(remaining_frames);
+      frames_in_this_batch = 1;
+    }
     for (u32 i = 0; i < frames_in_this_batch; i++)
     {
       s32 left_sum = 0;
@@ -2383,8 +2568,8 @@ void SPU::Execute(void* param, TickCount ticks, TickCount ticks_late)
       WriteToCaptureBuffer(3, static_cast<s16>(Clamp16(s_state.voices[3].last_volume)));
       IncrementCaptureBufferPosition();
 
-      // Key off/on voices after the first frame.
-      if (i == 0 && (s_state.key_off_register != 0 || s_state.key_on_register != 0))
+      if ((s_state.capture_buffer_position & 2u) == 0 &&
+          (s_state.key_off_register != 0 || s_state.key_on_register != 0))
       {
         u32 key_off_register = s_state.key_off_register;
         s_state.key_off_register = 0;
@@ -2399,10 +2584,7 @@ void SPU::Execute(void* param, TickCount ticks, TickCount ticks_late)
           key_off_register >>= 1;
 
           if (key_on_register & 1u)
-          {
-            s_state.endx_register &= ~(1u << voice);
             s_state.voices[voice].KeyOn();
-          }
           key_on_register >>= 1;
         }
       }
@@ -2434,15 +2616,13 @@ void SPU::UpdateEventInterval()
   if (s_state.tick_event.IsActive() && s_state.tick_event.GetInterval() == interval_ticks)
     return;
 
-  // Ensure all pending ticks have been executed, since we won't get them back after rescheduling.
-  s_state.tick_event.InvokeEarly(true);
   s_state.tick_event.SetInterval(interval_ticks);
 
-  TickCount downcount = interval_ticks;
-  if (!g_settings.cpu_overclock_active)
-    downcount -= s_state.ticks_carry;
-
-  s_state.tick_event.Schedule(downcount);
+  const TickCount carry_ticks =
+    g_settings.cpu_overclock_active ?
+      (s_state.ticks_carry / static_cast<TickCount>(g_settings.cpu_overclock_denominator)) :
+      s_state.ticks_carry;
+  s_state.tick_event.Schedule(interval_ticks - carry_ticks);
 }
 
 void SPU::DrawDebugStateWindow()

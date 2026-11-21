@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2019-2024 Connor McLaughlin <stenzek@gmail.com> and contributors.
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #pragma once
 
@@ -115,6 +115,8 @@ private:
     AnalogII,
     AnalogL
   };
+
+  void SetAxisState(Axis axis, u8 value);
 
   std::array<u8, static_cast<u8>(Axis::Count)> m_axis_state{};
 

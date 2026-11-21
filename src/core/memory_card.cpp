@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2019-2024 Connor McLaughlin <stenzek@gmail.com>
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #include "memory_card.h"
 #include "host.h"
@@ -31,6 +31,13 @@ MemoryCard::MemoryCard()
 MemoryCard::~MemoryCard()
 {
   SaveIfChanged(false);
+  WaitForPendingSave();
+}
+
+void MemoryCard::WaitForPendingSave()
+{
+  if (m_pending_save.valid())
+    m_pending_save.wait();
 }
 
 TickCount MemoryCard::GetSaveDelayInTicks()
@@ -58,6 +65,9 @@ bool MemoryCard::DoState(StateWrapper& sw)
   sw.Do(&m_last_byte);
   sw.Do(&m_data);
   sw.Do(&m_changed);
+
+  if (sw.IsReading() && (m_address > 0x3FF || m_sector_offset >= MemoryCardImage::FRAME_SIZE))
+    return false;
 
   return !sw.HasError();
 }
@@ -161,7 +171,7 @@ bool MemoryCard::Transfer(const u8 data_in, u8* data_out)
     break;
 
       FIXED_REPLY_STATE(State::ReadChecksum, m_checksum, true, State::ReadEnd);
-      FIXED_REPLY_STATE(State::ReadEnd, 0x47, true, State::Idle);
+      FIXED_REPLY_STATE(State::ReadEnd, 0x47, false, State::Idle);
 
       // write state
 
@@ -201,7 +211,7 @@ bool MemoryCard::Transfer(const u8 data_in, u8* data_out)
     }
     break;
 
-      FIXED_REPLY_STATE(State::WriteChecksum, m_checksum, true, State::WriteACK1);
+      FIXED_REPLY_STATE(State::WriteChecksum, m_last_byte, true, State::WriteACK1);
       FIXED_REPLY_STATE(State::WriteACK1, 0x5C, true, State::WriteACK2);
       FIXED_REPLY_STATE(State::WriteACK2, 0x5D, true, State::WriteEnd);
       FIXED_REPLY_STATE(State::WriteEnd, 0x47, false, State::Idle);
@@ -214,7 +224,7 @@ bool MemoryCard::Transfer(const u8 data_in, u8* data_out)
       FIXED_REPLY_STATE(State::GetID1, 0x04, true, State::GetID2);
       FIXED_REPLY_STATE(State::GetID2, 0x00, true, State::GetID3);
       FIXED_REPLY_STATE(State::GetID3, 0x00, true, State::GetID4);
-      FIXED_REPLY_STATE(State::GetID4, 0x80, true, State::Command);
+      FIXED_REPLY_STATE(State::GetID4, 0x80, false, State::Idle);
 
       // new command
     case State::Idle:
@@ -345,27 +355,32 @@ bool MemoryCard::SaveIfChanged(bool display_osd_message)
 
   INFO_LOG("Saving memory card to {}...", Path::GetFileTitle(m_filename));
 
-  Error error;
-  if (!MemoryCardImage::SaveToFile(m_data, m_filename.c_str(), &error))
-  {
-    if (display_osd_message)
+  WaitForPendingSave();
+  m_pending_save = std::async(std::launch::async, [data = m_data, filename = m_filename, display_osd_message,
+                                                   osd_key = std::move(osd_key),
+                                                   display_name = std::move(display_name)]() mutable {
+    Error error;
+    if (!MemoryCardImage::SaveToFile(data, filename.c_str(), &error))
     {
-      Host::AddIconOSDMessage(std::move(osd_key), ICON_FA_SD_CARD,
-                              fmt::format(TRANSLATE_FS("OSDMessage", "Failed to save memory card to '{}': {}"),
-                                          Path::GetFileName(display_name), error.GetDescription()),
-                              Host::OSD_ERROR_DURATION);
+      ERROR_LOG("Failed to save memory card to {}: {}", filename, error.GetDescription());
+      if (display_osd_message)
+      {
+        Host::AddIconOSDMessage(std::move(osd_key), ICON_FA_SD_CARD,
+                                fmt::format(TRANSLATE_FS("OSDMessage", "Failed to save memory card to '{}': {}"),
+                                            Path::GetFileName(display_name), error.GetDescription()),
+                                Host::OSD_ERROR_DURATION);
+      }
+      return;
     }
 
-    return false;
-  }
-
-  if (display_osd_message)
-  {
-    Host::AddIconOSDMessage(
-      std::move(osd_key), ICON_FA_SD_CARD,
-      fmt::format(TRANSLATE_FS("OSDMessage", "Saved memory card to '{}'."), Path::GetFileName(display_name)),
-      Host::OSD_QUICK_DURATION);
-  }
+    if (display_osd_message)
+    {
+      Host::AddIconOSDMessage(
+        std::move(osd_key), ICON_FA_SD_CARD,
+        fmt::format(TRANSLATE_FS("OSDMessage", "Saved memory card to '{}'."), Path::GetFileName(display_name)),
+        Host::OSD_QUICK_DURATION);
+    }
+  });
 
   return true;
 }

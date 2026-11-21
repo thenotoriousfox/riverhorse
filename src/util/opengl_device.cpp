@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2019-2023 Connor McLaughlin <stenzek@gmail.com>
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #include "opengl_device.h"
 #include "opengl_pipeline.h"
@@ -599,7 +599,9 @@ void OpenGLDevice::SetSwapInterval()
     return;
 
   // Window framebuffer has to be bound to call SetSwapInterval.
-  const s32 interval = static_cast<s32>(m_vsync_mode == GPUVSyncMode::FIFO);
+  s32 interval = static_cast<s32>(IsVSyncModeBlocking());
+  if (m_vsync_mode == GPUVSyncMode::FIFORelaxed && m_gl_context->SupportsNegativeSwapInterval())
+    interval = -1;
   GLint current_fbo = 0;
   glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &current_fbo);
   glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
@@ -1240,4 +1242,14 @@ void OpenGLDevice::UpdateViewport()
 void OpenGLDevice::UpdateScissor()
 {
   glScissor(m_last_scissor.left, m_last_scissor.top, m_last_scissor.width(), m_last_scissor.height());
+}
+
+void OpenGLDevice::ReleaseThread()
+{
+  m_gl_context->DoneCurrent();
+}
+
+bool OpenGLDevice::AcquireThread()
+{
+  return m_gl_context->MakeCurrent();
 }

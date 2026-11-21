@@ -1,15 +1,19 @@
 // SPDX-FileCopyrightText: 2019-2024 Connor McLaughlin <stenzek@gmail.com>
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #pragma once
 
+#include "bios.h"
 #include "settings.h"
 #include "types.h"
 
 #include "util/image.h"
 
+#include "common/heap_array.h"
+
 #include <memory>
 #include <optional>
+#include <span>
 #include <string>
 
 class ByteStream;
@@ -196,6 +200,9 @@ u32 GetGlobalTickCounter();
 u32 GetFrameNumber();
 u32 GetInternalFrameNumber();
 void IncrementInternalFrameNumber();
+
+/// Called when the CD-ROM delivers a data sector to the CPU.
+void OnCDROMDataSectorRead();
 void FrameDone();
 
 const std::string& GetDiscPath();
@@ -204,6 +211,7 @@ const std::string& GetGameTitle();
 const std::string& GetExeOverride();
 const GameDatabase::Entry* GetGameDatabaseEntry();
 GameHash GetGameHash();
+const BIOS::ImageInfo::Hash& GetBIOSHash();
 bool IsRunningUnknownGame();
 BootMode GetBootMode();
 
@@ -259,6 +267,23 @@ bool SaveResumeState(Error* error);
 
 /// Runs the VM until the CPU execution is canceled.
 void Execute();
+
+void ExecuteFrame();
+
+size_t GetMaxSaveStateSize();
+
+struct MemorySaveState
+{
+  std::unique_ptr<GPUTexture> vram_texture;
+  DynamicHeapArray<u8> state_data;
+  size_t state_size = 0;
+};
+bool SaveMemoryState(MemorySaveState* mss);
+bool LoadMemoryState(const MemorySaveState& mss);
+bool SaveStateToMemory(std::span<u8> buffer, Error* error, size_t* written = nullptr);
+bool LoadStateFromMemory(std::span<const u8> buffer, Error* error);
+
+std::vector<std::string> GetGamePatchNames(const std::string& serial);
 
 void SingleStepCPU();
 
@@ -447,6 +472,7 @@ void HostDisplayResized();
 
 /// Renders the display.
 bool PresentDisplay(bool skip_present, bool explicit_present);
+void UpdatePerformanceCounters();
 void InvalidateDisplay();
 
 //////////////////////////////////////////////////////////////////////////

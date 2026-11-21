@@ -1,10 +1,11 @@
 // SPDX-FileCopyrightText: 2019-2023 Connor McLaughlin <stenzek@gmail.com>
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #include "cd_subchannel_replacement.h"
 #include "common/file_system.h"
 #include "common/log.h"
 #include "common/path.h"
+#include "common/string_util.h"
 #include <algorithm>
 #include <memory>
 Log_SetChannel(CDSubChannelReplacement);
@@ -128,6 +129,14 @@ bool CDSubChannelReplacement::LoadLSD(const std::string& path)
 
   INFO_LOG("Loaded {} replacement sectors from LSD '{}'", m_replacement_subq.size(), path);
   return true;
+}
+
+bool CDSubChannelReplacement::LoadFromFile(std::string_view path)
+{
+  const std::string filename(path);
+  if (StringUtil::EndsWithNoCase(path, ".lsd"))
+    return LoadLSD(filename);
+  return LoadSBI(filename);
 }
 
 bool CDSubChannelReplacement::LoadFromImagePath(std::string_view image_path)

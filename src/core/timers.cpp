@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2019-2022 Connor McLaughlin <stenzek@gmail.com>
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #include "timers.h"
 #include "gpu.h"
@@ -24,6 +24,9 @@ namespace Timers {
 namespace {
 
 static constexpr u32 NUM_TIMERS = 3;
+static constexpr u32 COUNTER_WRAP = 0x10000;
+static constexpr u8 TARGET_RESET_HOLD_TICKS = 2;
+static constexpr u8 WRITE_HOLD_TICKS = 1;
 
 enum class SyncMode : u8
 {
@@ -60,12 +63,17 @@ struct CounterState
   bool external_counting_enabled;
   bool counting_enabled;
   bool irq_done;
+  u8 hold_ticks;
 };
 
 } // namespace
 
-static void UpdateCountingEnabled(CounterState& cs);
-static void CheckForIRQ(u32 index, u32 old_counter);
+static void UpdateCountingEnabled(u32 index, CounterState& cs);
+static void CheckForIRQ(u32 index, u32 first_uncompared_value);
+static TickCount GetTicksUntilTarget(const CounterState& cs);
+static void SynchronizeGPUForRead(u32 index, const CounterState& cs);
+static u32 ConsumeHold(CounterState& cs, u32 ticks);
+static TickCount GetTicksUntilOverflow(const CounterState& cs);
 
 static void AddSysClkTicks(void*, TickCount sysclk_ticks, TickCount ticks_late);
 
@@ -105,9 +113,11 @@ void Timers::Reset()
     cs.counter = 0;
     cs.target = 0;
     cs.gate = false;
+    cs.use_external_clock = false;
     cs.external_counting_enabled = false;
     cs.counting_enabled = true;
     cs.irq_done = false;
+    cs.hold_ticks = 0;
   }
 
   s_state.sysclk_event.Deactivate();
@@ -128,6 +138,7 @@ bool Timers::DoState(StateWrapper& sw)
     sw.Do(&cs.external_counting_enabled);
     sw.Do(&cs.counting_enabled);
     sw.Do(&cs.irq_done);
+    sw.DoEx(&cs.hold_ticks, 74, static_cast<u8>(0));
   }
 
   sw.Do(&s_state.sysclk_ticks_carry);
@@ -173,7 +184,8 @@ void Timers::SetGate(u32 timer, bool state)
 
   // Because the gate prevents counting in or outside of the gate, we need a correct counter.
   // For reset, we _can_ skip it, until the gate clears.
-  if (!cs.use_external_clock && (cs.mode.sync_mode != SyncMode::ResetOnGateEnd || !state))
+  const bool counters_updated = (!cs.use_external_clock && (cs.mode.sync_mode != SyncMode::ResetOnGateEnd || !state));
+  if (counters_updated)
     s_state.sysclk_event.InvokeEarly();
 
   switch (cs.mode.sync_mode)
@@ -198,8 +210,9 @@ void Timers::SetGate(u32 timer, bool state)
       UnreachableCode();
   }
 
-  UpdateCountingEnabled(cs);
-  UpdateSysClkEvent();
+  UpdateCountingEnabled(timer, cs);
+  if (counters_updated)
+    UpdateSysClkEvent();
 }
 
 TickCount Timers::GetTicksUntilIRQ(u32 timer)
@@ -209,40 +222,96 @@ TickCount Timers::GetTicksUntilIRQ(u32 timer)
     return std::numeric_limits<TickCount>::max();
 
   TickCount ticks_until_irq = std::numeric_limits<TickCount>::max();
-  if (cs.mode.irq_at_target && cs.counter < cs.target)
-    ticks_until_irq = static_cast<TickCount>(cs.target - cs.counter);
+  if (cs.mode.irq_at_target)
+    ticks_until_irq = GetTicksUntilTarget(cs);
   if (cs.mode.irq_on_overflow)
-    ticks_until_irq = std::min(ticks_until_irq, static_cast<TickCount>(0xFFFFu - cs.counter));
+    ticks_until_irq = std::min(ticks_until_irq, GetTicksUntilOverflow(cs));
 
   return ticks_until_irq;
+}
+
+TickCount Timers::GetTicksUntilTarget(const CounterState& cs)
+{
+  return static_cast<TickCount>(cs.hold_ticks + ((cs.counter < cs.target) ? (cs.target - cs.counter) :
+                                                                            ((COUNTER_WRAP - cs.counter) + cs.target)));
+}
+
+TickCount Timers::GetTicksUntilOverflow(const CounterState& cs)
+{
+  return static_cast<TickCount>(cs.hold_ticks + (COUNTER_WRAP - cs.counter));
+}
+
+u32 Timers::ConsumeHold(CounterState& cs, u32 ticks)
+{
+  const u32 held = std::min<u32>(cs.hold_ticks, ticks);
+  cs.hold_ticks -= static_cast<u8>(held);
+  return ticks - held;
 }
 
 void Timers::AddTicks(u32 timer, TickCount count)
 {
   CounterState& cs = s_state.counters[timer];
-  const u32 old_counter = cs.counter;
-  cs.counter += static_cast<u32>(count);
-  CheckForIRQ(timer, old_counter);
+  u32 remaining = ConsumeHold(cs, static_cast<u32>(count));
+  if (!cs.mode.irq_pulse_n)
+  {
+    const u32 first_uncompared_value = cs.counter + 1;
+    cs.counter += remaining;
+    CheckForIRQ(timer, first_uncompared_value);
+    return;
+  }
+
+  while (remaining > 0)
+  {
+    const u32 next_reset = (cs.counter < cs.target) ? cs.target : COUNTER_WRAP;
+    const u32 step = std::min(next_reset - cs.counter, remaining);
+    const u32 first_uncompared_value = cs.counter + 1;
+    cs.counter += step;
+    remaining -= step;
+    CheckForIRQ(timer, first_uncompared_value);
+    remaining = ConsumeHold(cs, remaining);
+  }
 }
 
-void Timers::CheckForIRQ(u32 timer, u32 old_counter)
+void Timers::CheckForIRQ(u32 timer, u32 first_uncompared_value)
 {
   CounterState& cs = s_state.counters[timer];
 
+  bool overflowed = false;
+  if (cs.counter >= COUNTER_WRAP)
+  {
+    const bool started_past_target = (first_uncompared_value > cs.target);
+    overflowed = (!cs.mode.reset_at_target || started_past_target);
+    if (started_past_target)
+      cs.counter -= COUNTER_WRAP;
+    first_uncompared_value = 0;
+  }
+
   bool interrupt_request = false;
-  if (cs.counter >= cs.target && (old_counter < cs.target || cs.target == 0))
+  if (cs.counter >= cs.target && first_uncompared_value <= cs.target)
   {
     interrupt_request |= cs.mode.irq_at_target;
     cs.mode.reached_target = true;
 
-    if (cs.mode.reset_at_target && cs.target > 0)
-      cs.counter %= cs.target;
+    if (cs.mode.reset_at_target && cs.target > 0 && cs.target != 0xFFFFu)
+    {
+      if (cs.use_external_clock)
+      {
+        cs.counter %= cs.target;
+      }
+      else
+      {
+        const u32 ticks_since_reset = (cs.counter - cs.target) % (cs.target + TARGET_RESET_HOLD_TICKS);
+        cs.counter = (ticks_since_reset > TARGET_RESET_HOLD_TICKS) ? (ticks_since_reset - TARGET_RESET_HOLD_TICKS) : 0;
+        cs.hold_ticks = static_cast<u8>(
+          (ticks_since_reset < TARGET_RESET_HOLD_TICKS) ? (TARGET_RESET_HOLD_TICKS - ticks_since_reset) : 0);
+      }
+    }
   }
-  if (cs.counter >= 0xFFFF)
+  if (overflowed || cs.counter >= COUNTER_WRAP)
   {
     interrupt_request |= cs.mode.irq_on_overflow;
     cs.mode.reached_overflow = true;
-    cs.counter %= 0xFFFFu;
+    cs.counter &= 0xFFFFu;
   }
 
   if (interrupt_request)
@@ -262,9 +331,9 @@ void Timers::CheckForIRQ(u32 timer, u32 old_counter)
       cs.irq_done = true;
       cs.mode.interrupt_request_n = true;
     }
-    else
+    else if (!cs.irq_done || cs.mode.irq_repeat)
     {
-      // TODO: How does the non-repeat mode work here?
+      cs.irq_done = true;
       cs.mode.interrupt_request_n ^= true;
       if (!cs.mode.interrupt_request_n)
         DEBUG_LOG("Raising timer {} alternate IRQ", timer);
@@ -296,6 +365,22 @@ void Timers::AddSysClkTicks(void*, TickCount sysclk_ticks, TickCount ticks_late)
   UpdateSysClkEvent();
 }
 
+void Timers::SynchronizeGPUForRead(u32 index, const CounterState& cs)
+{
+  if (index >= 2)
+    return;
+
+  if (cs.external_counting_enabled)
+  {
+    if (index == 0 || g_gpu->IsCRTCScanlinePending())
+      g_gpu->SynchronizeCRTC();
+  }
+  else if (cs.mode.sync_enable && TimingEvents::IsAnyEventDue())
+  {
+    g_gpu->SynchronizeCRTC();
+  }
+}
+
 u32 Timers::ReadRegister(u32 offset)
 {
   const u32 timer_index = (offset >> 4) & u32(0x03);
@@ -312,27 +397,15 @@ u32 Timers::ReadRegister(u32 offset)
   {
     case 0x00:
     {
-      if (timer_index < 2 && cs.external_counting_enabled)
-      {
-        // timers 0/1 depend on the GPU
-        if (timer_index == 0 || g_gpu->IsCRTCScanlinePending())
-          g_gpu->SynchronizeCRTC();
-      }
-
+      SynchronizeGPUForRead(timer_index, cs);
       s_state.sysclk_event.InvokeEarly();
 
-      return cs.counter;
+      return (cs.hold_ticks == TARGET_RESET_HOLD_TICKS) ? cs.target : cs.counter;
     }
 
     case 0x04:
     {
-      if (timer_index < 2 && cs.external_counting_enabled)
-      {
-        // timers 0/1 depend on the GPU
-        if (timer_index == 0 || g_gpu->IsCRTCScanlinePending())
-          g_gpu->SynchronizeCRTC();
-      }
-
+      SynchronizeGPUForRead(timer_index, cs);
       s_state.sysclk_event.InvokeEarly();
 
       const u32 bits = cs.mode.bits;
@@ -362,12 +435,9 @@ void Timers::WriteRegister(u32 offset, u32 value)
 
   CounterState& cs = s_state.counters[timer_index];
 
-  if (timer_index < 2 && cs.external_counting_enabled)
-  {
-    // timers 0/1 depend on the GPU
-    if (timer_index == 0 || g_gpu->IsCRTCScanlinePending())
-      g_gpu->SynchronizeCRTC();
-  }
+  const bool update_gpu = (timer_index < 2 && (cs.external_counting_enabled || port_offset == 0x04));
+  if (update_gpu)
+    g_gpu->SynchronizeCRTC();
 
   s_state.sysclk_event.InvokeEarly();
 
@@ -376,10 +446,9 @@ void Timers::WriteRegister(u32 offset, u32 value)
   {
     case 0x00:
     {
-      const u32 old_counter = cs.counter;
       DEBUG_LOG("Timer {} write counter {}", timer_index, value);
       cs.counter = value & u32(0xFFFF);
-      CheckForIRQ(timer_index, old_counter);
+      cs.hold_ticks = cs.use_external_clock ? 0 : WRITE_HOLD_TICKS;
       if (timer_index == 2 || !cs.external_counting_enabled)
         UpdateSysClkEvent();
     }
@@ -387,17 +456,18 @@ void Timers::WriteRegister(u32 offset, u32 value)
 
     case 0x04:
     {
-      static constexpr u32 WRITE_MASK = 0b1110001111111111;
+      static constexpr u32 WRITE_MASK = 0b0000001111111111;
 
       DEBUG_LOG("Timer {} write mode register 0x{:04X}", timer_index, value);
       cs.mode.bits = (value & WRITE_MASK) | (cs.mode.bits & ~WRITE_MASK);
       cs.use_external_clock = (cs.mode.clock_source & (timer_index == 2 ? 2 : 1)) != 0;
       cs.counter = 0;
+      cs.hold_ticks = cs.use_external_clock ? 0 : WRITE_HOLD_TICKS;
       cs.irq_done = false;
       InterruptController::SetLineState(
         static_cast<InterruptController::IRQ>(static_cast<u32>(InterruptController::IRQ::TMR0) + timer_index), false);
 
-      UpdateCountingEnabled(cs);
+      UpdateCountingEnabled(timer_index, cs);
       CheckForIRQ(timer_index, cs.counter);
       UpdateSysClkEvent();
     }
@@ -407,7 +477,6 @@ void Timers::WriteRegister(u32 offset, u32 value)
     {
       DEBUG_LOG("Timer {} write target 0x{:04X}", timer_index, ZeroExtend32(Truncate16(value)));
       cs.target = value & u32(0xFFFF);
-      CheckForIRQ(timer_index, cs.counter);
       if (timer_index == 2 || !cs.external_counting_enabled)
         UpdateSysClkEvent();
     }
@@ -417,11 +486,19 @@ void Timers::WriteRegister(u32 offset, u32 value)
       ERROR_LOG("Write unknown register in timer {} (offset 0x{:02X}, value 0x{:X})", timer_index, offset, value);
       break;
   }
+
+  if (update_gpu)
+    g_gpu->RescheduleCRTC();
 }
 
-void Timers::UpdateCountingEnabled(CounterState& cs)
+void Timers::UpdateCountingEnabled(u32 index, CounterState& cs)
 {
-  if (cs.mode.sync_enable)
+  if (index == 2)
+  {
+    cs.counting_enabled = (!cs.mode.sync_enable || cs.mode.sync_mode == SyncMode::ResetOnGateEnd ||
+                           cs.mode.sync_mode == SyncMode::ResetAndRunOnGateStart);
+  }
+  else if (cs.mode.sync_enable)
   {
     switch (cs.mode.sync_mode)
     {
@@ -457,31 +534,37 @@ TickCount Timers::GetTicksUntilNextInterrupt()
   {
     const CounterState& cs = s_state.counters[i];
     if (!cs.counting_enabled || (i < 2 && cs.external_counting_enabled) ||
-        (!cs.mode.irq_at_target && !cs.mode.irq_on_overflow && (cs.mode.irq_repeat || !cs.irq_done)))
+        (!cs.mode.irq_at_target && !cs.mode.irq_on_overflow) || (!cs.mode.irq_repeat && cs.irq_done))
     {
       continue;
     }
 
     if (cs.mode.irq_at_target)
     {
-      TickCount ticks = (cs.counter <= cs.target) ? static_cast<TickCount>(cs.target - cs.counter) :
-                                                    static_cast<TickCount>((0xFFFFu - cs.counter) + cs.target);
+      TickCount ticks = GetTicksUntilTarget(cs);
       if (cs.external_counting_enabled) // sysclk/8 for timer 2
-        ticks *= 8;
+        ticks = ticks * 8 - s_state.sysclk_div_8_carry;
 
       min_ticks = std::min(min_ticks, ticks);
     }
     if (cs.mode.irq_on_overflow)
     {
-      TickCount ticks = static_cast<TickCount>(0xFFFFu - cs.counter);
+      TickCount ticks = GetTicksUntilOverflow(cs);
       if (cs.external_counting_enabled) // sysclk/8 for timer 2
-        ticks *= 8;
+        ticks = ticks * 8 - s_state.sysclk_div_8_carry;
 
       min_ticks = std::min(min_ticks, ticks);
     }
   }
 
-  return System::ScaleTicksToOverclock(std::max<TickCount>(1, min_ticks));
+  min_ticks = std::max<TickCount>(1, min_ticks);
+  if (!g_settings.cpu_overclock_active)
+    return min_ticks;
+
+  return static_cast<TickCount>(((static_cast<u64>(min_ticks) * g_settings.cpu_overclock_numerator) -
+                                 static_cast<u32>(s_state.sysclk_ticks_carry) +
+                                 (g_settings.cpu_overclock_denominator - 1)) /
+                                g_settings.cpu_overclock_denominator);
 }
 
 void Timers::UpdateSysClkEvent()

@@ -5,6 +5,8 @@
 
 #include "common/error.h"
 
+#include <X11/Xlib.h>
+
 OpenGLContextEGLX11::OpenGLContextEGLX11(const WindowInfo& wi) : OpenGLContextEGL(wi)
 {
 }
@@ -50,4 +52,19 @@ EGLSurface OpenGLContextEGLX11::CreatePlatformSurface(EGLConfig config, void* wi
     surface = CreateFallbackSurface(config, win, error);
 
   return surface;
+}
+bool OpenGLContextEGLX11::IsConfigCompatibleWithWindow(EGLConfig config)
+{
+  EGLint visual_id;
+  if (!eglGetConfigAttrib(m_display, config, EGL_NATIVE_VISUAL_ID, &visual_id) || visual_id == 0)
+    return true;
+
+  XWindowAttributes attributes;
+  if (!XGetWindowAttributes(static_cast<Display*>(m_wi.display_connection),
+                            static_cast<Window>(reinterpret_cast<uintptr_t>(m_wi.window_handle)), &attributes))
+  {
+    return true;
+  }
+
+  return (static_cast<VisualID>(visual_id) == XVisualIDFromVisual(attributes.visual));
 }

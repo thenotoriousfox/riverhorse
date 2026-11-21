@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2019-2024 Connor McLaughlin <stenzek@gmail.com>
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #pragma once
 
@@ -9,6 +9,7 @@
 
 #include "common/bitfield.h"
 
+#include <future>
 #include <array>
 #include <memory>
 #include <string>
@@ -97,6 +98,7 @@ private:
 
   bool SaveIfChanged(bool display_osd_message);
   void QueueFileSave();
+  void WaitForPendingSave();
 
   State m_state = State::Idle;
   FLAG m_FLAG = {};
@@ -110,4 +112,6 @@ private:
   std::string m_filename;
 
   MemoryCardImage::DataArray m_data{};
+
+  std::future<void> m_pending_save;
 };

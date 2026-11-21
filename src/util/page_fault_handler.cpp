@@ -4,7 +4,6 @@
 #include "page_fault_handler.h"
 
 #include "common/assert.h"
-#include "common/crash_handler.h"
 #include "common/error.h"
 #include "common/log.h"
 
@@ -120,13 +119,15 @@ LONG PageFaultHandler::ExceptionHandler(PEXCEPTION_POINTERS exi)
   return (handled == HandlerResult::ContinueExecution) ? EXCEPTION_CONTINUE_EXECUTION : EXCEPTION_CONTINUE_SEARCH;
 }
 
+static PVOID s_vectored_handler = nullptr;
+
 bool PageFaultHandler::Install(Error* error)
 {
   std::unique_lock lock(s_exception_handler_mutex);
   AssertMsg(!s_installed, "Page fault handler has already been installed.");
 
-  PVOID handle = AddVectoredExceptionHandler(1, ExceptionHandler);
-  if (!handle)
+  s_vectored_handler = AddVectoredExceptionHandler(1, ExceptionHandler);
+  if (!s_vectored_handler)
   {
     Error::SetWin32(error, "AddVectoredExceptionHandler() failed: ", GetLastError());
     return false;
@@ -136,11 +137,44 @@ bool PageFaultHandler::Install(Error* error)
   return true;
 }
 
+void PageFaultHandler::Uninstall()
+{
+  std::unique_lock lock(s_exception_handler_mutex);
+  if (!s_installed)
+    return;
+
+  RemoveVectoredExceptionHandler(s_vectored_handler);
+  s_vectored_handler = nullptr;
+  s_installed = false;
+}
+
 #else
 
 namespace PageFaultHandler {
 static void SignalHandler(int sig, siginfo_t* info, void* ctx);
+static void ForwardToPreviousHandler(int sig, siginfo_t* info, void* ctx);
+
+static struct sigaction s_previous_sigsegv_action;
+static struct sigaction s_previous_sigbus_action;
 } // namespace PageFaultHandler
+
+void PageFaultHandler::ForwardToPreviousHandler(int sig, siginfo_t* info, void* ctx)
+{
+  const struct sigaction& previous = (sig == SIGBUS) ? s_previous_sigbus_action : s_previous_sigsegv_action;
+  if ((previous.sa_flags & SA_SIGINFO) && previous.sa_sigaction)
+  {
+    previous.sa_sigaction(sig, info, ctx);
+    return;
+  }
+
+  if (previous.sa_handler != SIG_DFL && previous.sa_handler != SIG_IGN && previous.sa_handler)
+  {
+    previous.sa_handler(sig);
+    return;
+  }
+
+  signal(sig, SIG_DFL);
+}
 
 void PageFaultHandler::SignalHandler(int sig, siginfo_t* info, void* ctx)
 {
@@ -217,8 +251,7 @@ void PageFaultHandler::SignalHandler(int sig, siginfo_t* info, void* ctx)
   if (result == HandlerResult::ContinueExecution)
     return;
 
-  // We couldn't handle it. Pass it off to the crash dumper.
-  CrashHandler::CrashSignalHandler(sig, info, ctx);
+  ForwardToPreviousHandler(sig, info, ctx);
 }
 
 bool PageFaultHandler::Install(Error* error)
@@ -235,14 +268,14 @@ bool PageFaultHandler::Install(Error* error)
   // Don't block the signal from executing recursively, we want to fire the original handler.
   sa.sa_flags |= SA_NODEFER;
 #endif
-  if (sigaction(SIGSEGV, &sa, nullptr) != 0)
+  if (sigaction(SIGSEGV, &sa, &s_previous_sigsegv_action) != 0)
   {
     Error::SetErrno(error, "sigaction() for SIGSEGV failed: ", errno);
     return false;
   }
 #if defined(__APPLE__) || defined(__aarch64__)
   // MacOS uses SIGBUS for memory permission violations
-  if (sigaction(SIGBUS, &sa, nullptr) != 0)
+  if (sigaction(SIGBUS, &sa, &s_previous_sigbus_action) != 0)
   {
     Error::SetErrno(error, "sigaction() for SIGBUS failed: ", errno);
     return false;
@@ -254,6 +287,19 @@ bool PageFaultHandler::Install(Error* error)
 
   s_installed = true;
   return true;
+}
+
+void PageFaultHandler::Uninstall()
+{
+  std::unique_lock lock(s_exception_handler_mutex);
+  if (!s_installed)
+    return;
+
+  sigaction(SIGSEGV, &s_previous_sigsegv_action, nullptr);
+#if defined(__APPLE__) || defined(__aarch64__)
+  sigaction(SIGBUS, &s_previous_sigbus_action, nullptr);
+#endif
+  s_installed = false;
 }
 
 #endif

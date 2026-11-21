@@ -49,6 +49,7 @@
     <ClCompile Include="gpu_hw_shadergen.cpp" />
     <ClCompile Include="gpu_shadergen.cpp" />
     <ClCompile Include="gpu_sw.cpp" />
+    <ClCompile Include="gpu_sw_psxgpu_backend.cpp" />
     <ClCompile Include="gpu_sw_backend.cpp" />
     <ClCompile Include="gte.cpp" />
     <ClCompile Include="dma.cpp" />
@@ -66,6 +67,7 @@
     <ClCompile Include="multitap.cpp" />
     <ClCompile Include="guncon.cpp" />
     <ClCompile Include="negcon.cpp" />
+    <ClCompile Include="netplay.cpp" />
     <ClCompile Include="negcon_rumble.cpp" />
     <ClCompile Include="pad.cpp" />
     <ClCompile Include="controller.cpp" />
@@ -126,6 +128,7 @@
     <ClInclude Include="gpu_hw_shadergen.h" />
     <ClInclude Include="gpu_shadergen.h" />
     <ClInclude Include="gpu_sw.h" />
+    <ClInclude Include="gpu_sw_psxgpu_backend.h" />
     <ClInclude Include="gpu_sw_backend.h" />
     <ClInclude Include="gpu_types.h" />
     <ClInclude Include="gte.h" />
@@ -146,6 +149,8 @@
     <ClInclude Include="multitap.h" />
     <ClInclude Include="guncon.h" />
     <ClInclude Include="negcon.h" />
+    <ClInclude Include="netplay.h" />
+    <ClInclude Include="netplay_packets.h" />
     <ClInclude Include="negcon_rumble.h" />
     <ClInclude Include="pad.h" />
     <ClInclude Include="controller.h" />
@@ -167,6 +172,15 @@
     <ClInclude Include="types.h" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\dep\enet\enet.vcxproj">
+      <Project>{460a096b-fcc7-465c-8e4b-434af490a9ea}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\..\dep\ggpo-x\ggpo-x.vcxproj">
+      <Project>{edf3634a-ce8a-4625-92bd-27bad5d30a9a}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\..\dep\psx_gpu\psx_gpu.vcxproj">
+      <Project>{5085fe3a-29fc-40f9-b6c6-5898eea430a0}</Project>
+    </ProjectReference>
     <ProjectReference Include="..\..\dep\imgui\imgui.vcxproj">
       <Project>{bb08260f-6fbc-46af-8924-090ee71360c6}</Project>
     </ProjectReference>

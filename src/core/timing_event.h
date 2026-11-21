@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2019-2024 Connor McLaughlin <stenzek@gmail.com>
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #pragma once
 
@@ -86,6 +86,9 @@ void Shutdown();
 bool DoState(StateWrapper& sw);
 
 bool IsRunningEvents();
+
+/// Returns true if an event is due at or before the current time but has not run yet.
+bool IsAnyEventDue();
 void SetFrameDone();
 void RunEvents();
 

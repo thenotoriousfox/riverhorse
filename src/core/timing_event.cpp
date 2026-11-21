@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2019-2024 Connor McLaughlin <stenzek@gmail.com>
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #include "timing_event.h"
 #include "cpu_core.h"
@@ -12,6 +12,11 @@
 #include "common/log.h"
 #include "common/thirdparty/SmallVector.h"
 
+#include <algorithm>
+#include <limits>
+#include <span>
+#include <vector>
+
 Log_SetChannel(TimingEvents);
 
 namespace TimingEvents {
@@ -20,6 +25,9 @@ static void SortEvent(TimingEvent* event);
 static void AddActiveEvent(TimingEvent* event);
 static void RemoveActiveEvent(TimingEvent* event);
 static void SortEvents();
+static void RestoreEventOrder(std::span<TimingEvent* const> saved_order, bool saved_order_is_complete);
+static std::vector<TimingEvent*>& GetRegisteredEvents();
+static TimingEvent* FindRegisteredEvent(const std::string_view name);
 static TimingEvent* FindActiveEvent(const std::string_view name);
 
 namespace {
@@ -63,6 +71,11 @@ void TimingEvents::Reset()
 void TimingEvents::Shutdown()
 {
   Assert(s_state.active_event_count == 0);
+}
+
+bool TimingEvents::IsAnyEventDue()
+{
+  return (s_state.active_events_head && CPU::GetPendingTicks() >= s_state.active_events_head->GetDowncount());
 }
 
 void TimingEvents::UpdateCPUDowncount()
@@ -273,6 +286,67 @@ void TimingEvents::SortEvents()
     AddActiveEvent(event);
 }
 
+void TimingEvents::RestoreEventOrder(std::span<TimingEvent* const> saved_order, bool saved_order_is_complete)
+{
+  llvm::SmallVector<TimingEvent*, 16> events(saved_order.begin(), saved_order.end());
+  for (TimingEvent* event = s_state.active_events_head; event;)
+  {
+    TimingEvent* const next = event->next;
+    if (std::find(saved_order.begin(), saved_order.end(), event) == saved_order.end())
+    {
+      if (saved_order_is_complete)
+      {
+        event->m_active = false;
+        event->prev = nullptr;
+        event->next = nullptr;
+      }
+      else
+      {
+        events.push_back(event);
+      }
+    }
+    event = next;
+  }
+
+  for (TimingEvent* event : events)
+    event->m_active = true;
+
+  std::stable_sort(events.begin(), events.end(),
+                   [](const TimingEvent* lhs, const TimingEvent* rhs) { return lhs->m_downcount < rhs->m_downcount; });
+
+  TimingEvent* prev = nullptr;
+  for (TimingEvent* event : events)
+  {
+    event->prev = prev;
+    event->next = nullptr;
+    if (prev)
+      prev->next = event;
+    prev = event;
+  }
+
+  s_state.active_events_head = events.empty() ? nullptr : events.front();
+  s_state.active_events_tail = prev;
+  s_state.active_event_count = static_cast<u32>(events.size());
+  UpdateCPUDowncount();
+}
+
+std::vector<TimingEvent*>& TimingEvents::GetRegisteredEvents()
+{
+  static std::vector<TimingEvent*> events;
+  return events;
+}
+
+TimingEvent* TimingEvents::FindRegisteredEvent(const std::string_view name)
+{
+  for (TimingEvent* event : GetRegisteredEvents())
+  {
+    if (event->GetName() == name)
+      return event;
+  }
+
+  return nullptr;
+}
+
 static TimingEvent* TimingEvents::FindActiveEvent(const std::string_view name)
 {
   for (TimingEvent* event = s_state.active_events_head; event; event = event->next)
@@ -375,6 +449,7 @@ bool TimingEvents::DoState(StateWrapper& sw)
     u32 event_count = 0;
     sw.Do(&event_count);
 
+    llvm::SmallVector<TimingEvent*, 16> saved_order;
     for (u32 i = 0; i < event_count; i++)
     {
       TinyString event_name;
@@ -384,10 +459,18 @@ bool TimingEvents::DoState(StateWrapper& sw)
       sw.Do(&time_since_last_run);
       sw.Do(&period);
       sw.Do(&interval);
-      if (sw.HasError())
-        return false;
 
-      TimingEvent* event = FindActiveEvent(event_name);
+      static constexpr TickCount MAX_LATENESS = System::MASTER_CLOCK;
+      static constexpr TickCount MAX_TICKS = std::numeric_limits<TickCount>::max() / 2;
+      if (sw.HasError() || period <= 0 || interval <= 0 || downcount < -MAX_LATENESS || downcount > MAX_TICKS ||
+          time_since_last_run < -MAX_LATENESS || time_since_last_run > MAX_TICKS)
+      {
+        ERROR_LOG("Event '{}' out of range: downcount {}, time since last run {}, period {}, interval {}", event_name,
+                  downcount, time_since_last_run, period, interval);
+        return false;
+      }
+
+      TimingEvent* event = (sw.GetVersion() >= 92) ? FindRegisteredEvent(event_name) : FindActiveEvent(event_name);
       if (!event)
       {
         WARNING_LOG("Save state has event '{}', but couldn't find this event when loading.", event_name);
@@ -399,6 +482,7 @@ bool TimingEvents::DoState(StateWrapper& sw)
       event->m_time_since_last_run = time_since_last_run;
       event->m_period = period;
       event->m_interval = interval;
+      saved_order.push_back(event);
     }
 
     if (sw.GetVersion() < 43) [[unlikely]]
@@ -407,8 +491,35 @@ bool TimingEvents::DoState(StateWrapper& sw)
       sw.Do(&last_event_run_time);
     }
 
+    if (sw.GetVersion() >= 92)
+    {
+      u32 inactive_count = 0;
+      sw.Do(&inactive_count);
+      for (u32 i = 0; i < inactive_count; i++)
+      {
+        TinyString event_name;
+        TickCount downcount, time_since_last_run, period, interval;
+        sw.Do(&event_name);
+        sw.Do(&downcount);
+        sw.Do(&time_since_last_run);
+        sw.Do(&period);
+        sw.Do(&interval);
+        if (sw.HasError())
+          return false;
+
+        TimingEvent* event = FindRegisteredEvent(event_name);
+        if (!event || std::find(saved_order.begin(), saved_order.end(), event) != saved_order.end())
+          continue;
+
+        event->m_downcount = downcount;
+        event->m_time_since_last_run = time_since_last_run;
+        event->m_period = period;
+        event->m_interval = interval;
+      }
+    }
+
     DEBUG_LOG("Loaded {} events from save state.", event_count);
-    SortEvents();
+    RestoreEventOrder(saved_order, sw.GetVersion() >= 92);
   }
   else
   {
@@ -417,6 +528,22 @@ bool TimingEvents::DoState(StateWrapper& sw)
 
     for (TimingEvent* event = s_state.active_events_head; event; event = event->next)
     {
+      sw.Do(&event->m_name);
+      sw.Do(&event->m_downcount);
+      sw.Do(&event->m_time_since_last_run);
+      sw.Do(&event->m_period);
+      sw.Do(&event->m_interval);
+    }
+
+    u32 inactive_count = static_cast<u32>(
+      std::count_if(GetRegisteredEvents().begin(), GetRegisteredEvents().end(),
+                    [](const TimingEvent* event) { return !event->m_active; }));
+    sw.Do(&inactive_count);
+    for (TimingEvent* event : GetRegisteredEvents())
+    {
+      if (event->m_active)
+        continue;
+
       sw.Do(&event->m_name);
       sw.Do(&event->m_downcount);
       sw.Do(&event->m_time_since_last_run);
@@ -435,11 +562,14 @@ TimingEvent::TimingEvent(const std::string_view name, TickCount period, TickCoun
   : m_callback(callback), m_callback_param(callback_param), m_downcount(interval), m_time_since_last_run(0),
     m_period(period), m_interval(interval), m_name(name)
 {
+  TimingEvents::GetRegisteredEvents().push_back(this);
 }
 
 TimingEvent::~TimingEvent()
 {
   DebugAssert(!m_active);
+  std::vector<TimingEvent*>& events = TimingEvents::GetRegisteredEvents();
+  events.erase(std::remove(events.begin(), events.end(), this), events.end());
 }
 
 TickCount TimingEvent::GetTicksSinceLastExecution() const

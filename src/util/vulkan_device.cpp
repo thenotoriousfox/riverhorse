@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2019-2024 Connor McLaughlin <stenzek@gmail.com>
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #include "vulkan_device.h"
 #include "vulkan_builders.h"
@@ -107,6 +107,7 @@ static u32 s_debug_scope_depth = 0;
 
 // We need to synchronize instance creation because of adapter enumeration from the UI thread.
 static std::mutex s_instance_mutex;
+static std::optional<VulkanDevice::HostContext> s_host_context;
 
 VulkanDevice::VulkanDevice()
 {
@@ -165,9 +166,9 @@ VkInstance VulkanDevice::CreateVulkanInstance(const WindowInfo& wi, OptionalExte
   VkApplicationInfo app_info = {};
   app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
   app_info.pNext = nullptr;
-  app_info.pApplicationName = "DuckStation";
+  app_info.pApplicationName = "Riverhorse";
   app_info.applicationVersion = VK_MAKE_VERSION(0, 1, 0);
-  app_info.pEngineName = "DuckStation";
+  app_info.pEngineName = "Riverhorse";
   app_info.engineVersion = VK_MAKE_VERSION(0, 1, 0);
   app_info.apiVersion = apiVersion;
 
@@ -616,6 +617,8 @@ bool VulkanDevice::CreateDevice(VkSurfaceKHR surface, bool enable_validation_lay
   device_info.pQueueCreateInfos = queue_infos.data();
 
   ExtensionList enabled_extensions;
+  if (s_host_context)
+    enabled_extensions = s_host_context->device_extensions;
   if (!SelectDeviceExtensions(&enabled_extensions, surface != VK_NULL_HANDLE, error))
     return false;
 
@@ -635,6 +638,13 @@ bool VulkanDevice::CreateDevice(VkSurfaceKHR surface, bool enable_validation_lay
   enabled_features.sampleRateShading = available_features.sampleRateShading;
   enabled_features.geometryShader = available_features.geometryShader;
   enabled_features.fragmentStoresAndAtomics = available_features.fragmentStoresAndAtomics;
+  if (s_host_context)
+  {
+    const VkBool32* required = reinterpret_cast<const VkBool32*>(&s_host_context->device_features);
+    VkBool32* enabled = reinterpret_cast<VkBool32*>(&enabled_features);
+    for (size_t i = 0; i < sizeof(VkPhysicalDeviceFeatures) / sizeof(VkBool32); i++)
+      enabled[i] |= required[i];
+  }
   device_info.pEnabledFeatures = &enabled_features;
 
   // Enable debug layer on debug builds
@@ -1442,7 +1452,11 @@ void VulkanDevice::DoSubmitCommandBuffer(u32 index, VulkanSwapChain* present_swa
     submit_info.signalSemaphoreCount = 1;
   }
 
+  if (s_host_context && s_host_context->lock_queue)
+    s_host_context->lock_queue();
   const VkResult res = vkQueueSubmit(m_graphics_queue, 1, &submit_info, resources.fence);
+  if (s_host_context && s_host_context->unlock_queue)
+    s_host_context->unlock_queue();
   if (res != VK_SUCCESS)
   {
     LOG_VULKAN_ERROR(res, "vkQueueSubmit failed: ");
@@ -1940,6 +1954,11 @@ void VulkanDevice::DestroyFramebuffer(VkFramebuffer fbo)
   VulkanDevice::GetInstance().DeferFramebufferDestruction(fbo);
 }
 
+void VulkanDevice::SetHostContext(std::optional<HostContext> context)
+{
+  s_host_context = std::move(context);
+}
+
 bool VulkanDevice::IsSuitableDefaultRenderer()
 {
 #ifdef __ANDROID__
@@ -2002,7 +2021,21 @@ bool VulkanDevice::CreateDevice(std::string_view adapter, bool threaded_presenta
     return false;
   }
 
-  m_instance = CreateVulkanInstance(m_window_info, &m_optional_extensions, enable_debug_utils, enable_validation_layer);
+  if (s_host_context)
+  {
+    m_instance = s_host_context->instance;
+    m_owns_instance = false;
+    m_owns_device = false;
+    enable_debug_utils = false;
+    enable_validation_layer = false;
+  }
+  else
+  {
+    m_instance =
+      CreateVulkanInstance(m_window_info, &m_optional_extensions, enable_debug_utils, enable_validation_layer);
+    m_owns_instance = true;
+    m_owns_device = true;
+  }
   if (m_instance == VK_NULL_HANDLE)
   {
     if (enable_debug_utils || enable_validation_layer)
@@ -2029,14 +2062,18 @@ bool VulkanDevice::CreateDevice(std::string_view adapter, bool threaded_presenta
     return false;
   }
 
-  GPUList gpus = EnumerateGPUs(m_instance);
-  if (gpus.empty())
+  const bool host_chose_gpu = (s_host_context && s_host_context->physical_device != VK_NULL_HANDLE);
+  GPUList gpus = host_chose_gpu ? GPUList() : EnumerateGPUs(m_instance);
+  if (host_chose_gpu)
+  {
+    m_physical_device = s_host_context->physical_device;
+  }
+  else if (gpus.empty())
   {
     Error::SetStringView(error, "No physical devices found. Does your GPU and/or driver support Vulkan?");
     return false;
   }
-
-  if (!adapter.empty())
+  else if (!adapter.empty())
   {
     u32 gpu_index = 0;
     for (; gpu_index < static_cast<u32>(gpus.size()); gpu_index++)
@@ -2057,8 +2094,15 @@ bool VulkanDevice::CreateDevice(std::string_view adapter, bool threaded_presenta
   }
   else
   {
-    INFO_LOG("No GPU requested, using first ({})", gpus[0].second.name);
-    m_physical_device = gpus[0].first;
+    const auto discrete = std::find_if(gpus.begin(), gpus.end(), [](const auto& gpu) {
+      VkPhysicalDeviceProperties properties;
+      vkGetPhysicalDeviceProperties(gpu.first, &properties);
+      return (properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU);
+    });
+    const auto& chosen = (discrete != gpus.end()) ? *discrete : gpus[0];
+    INFO_LOG("No GPU requested, using {} ({})", (discrete != gpus.end()) ? "first discrete GPU" : "first GPU",
+             chosen.second.name);
+    m_physical_device = chosen.first;
   }
 
   // Read device physical memory properties, we need it for allocating buffers
@@ -2079,7 +2123,7 @@ bool VulkanDevice::CreateDevice(std::string_view adapter, bool threaded_presenta
 
   VkSurfaceKHR surface = VK_NULL_HANDLE;
   ScopedGuard surface_cleanup = [this, &surface]() {
-    if (surface != VK_NULL_HANDLE)
+    if (surface != VK_NULL_HANDLE && m_window_info.type != WindowInfo::Type::Surfaceless)
       vkDestroySurfaceKHR(m_instance, surface, nullptr);
   };
   if (m_window_info.type != WindowInfo::Type::Surfaceless)
@@ -2087,6 +2131,10 @@ bool VulkanDevice::CreateDevice(std::string_view adapter, bool threaded_presenta
     surface = VulkanSwapChain::CreateVulkanSurface(m_instance, m_physical_device, &m_window_info);
     if (surface == VK_NULL_HANDLE)
       return false;
+  }
+  else if (s_host_context)
+  {
+    surface = s_host_context->surface;
   }
 
   // Attempt to create the device.
@@ -2102,7 +2150,7 @@ bool VulkanDevice::CreateDevice(std::string_view adapter, bool threaded_presenta
 
   m_exclusive_fullscreen_control = exclusive_fullscreen_control;
 
-  if (surface != VK_NULL_HANDLE)
+  if (m_window_info.type != WindowInfo::Type::Surfaceless)
   {
     VkPresentModeKHR present_mode;
     if (!VulkanSwapChain::SelectPresentMode(surface, &m_vsync_mode, &present_mode) ||
@@ -2178,20 +2226,16 @@ void VulkanDevice::DestroyDevice()
     m_pipeline_cache = VK_NULL_HANDLE;
   }
 
-  if (m_device != VK_NULL_HANDLE)
-  {
+  if (m_device != VK_NULL_HANDLE && m_owns_device)
     vkDestroyDevice(m_device, nullptr);
-    m_device = VK_NULL_HANDLE;
-  }
+  m_device = VK_NULL_HANDLE;
 
   if (m_debug_messenger_callback != VK_NULL_HANDLE)
     DisableDebugUtils();
 
-  if (m_instance != VK_NULL_HANDLE)
-  {
+  if (m_instance != VK_NULL_HANDLE && m_owns_instance)
     vkDestroyInstance(m_instance, nullptr);
-    m_instance = VK_NULL_HANDLE;
-  }
+  m_instance = VK_NULL_HANDLE;
 
   Vulkan::UnloadVulkanLibrary();
 }

@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2019-2024 Connor McLaughlin <stenzek@gmail.com>
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #pragma once
 
@@ -30,6 +30,7 @@ public:
     DATA_SECTOR_SIZE = 2048,
     SECTOR_SYNC_SIZE = 12,
     SECTOR_HEADER_SIZE = 4,
+    MODE2_DATA_SECTOR_SIZE = 2336,
     FRAMES_PER_SECOND = 75, // "sectors", or "timecode frames" (not "channel frames")
     SECONDS_PER_MINUTE = 60,
     FRAMES_PER_MINUTE = FRAMES_PER_SECOND * SECONDS_PER_MINUTE,
@@ -232,7 +233,10 @@ public:
   };
 
   // Helper functions.
+  static const std::array<u8, SECTOR_SYNC_SIZE> SECTOR_SYNC_PATTERN;
+
   static u32 GetBytesPerSector(TrackMode mode);
+  static void ConvertSectorToRaw(void* buffer, LBA lba, TrackMode mode);
   static void DeinterleaveSubcode(const u8* subcode_in, u8* subcode_out);
 
   /// Returns a list of physical CD-ROM devices, .first being the device path, .second being the device name.
@@ -245,6 +249,7 @@ public:
   static std::unique_ptr<CDImage> Open(const char* filename, bool allow_patches, Error* error);
   static std::unique_ptr<CDImage> OpenBinImage(const char* filename, Error* error);
   static std::unique_ptr<CDImage> OpenCueSheetImage(const char* filename, Error* error);
+  static std::unique_ptr<CDImage> OpenCCDImage(const char* filename, Error* error);
   static std::unique_ptr<CDImage> OpenCHDImage(const char* filename, Error* error);
   static std::unique_ptr<CDImage> OpenEcmImage(const char* filename, Error* error);
   static std::unique_ptr<CDImage> OpenMdsImage(const char* filename, Error* error);
@@ -302,8 +307,14 @@ public:
   // Reads sub-channel Q for the specified index+LBA.
   virtual bool ReadSubChannelQ(SubChannelQ* subq, const Index& index, LBA lba_in_index);
 
+  // Generates sub-channel Q given the specified position.
+  bool GenerateSubChannelQ(SubChannelQ* subq, LBA lba);
+
   // Returns true if the image has replacement subchannel data.
   virtual bool HasNonStandardSubchannel() const;
+
+  // Loads replacement subchannel data from an SBI or LSD file, chosen by its extension.
+  virtual bool LoadSubchannelReplacementFile(std::string_view path);
 
   // Reads a single sector from an index.
   virtual bool ReadSectorFromIndex(void* buffer, const Index& index, LBA lba_in_index) = 0;
@@ -340,9 +351,6 @@ protected:
 
   const Index* GetIndexForDiscPosition(LBA pos);
   const Index* GetIndexForTrackPosition(u32 track_number, LBA track_pos);
-
-  /// Generates sub-channel Q given the specified position.
-  bool GenerateSubChannelQ(SubChannelQ* subq, LBA lba);
 
   /// Generates sub-channel Q from the given index and index-offset.
   void GenerateSubChannelQ(SubChannelQ* subq, const Index& index, u32 index_offset);

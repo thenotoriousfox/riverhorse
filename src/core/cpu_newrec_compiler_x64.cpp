@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2023 Connor McLaughlin <stenzek@gmail.com>
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #include "cpu_newrec_compiler_x64.h"
 #include "common/align.h"
@@ -650,7 +650,8 @@ void CPU::NewRec::X64Compiler::CheckBranchTarget(const Xbyak::Reg32& pcreg)
   SwitchToFarCode(true, &CodeGenerator::jnz);
 
   BackupHostState();
-  EndBlockWithException(Exception::AdEL);
+  StoreHostRegToCPUPointer(pcreg.getIdx(), &g_state.cop0_regs.BadVaddr);
+  EndBlockWithBranchTargetException();
 
   RestoreHostState();
   SwitchToNearCode(false);
@@ -1618,9 +1619,8 @@ void CPU::NewRec::X64Compiler::Compile_lwx(CompileFlags cf, MemoryAccessSize siz
     DebugAssert(value != RWARG3);
     cg->mov(RWARG3, value);
     cg->mov(RWARG2, addr);
-    cg->and_(RWARG2, ~0x3u);
     cg->mov(RWARG1, inst->bits);
-    cg->call(reinterpret_cast<const void*>(&PGXP::CPU_LW));
+    cg->call(reinterpret_cast<const void*>(&PGXP::CPU_LWx));
   }
 }
 
@@ -1743,9 +1743,7 @@ void CPU::NewRec::X64Compiler::Compile_swx(CompileFlags cf, MemoryAccessSize siz
   // TODO: this can take over rt's value if it's no longer needed
   // NOTE: can't trust T in cf because of the alloc
   const Reg32 addr = Reg32(AllocateTempHostReg(HR_CALLEE_SAVED));
-  const Reg32 value = g_settings.gpu_pgxp_enable ? Reg32(AllocateTempHostReg(HR_CALLEE_SAVED)) : RWARG2;
-  if (g_settings.gpu_pgxp_enable)
-    MoveMIPSRegToReg(value, inst->r.rt);
+  const Reg32 value = RWARG2;
 
   FlushForLoadStore(address, true, use_fastmem);
 
@@ -1762,9 +1760,7 @@ void CPU::NewRec::X64Compiler::Compile_swx(CompileFlags cf, MemoryAccessSize siz
   cg->shl(cg->ecx, 3); // *8
   cg->and_(addr, ~0x3u);
 
-  // Need to load down here for PGXP-off, because it's in a volatile reg that can get overwritten by flush.
-  if (!g_settings.gpu_pgxp_enable)
-    MoveMIPSRegToReg(value, inst->r.rt);
+  MoveMIPSRegToReg(value, inst->r.rt);
 
   if (inst->op == InstructionOp::swl)
   {
@@ -1796,23 +1792,8 @@ void CPU::NewRec::X64Compiler::Compile_swx(CompileFlags cf, MemoryAccessSize siz
     cg->or_(value, RWRET);
   }
 
-  if (!g_settings.gpu_pgxp_enable)
-  {
-    GenerateStore(addr, value, MemoryAccessSize::Word, use_fastmem);
-    FreeHostReg(addr.getIdx());
-  }
-  else
-  {
-    GenerateStore(addr, value, MemoryAccessSize::Word, use_fastmem);
-
-    Flush(FLUSH_FOR_C_CALL);
-    cg->mov(RWARG3, value);
-    FreeHostReg(value.getIdx());
-    cg->mov(RWARG2, addr);
-    FreeHostReg(addr.getIdx());
-    cg->mov(RWARG1, inst->bits);
-    cg->call(reinterpret_cast<const void*>(&PGXP::CPU_SW));
-  }
+  GenerateStore(addr, value, MemoryAccessSize::Word, use_fastmem);
+  FreeHostReg(addr.getIdx());
 }
 
 void CPU::NewRec::X64Compiler::Compile_swc2(CompileFlags cf, MemoryAccessSize size, bool sign, bool use_fastmem,

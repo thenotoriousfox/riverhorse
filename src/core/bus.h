@@ -151,6 +151,8 @@ bool CanUseFastmemForAddress(VirtualMemoryAddress address);
 
 void SetExpansionROM(std::vector<u8> data);
 
+bool HasKernelInitialized();
+
 extern std::bitset<RAM_8MB_CODE_PAGE_COUNT> g_ram_code_bits;
 extern u8* g_ram;             // 2MB-8MB RAM
 extern u8* g_unprotected_ram; // RAM without page protection, use for debugger access.

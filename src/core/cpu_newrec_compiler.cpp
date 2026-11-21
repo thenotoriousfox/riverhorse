@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2023 Connor McLaughlin <stenzek@gmail.com>
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #include "cpu_newrec_compiler.h"
 #include "common/assert.h"
@@ -471,6 +471,9 @@ bool CPU::NewRec::Compiler::TrySwapDelaySlot(Reg rs, Reg rt, Reg rd)
           case CopCommonInstruction::mtcn: // MTC0
           case CopCommonInstruction::ctcn: // CTC0
             break;
+
+          case CopCommonInstruction::bcnc:
+            goto is_unsafe;
         }
       }
       else
@@ -1260,8 +1263,8 @@ void CPU::NewRec::Compiler::CompileInstruction()
     case InstructionOp::sb: CompileLoadStoreTemplate(&Compiler::Compile_sxx, MemoryAccessSize::Byte, true, false, TF_READS_S | TF_READS_T); SpecExec_sxx(MemoryAccessSize::Byte); break;
     case InstructionOp::sh: CompileLoadStoreTemplate(&Compiler::Compile_sxx, MemoryAccessSize::HalfWord, true, false, TF_READS_S | TF_READS_T); SpecExec_sxx(MemoryAccessSize::HalfWord); break;
     case InstructionOp::sw: CompileLoadStoreTemplate(&Compiler::Compile_sxx, MemoryAccessSize::Word, true, false, TF_READS_S | TF_READS_T); SpecExec_sxx(MemoryAccessSize::Word); break;
-    case InstructionOp::swl: CompileLoadStoreTemplate(&Compiler::Compile_swx, MemoryAccessSize::Word, false, false, TF_READS_S /*| TF_READS_T*/); SpecExec_swx(false); break;
-    case InstructionOp::swr: CompileLoadStoreTemplate(&Compiler::Compile_swx, MemoryAccessSize::Word, false, false, TF_READS_S /*| TF_READS_T*/); SpecExec_swx(true); break;
+    case InstructionOp::swl: if (g_settings.gpu_pgxp_enable) { Compile_Fallback(); } else { CompileLoadStoreTemplate(&Compiler::Compile_swx, MemoryAccessSize::Word, false, false, TF_READS_S /*| TF_READS_T*/); SpecExec_swx(false); } break;
+    case InstructionOp::swr: if (g_settings.gpu_pgxp_enable) { Compile_Fallback(); } else { CompileLoadStoreTemplate(&Compiler::Compile_swx, MemoryAccessSize::Word, false, false, TF_READS_S /*| TF_READS_T*/); SpecExec_swx(true); } break;
 
     case InstructionOp::cop0:
       {
@@ -1721,7 +1724,7 @@ void CPU::NewRec::Compiler::TruncateBlock()
 const TickCount* CPU::NewRec::Compiler::GetFetchMemoryAccessTimePtr() const
 {
   const TickCount* ptr =
-    Bus::GetMemoryAccessTimePtr(m_block->pc & PHYSICAL_MEMORY_ADDRESS_MASK, MemoryAccessSize::Word);
+    Bus::GetMemoryAccessTimePtr(m_block->pc & KSEG_MASK, MemoryAccessSize::Word);
   AssertMsg(ptr, "Address has dynamic fetch ticks");
   return ptr;
 }
@@ -1782,7 +1785,8 @@ void CPU::NewRec::Compiler::Compile_jr_const(CompileFlags cf)
   const u32 newpc = GetConstantRegU32(cf.MipsS());
   if (newpc & 3 && g_settings.cpu_recompiler_memory_exceptions)
   {
-    EndBlockWithException(Exception::AdEL);
+    StoreConstantToCPUPointer(newpc, &g_state.cop0_regs.BadVaddr);
+    EndBlockWithBranchTargetException();
     return;
   }
 
@@ -1805,8 +1809,30 @@ void CPU::NewRec::Compiler::Compile_jalr_const(CompileFlags cf)
   if (MipsD() != Reg::zero)
     SetConstantReg(MipsD(), GetBranchReturnAddress({}));
 
+  if (newpc & 3 && g_settings.cpu_recompiler_memory_exceptions)
+  {
+    StoreConstantToCPUPointer(newpc, &g_state.cop0_regs.BadVaddr);
+    EndBlockWithBranchTargetException();
+    return;
+  }
+
   CompileBranchDelaySlot();
   EndBlock(newpc, true);
+}
+
+void CPU::NewRec::Compiler::EndBlockWithBranchTargetException()
+{
+  Flush(FLUSH_END_BLOCK | FLUSH_FOR_EXCEPTION | FLUSH_FOR_C_CALL);
+  const u32 cause_reg = AllocateTempHostReg();
+  const u32 epc_reg = AllocateTempHostReg();
+  LoadHostRegWithConstant(cause_reg, Cop0Registers::CAUSE::MakeValueForException(Exception::AdEL, false, false, 0));
+  LoadHostRegFromCPUPointer(epc_reg, &g_state.cop0_regs.BadVaddr);
+  GenerateCall(reinterpret_cast<const void*>(static_cast<void (*)(u32, u32)>(&CPU::RaiseException)), cause_reg,
+               epc_reg);
+  FreeHostReg(cause_reg);
+  FreeHostReg(epc_reg);
+  m_dirty_pc = false;
+  EndBlock(std::nullopt, true);
 }
 
 void CPU::NewRec::Compiler::Compile_syscall()
@@ -2422,7 +2448,7 @@ CPU::NewRec::Compiler::SpecValue CPU::NewRec::Compiler::SpecReadMem(VirtualMemor
     return value;
   }
 
-  const PhysicalMemoryAddress phys_addr = address & PHYSICAL_MEMORY_ADDRESS_MASK;
+  const PhysicalMemoryAddress phys_addr = address & KSEG_MASK;
   if (Bus::IsRAMAddress(phys_addr))
   {
     u32 ram_offset = phys_addr & Bus::g_ram_mask;
@@ -2442,7 +2468,7 @@ void CPU::NewRec::Compiler::SpecWriteMem(u32 address, SpecValue value)
     return;
   }
 
-  const PhysicalMemoryAddress phys_addr = address & PHYSICAL_MEMORY_ADDRESS_MASK;
+  const PhysicalMemoryAddress phys_addr = address & KSEG_MASK;
   if ((address & SCRATCHPAD_ADDR_MASK) == SCRATCHPAD_ADDR || Bus::IsRAMAddress(phys_addr))
     m_speculative_constants.memory.emplace(address, value);
 }

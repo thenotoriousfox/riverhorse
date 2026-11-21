@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2019-2023 Connor McLaughlin <stenzek@gmail.com> and contributors.
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #include "digital_controller.h"
 #include "host.h"
@@ -127,13 +127,13 @@ bool DigitalController::Transfer(const u8 data_in, u8* data_out)
 
     case TransferState::ButtonsLSB:
     {
-      *data_out = Truncate8(m_button_state) & GetButtonsLSBMask();
+      *data_out = Truncate8(m_button_state & m_grounded_buttons_mask);
       m_transfer_state = TransferState::ButtonsMSB;
       return true;
     }
 
     case TransferState::ButtonsMSB:
-      *data_out = Truncate8(m_button_state >> 8);
+      *data_out = Truncate8((m_button_state & m_grounded_buttons_mask) >> 8);
       m_transfer_state = TransferState::Idle;
       return false;
 
@@ -173,11 +173,15 @@ static const Controller::ControllerBindingInfo s_binding_info[] = {
 #undef BUTTON
 };
 
+static const char* s_variant_settings[] = {TRANSLATE_NOOP("DigitalController", "Standard Controller"),
+                                           TRANSLATE_NOOP("DigitalController", "Pop'n Controller"),
+                                           TRANSLATE_NOOP("DigitalController", "Densha de Go! Controller"), nullptr};
+
 static const SettingInfo s_settings[] = {
-  {SettingInfo::Type::Boolean, "ForcePopnControllerMode",
-   TRANSLATE_NOOP("DigitalController", "Force Pop'n Controller Mode"),
-   TRANSLATE_NOOP("DigitalController", "Forces the Digital Controller to act as a Pop'n Controller."), "false", nullptr,
-   nullptr, nullptr, nullptr, nullptr, 0.0f}};
+  {SettingInfo::Type::IntegerList, "ControllerVariant", TRANSLATE_NOOP("DigitalController", "Controller Variant"),
+   TRANSLATE_NOOP("DigitalController",
+                  "Reports the buttons that a Pop'n or Densha de Go! controller holds down, so games recognise it."),
+   "0", "0", "2", nullptr, nullptr, s_variant_settings, 0.0f}};
 
 const Controller::ControllerInfo DigitalController::INFO = {ControllerType::DigitalController,
                                                             "DigitalController",
@@ -190,13 +194,22 @@ const Controller::ControllerInfo DigitalController::INFO = {ControllerType::Digi
 void DigitalController::LoadSettings(SettingsInterface& si, const char* section)
 {
   Controller::LoadSettings(si, section);
-  m_popn_controller_mode = si.GetBoolValue(section, "ForcePopnControllerMode", false);
-}
 
-u8 DigitalController::GetButtonsLSBMask() const
-{
-  constexpr u8 popn_controller_mask =
-    static_cast<u8>(~(u8(1) << static_cast<u8>(Button::Right) | u8(1) << static_cast<u8>(Button::Down) |
-                      u8(1) << static_cast<u8>(Button::Left)));
-  return m_popn_controller_mode ? popn_controller_mask : 0xFF;
+  static constexpr auto bit = [](Button button) { return static_cast<u16>(1u << static_cast<u8>(button)); };
+  static constexpr u16 POPN_GROUNDED = bit(Button::Left) | bit(Button::Right) | bit(Button::Down);
+  static constexpr u16 DENSHA_GROUNDED = bit(Button::Up) | bit(Button::Down);
+
+  const s32 default_variant = si.GetBoolValue(section, "ForcePopnControllerMode", false) ? 1 : 0;
+  switch (si.GetIntValue(section, "ControllerVariant", default_variant))
+  {
+    case 1:
+      m_grounded_buttons_mask = static_cast<u16>(~POPN_GROUNDED);
+      break;
+    case 2:
+      m_grounded_buttons_mask = static_cast<u16>(~DENSHA_GROUNDED);
+      break;
+    default:
+      m_grounded_buttons_mask = UINT16_C(0xFFFF);
+      break;
+  }
 }

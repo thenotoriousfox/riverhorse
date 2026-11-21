@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2019-2024 Connor McLaughlin <stenzek@gmail.com>
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #include "cd_image.h"
 #include "cd_subchannel_replacement.h"
@@ -66,6 +66,7 @@ public:
 
   bool ReadSubChannelQ(SubChannelQ* subq, const Index& index, LBA lba_in_index) override;
   bool HasNonStandardSubchannel() const override;
+  bool LoadSubchannelReplacementFile(std::string_view path) override;
   PrecacheResult Precache(ProgressCallback* progress) override;
   bool IsPrecached() const override;
   s64 GetSizeOnDisk() const override;
@@ -444,6 +445,11 @@ bool CDImageCHD::ReadSubChannelQ(SubChannelQ* subq, const Index& index, LBA lba_
   // P, Q, R, S, T, U, V, W
   std::memcpy(subq->data.data(), real_subchannel_data + (1 * SUBCHANNEL_BYTES_PER_FRAME), SUBCHANNEL_BYTES_PER_FRAME);
   return true;
+}
+
+bool CDImageCHD::LoadSubchannelReplacementFile(std::string_view path)
+{
+  return m_sbi.LoadFromFile(path);
 }
 
 bool CDImageCHD::HasNonStandardSubchannel() const

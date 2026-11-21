@@ -11,6 +11,21 @@
 #include <string>
 #include <vector>
 
+namespace CheatInstructionPatches {
+
+inline bool g_any_active = false;
+
+/// Returns the instruction to execute at pc in place of the word read from memory.
+u32 Apply(VirtualMemoryAddress pc, u32 bits);
+
+void SetAddress(u8 slot, VirtualMemoryAddress address);
+void SetExpected(u8 slot, u32 bits);
+void SetReplacement(u8 slot, u32 bits);
+void Clear(u8 slot);
+void ClearAll();
+
+} // namespace CheatInstructionPatches
+
 struct CheatCode
 {
   enum class Type : u8
@@ -189,7 +204,7 @@ public:
 
   bool SaveToPCSXRFile(const char* filename);
 
-  bool LoadFromPackage(const std::string& serial);
+  bool LoadFromPackage(const std::string& serial, const char* resource_name);
 
   void Apply();
 

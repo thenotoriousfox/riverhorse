@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2019-2024 Connor McLaughlin <stenzek@gmail.com>
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #define IMGUI_DEFINE_MATH_OPERATORS
 
@@ -85,89 +85,92 @@ static std::tuple<float, float> GetMinMax(std::span<const float> values)
 void Host::DisplayLoadingScreen(const char* message, int progress_min /*= -1*/, int progress_max /*= -1*/,
                                 int progress_value /*= -1*/)
 {
-  if (!g_gpu_device)
-  {
-    INFO_LOG("{}: {}/{}", message, progress_value, progress_max);
-    return;
-  }
-
-  const auto& io = ImGui::GetIO();
-  const float scale = ImGuiManager::GetGlobalScale();
-  const float width = (400.0f * scale);
-  const bool has_progress = (progress_min < progress_max);
-
-  // eat the last imgui frame, it might've been partially rendered by the caller.
-  ImGui::EndFrame();
-  ImGui::NewFrame();
-
-  const float logo_width = 260.0f * scale;
-  const float logo_height = 260.0f * scale;
-
-  ImGui::SetNextWindowSize(ImVec2(logo_width, logo_height), ImGuiCond_Always);
-  ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, (io.DisplaySize.y * 0.5f) - (50.0f * scale)),
-                          ImGuiCond_Always, ImVec2(0.5f, 0.5f));
-  if (ImGui::Begin("LoadingScreenLogo", nullptr,
-                   ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoMove |
-                     ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoNav |
-                     ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoFocusOnAppearing |
-                     ImGuiWindowFlags_NoBackground))
-  {
-    GPUTexture* tex = ImGuiFullscreen::GetCachedTexture("images/duck.png");
-    if (tex)
-      ImGui::Image(tex, ImVec2(logo_width, logo_height));
-  }
-  ImGui::End();
-
-  const float padding_and_rounding = 15.0f * scale;
-  ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, padding_and_rounding);
-  ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(padding_and_rounding, padding_and_rounding));
-  ImGui::SetNextWindowSize(ImVec2(width, (has_progress ? 80.0f : 50.0f) * scale), ImGuiCond_Always);
-  ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, (io.DisplaySize.y * 0.5f) + (100.0f * scale)),
-                          ImGuiCond_Always, ImVec2(0.5f, 0.0f));
-  if (ImGui::Begin("LoadingScreen", nullptr,
-                   ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoMove |
-                     ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoNav |
-                     ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoFocusOnAppearing))
-  {
-    if (has_progress)
+  GPUDevice::RunOnDeviceThread([&]() {
+    if (!g_gpu_device)
     {
-      ImGui::TextUnformatted(message);
-
-      TinyString buf;
-      buf.format("{}/{}", progress_value, progress_max);
-
-      const ImVec2 prog_size = ImGui::CalcTextSize(buf.c_str(), buf.end_ptr());
-      ImGui::SameLine();
-      ImGui::SetCursorPosX(width - padding_and_rounding - prog_size.x);
-      ImGui::TextUnformatted(buf.c_str(), buf.end_ptr());
-      ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 5.0f);
-
-      ImGui::ProgressBar(static_cast<float>(progress_value) / static_cast<float>(progress_max - progress_min),
-                         ImVec2(-1.0f, 0.0f), "");
-      INFO_LOG("{}: {}", message, buf);
+      INFO_LOG("{}: {}/{}", message, progress_value, progress_max);
+      return;
     }
-    else
+
+    const auto& io = ImGui::GetIO();
+    const float scale = ImGuiManager::GetGlobalScale();
+    const float width = (400.0f * scale);
+    const bool has_progress = (progress_min < progress_max);
+
+    // eat the last imgui frame, it might've been partially rendered by the caller.
+    ImGui::EndFrame();
+    ImGui::NewFrame();
+
+    const float logo_width = 260.0f * scale;
+    const float logo_height = 260.0f * scale;
+
+    ImGui::SetNextWindowSize(ImVec2(logo_width, logo_height), ImGuiCond_Always);
+    ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, (io.DisplaySize.y * 0.5f) - (50.0f * scale)),
+                            ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+    if (ImGui::Begin("LoadingScreenLogo", nullptr,
+                     ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoMove |
+                       ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoNav |
+                       ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoFocusOnAppearing |
+                       ImGuiWindowFlags_NoBackground))
     {
-      const ImVec2 text_size(ImGui::CalcTextSize(message));
-      ImGui::SetCursorPosX((width - text_size.x) / 2.0f);
-      ImGui::TextUnformatted(message);
-      INFO_LOG(message);
+      GPUTexture* tex = ImGuiFullscreen::GetCachedTexture("images/riverhorse.png");
+      if (tex)
+        ImGui::Image(tex, ImVec2(logo_width, logo_height));
     }
-  }
-  ImGui::End();
-  ImGui::PopStyleVar(2);
+    ImGui::End();
 
-  ImGui::EndFrame();
+    const float padding_and_rounding = 15.0f * scale;
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, padding_and_rounding);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(padding_and_rounding, padding_and_rounding));
+    ImGui::SetNextWindowSize(ImVec2(width, (has_progress ? 80.0f : 50.0f) * scale), ImGuiCond_Always);
+    ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, (io.DisplaySize.y * 0.5f) + (100.0f * scale)),
+                            ImGuiCond_Always, ImVec2(0.5f, 0.0f));
+    if (ImGui::Begin("LoadingScreen", nullptr,
+                     ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoMove |
+                       ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoNav |
+                       ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoFocusOnAppearing))
+    {
+      if (has_progress)
+      {
+        ImGui::TextUnformatted(message);
 
-  // TODO: Glass effect or something.
+        TinyString buf;
+        buf.format("{}/{}", progress_value, progress_max);
 
-  if (g_gpu_device->BeginPresent(false))
-  {
-    g_gpu_device->RenderImGui();
-    g_gpu_device->EndPresent(false);
-  }
+        const ImVec2 prog_size = ImGui::CalcTextSize(buf.c_str(), buf.end_ptr());
+        ImGui::SameLine();
+        ImGui::SetCursorPosX(width - padding_and_rounding - prog_size.x);
+        ImGui::TextUnformatted(buf.c_str(), buf.end_ptr());
+        ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 5.0f);
 
-  ImGui::NewFrame();
+        ImGui::ProgressBar(static_cast<float>(progress_value) / static_cast<float>(progress_max - progress_min),
+                           ImVec2(-1.0f, 0.0f), "");
+        INFO_LOG("{}: {}", message, buf);
+      }
+      else
+      {
+        const ImVec2 text_size(ImGui::CalcTextSize(message));
+        ImGui::SetCursorPosX((width - text_size.x) / 2.0f);
+        ImGui::TextUnformatted(message);
+        INFO_LOG(message);
+      }
+    }
+    ImGui::End();
+    ImGui::PopStyleVar(2);
+
+    ImGui::EndFrame();
+
+    // TODO: Glass effect or something.
+
+    ImGui::Render();
+    if (g_gpu_device->BeginPresent(false))
+    {
+      g_gpu_device->RenderImGui(ImGui::GetDrawData());
+      g_gpu_device->EndPresent(false);
+    }
+
+    ImGui::NewFrame();
+  });
 }
 
 void ImGuiManager::RenderDebugWindows()
@@ -422,9 +425,13 @@ void ImGuiManager::DrawEnhancementsOverlay()
     text.append_format(" CPU={}%", g_settings.GetCPUOverclockPercent());
   if (g_settings.enable_8mb_ram)
     text.append(" 8MB");
-  if (g_settings.cdrom_read_speedup != 1)
+  if (g_settings.cdrom_read_speedup == 0)
+    text.append(" CDR=Max");
+  else if (g_settings.cdrom_read_speedup != 1)
     text.append_format(" CDR={}x", g_settings.cdrom_read_speedup);
-  if (g_settings.cdrom_seek_speedup != 1)
+  if (g_settings.cdrom_seek_speedup == 0)
+    text.append(" CDS=Max");
+  else if (g_settings.cdrom_seek_speedup != 1)
     text.append_format(" CDS={}x", g_settings.cdrom_seek_speedup);
   if (g_settings.gpu_resolution_scale != 1)
     text.append_format(" IR={}x", g_settings.gpu_resolution_scale);
@@ -776,46 +783,48 @@ void SaveStateSelectorUI::Close()
 
 void SaveStateSelectorUI::RefreshList(const std::string& serial)
 {
-  for (ListEntry& entry : s_slots)
-  {
-    if (entry.preview_texture)
-      g_gpu_device->RecycleTexture(std::move(entry.preview_texture));
-  }
-  s_slots.clear();
-
-  if (System::IsShutdown())
-    return;
-
-  if (!serial.empty())
-  {
-    for (s32 i = 1; i <= System::PER_GAME_SAVE_STATE_SLOTS; i++)
+  GPUDevice::RunOnDeviceThread([&]() {
+    for (ListEntry& entry : s_slots)
     {
-      std::string path(System::GetGameSaveStateFileName(serial, i));
+      if (entry.preview_texture)
+        g_gpu_device->RecycleTexture(std::move(entry.preview_texture));
+    }
+    s_slots.clear();
+
+    if (System::IsShutdown())
+      return;
+
+    if (!serial.empty())
+    {
+      for (s32 i = 1; i <= System::PER_GAME_SAVE_STATE_SLOTS; i++)
+      {
+        std::string path(System::GetGameSaveStateFileName(serial, i));
+        std::optional<ExtendedSaveStateInfo> ssi = System::GetExtendedSaveStateInfo(path.c_str());
+
+        ListEntry li;
+        if (ssi)
+          InitializeListEntry(&li, &ssi.value(), std::move(path), i, false);
+        else
+          InitializePlaceholderListEntry(&li, std::move(path), i, false);
+
+        s_slots.push_back(std::move(li));
+      }
+    }
+
+    for (s32 i = 1; i <= System::GLOBAL_SAVE_STATE_SLOTS; i++)
+    {
+      std::string path(System::GetGlobalSaveStateFileName(i));
       std::optional<ExtendedSaveStateInfo> ssi = System::GetExtendedSaveStateInfo(path.c_str());
 
       ListEntry li;
       if (ssi)
-        InitializeListEntry(&li, &ssi.value(), std::move(path), i, false);
+        InitializeListEntry(&li, &ssi.value(), std::move(path), i, true);
       else
-        InitializePlaceholderListEntry(&li, std::move(path), i, false);
+        InitializePlaceholderListEntry(&li, std::move(path), i, true);
 
       s_slots.push_back(std::move(li));
     }
-  }
-
-  for (s32 i = 1; i <= System::GLOBAL_SAVE_STATE_SLOTS; i++)
-  {
-    std::string path(System::GetGlobalSaveStateFileName(i));
-    std::optional<ExtendedSaveStateInfo> ssi = System::GetExtendedSaveStateInfo(path.c_str());
-
-    ListEntry li;
-    if (ssi)
-      InitializeListEntry(&li, &ssi.value(), std::move(path), i, true);
-    else
-      InitializePlaceholderListEntry(&li, std::move(path), i, true);
-
-    s_slots.push_back(std::move(li));
-  }
+  });
 }
 
 void SaveStateSelectorUI::Clear()
@@ -832,25 +841,29 @@ void SaveStateSelectorUI::Clear()
 
 void SaveStateSelectorUI::ClearList()
 {
-  for (ListEntry& li : s_slots)
-  {
-    if (li.preview_texture)
-      g_gpu_device->RecycleTexture(std::move(li.preview_texture));
-  }
-  s_slots.clear();
+  GPUDevice::RunOnDeviceThread([&]() {
+    for (ListEntry& li : s_slots)
+    {
+      if (li.preview_texture)
+        g_gpu_device->RecycleTexture(std::move(li.preview_texture));
+    }
+    s_slots.clear();
+  });
 }
 
 void SaveStateSelectorUI::DestroyTextures()
 {
-  Close();
+  GPUDevice::RunOnDeviceThread([&]() {
+    Close();
 
-  for (ListEntry& entry : s_slots)
-  {
-    if (entry.preview_texture)
-      g_gpu_device->RecycleTexture(std::move(entry.preview_texture));
-  }
+    for (ListEntry& entry : s_slots)
+    {
+      if (entry.preview_texture)
+        g_gpu_device->RecycleTexture(std::move(entry.preview_texture));
+    }
 
-  s_placeholder_texture.reset();
+    s_placeholder_texture.reset();
+  });
 }
 
 void SaveStateSelectorUI::RefreshHotkeyLegend()
@@ -928,28 +941,30 @@ void SaveStateSelectorUI::SelectPreviousSlot(bool open_selector)
 void SaveStateSelectorUI::InitializeListEntry(ListEntry* li, ExtendedSaveStateInfo* ssi, const std::string& path,
                                               s32 slot, bool global)
 {
-  if (global)
-    li->game_details = fmt::format(TRANSLATE_FS("SaveStateSelectorUI", "{} ({})"), ssi->title, ssi->serial);
+  GPUDevice::RunOnDeviceThread([&]() {
+    if (global)
+      li->game_details = fmt::format(TRANSLATE_FS("SaveStateSelectorUI", "{} ({})"), ssi->title, ssi->serial);
 
-  li->summary = fmt::format(TRANSLATE_FS("SaveStateSelectorUI", DATE_TIME_FORMAT), fmt::localtime(ssi->timestamp));
-  li->filename = Path::GetFileName(path);
-  li->slot = slot;
-  li->global = global;
+    li->summary = fmt::format(TRANSLATE_FS("SaveStateSelectorUI", DATE_TIME_FORMAT), fmt::localtime(ssi->timestamp));
+    li->filename = Path::GetFileName(path);
+    li->slot = slot;
+    li->global = global;
 
-  // Might not have a display yet, we're called at startup..
-  if (g_gpu_device)
-  {
-    g_gpu_device->RecycleTexture(std::move(li->preview_texture));
-
-    if (ssi->screenshot.IsValid())
+    // Might not have a display yet, we're called at startup..
+    if (g_gpu_device)
     {
-      li->preview_texture = g_gpu_device->FetchTexture(ssi->screenshot.GetWidth(), ssi->screenshot.GetHeight(), 1, 1, 1,
-                                                       GPUTexture::Type::Texture, GPUTexture::Format::RGBA8,
-                                                       ssi->screenshot.GetPixels(), ssi->screenshot.GetPitch());
-      if (!li->preview_texture) [[unlikely]]
-        ERROR_LOG("Failed to upload save state image to GPU");
+      g_gpu_device->RecycleTexture(std::move(li->preview_texture));
+
+      if (ssi->screenshot.IsValid())
+      {
+        li->preview_texture = g_gpu_device->FetchTexture(ssi->screenshot.GetWidth(), ssi->screenshot.GetHeight(), 1, 1,
+                                                         1, GPUTexture::Type::Texture, GPUTexture::Format::RGBA8,
+                                                         ssi->screenshot.GetPixels(), ssi->screenshot.GetPitch());
+        if (!li->preview_texture) [[unlikely]]
+          ERROR_LOG("Failed to upload save state image to GPU");
+      }
     }
-  }
+  });
 }
 
 void SaveStateSelectorUI::InitializePlaceholderListEntry(ListEntry* li, const std::string& path, s32 slot, bool global)

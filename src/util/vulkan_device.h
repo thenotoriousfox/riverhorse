@@ -18,6 +18,7 @@
 #include <functional>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <thread>
 #include <unordered_map>
@@ -160,6 +161,21 @@ public:
 
   /// Returns true if Vulkan is suitable as a default for the devices in the system.
   static bool IsSuitableDefaultRenderer();
+
+  struct HostContext
+  {
+    VkInstance instance;
+    VkPhysicalDevice physical_device;
+    VkSurfaceKHR surface;
+    std::vector<const char*> device_extensions;
+    VkPhysicalDeviceFeatures device_features;
+    std::function<void()> lock_queue;
+    std::function<void()> unlock_queue;
+  };
+  static void SetHostContext(std::optional<HostContext> context);
+
+  ALWAYS_INLINE VkQueue GetGraphicsQueue() const { return m_graphics_queue; }
+  ALWAYS_INLINE VkQueue GetPresentQueue() const { return m_present_queue; }
 
   // Helpers for getting constants
   ALWAYS_INLINE u32 GetBufferCopyOffsetAlignment() const
@@ -404,6 +420,8 @@ private:
   void StopPresentThread();
 
   VkInstance m_instance = VK_NULL_HANDLE;
+  bool m_owns_instance = true;
+  bool m_owns_device = true;
   VkPhysicalDevice m_physical_device = VK_NULL_HANDLE;
   VkDevice m_device = VK_NULL_HANDLE;
   VmaAllocator m_allocator = VK_NULL_HANDLE;

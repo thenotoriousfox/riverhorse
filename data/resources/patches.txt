@@ -1,0 +1,4489 @@
+;*******************************************************************************
+;Riverhorse patch database
+;*************************
+;
+; Same format as chtdb.txt: ":SERIAL" starts a game, "#Name" starts a patch, and
+; the lines after it are its codes. Players switch patches on per game in the
+; game's settings. To add a patch, see CONTRIBUTING.md: give the disc serial and
+; the version you tested, and only add codes you wrote or that come from a
+; GPL-compatible source.
+;*******************************************************************************
+
+:SLUS-01300
+#Play game at 60 FPS
+E006ABB0 0003
+3006ABB0 0001
+
+; [ Disney's 102 Dalmatians - Puppies to the Rescue (USA) (2000) (Eidos Interactive) {SLUS-01152} <102dalm> ]
+:SLUS-01152
+#Widescreen 16-9
+8007A09C 0C00
+
+; [ Akuji the Heartless (USA) (1998) (Eidos Interactive) {SLUS-00715} <akuji> ]
+:SLUS-00715
+#Play game at 60 FPS
+A7055FBA 14401400
+#Widescreen 16-9 (Vert-)
+8005A310 0C00
+8005A32C 0034
+8005A32E AFA0
+8005A330 1000
+8005A332 AFA0
+
+; [ Alien Resurrection (USA) (2000) (Fox Interactive) {SLUS-00633} <alienres> ]
+:SLUS-00633
+#Widescreen 16-9 (Vert-)
+8009E3D0 1400
+
+; [ Alundra 2 - A New Legend Begins (USA) (2000) (Activision) {SLUS-01017} <alundra2> ]
+:SLUS-01017
+#Widescreen 16-9 (Vert-)
+800595B8 0C00
+
+; [ Andretti Racing (USA) (1996) (Electronic Arts) {SLUS-00264} <andretti> ]
+:SLUS-00264
+#Play game at 60 FPS
+A7184972 0C081400
+
+; [ Ape Escape (USA) (1999) (Sony Computer Entertainment America) {SCUS-94423} <apescape> ]
+:SCUS-94423
+#Widescreen 16-9
+A70AF0A0 10000C00
+
+; [ Aquanaut's Holiday (USA) (1996) (Sony Computer Entertainment America) {SCUS-94603} <aquanaut> ]
+:SCUS-94603
+#Widescreen 16-9:Enabling this code results in the camera shaking heavily while turning
+8013E788 0C00
+
+:SLUS-01224
+#Widescreen 16-10
+80181368 0D00
+8018136A 2409
+8019A5CC 0080
+8019A5CE 0080
+8019A5E0 0120
+8019A5E2 0080
+8019A5E8 0042
+
+; [ Agile Warrior - F-111X (USA) (1995) (Virgin Interactive Entertainment) {SLUS-00023} <awf111x> ]
+:SLUS-00023
+#Play game at 60 FPS
+300F9764 003C
+
+; [ BallBlazer Champions (USA) (1997) (LucasArts Entertainment Company) {SLUS-00068} <ballblzr> ]
+:SLUS-00068
+#Select Widescreen Type\Widescreen 16-9
+80043BC8 1555
+80043BCC 1555
+#Select Widescreen Type\Widescreen 16-9 (Vert-)
+80043BC8 1555
+#Select Widescreen Type\Widescreen 16-9 (Vert- Adjusted)
+80043BC8 1555
+80043BCC 1150
+
+; [ Detective Barbie - The Mystery Cruise (USA) (2000) (Mattel Interactive) {SLUS-01221} <barbiemc> ]
+:SLUS-01221
+#Widescreen 16-9
+A70EC4AC 10000C00
+A71048C4 10000C00
+A71049C4 10000C00
+A710230C 10000C00
+A7089BE8 10000C00
+
+; [ Barbie - Super Sports (USA) (1999) (Mattel Interactive) {SLUS-00946} <barbiess> ]
+:SLUS-00946
+#Widescreen 16-9
+A70AA386 10000C00
+
+; [ Batman & Robin (USA) (1998) (Acclaim Entertainment) {SLUS-00393} <batnrob> ]
+:SLUS-00393
+#Widescreen 16-9
+80061B60 0C00
+#Widescreen 16-9 (Vert-)
+80061B64 1555
+
+; [ Bushido Blade (USA) (1997) (Sony Computer Entertainment America) {SCUS-94180} <bblade> ]
+:SCUS-94180
+#Widescreen 16-9
+A713C87C 10000C00
+
+; [ Bushido Blade 2 (USA) (1998) (Square Electronic Arts) {SLUS-00663} <bblade2> ]
+:SLUS-00663
+#Widescreen 16-9
+A70FF650 10000C00
+
+; [ Bugs Bunny & Taz - Time Busters (USA) (2000) (Infogrames) {SLUS-01144} <bbtaztb> ]
+:SLUS-01144
+#Widescreen 16-9
+A70990AC 10000C00
+
+; [ Beyblade (USA) (2002) (Crave Entertainment) {SLUS-01489} <beyblade> ]
+:SLUS-01489
+#Widescreen 16-9
+80048342 0EC8
+
+; [ Big Air (USA) (1999) (Accolade) {SLUS-00645} <bigair> ]
+:SLUS-00645
+#Widescreen 16-9
+A706B650 10000C00
+
+; [ Bloody Roar II (USA) (1999) (Sony Computer Entertainment America) {SCUS-94424} <bldyror2> ]
+:SCUS-94424
+#Widescreen 16-9
+A71F0018 19991333
+
+:SLUS-01424
+#Widescreen 16-9
+A70C5CB6 10000C00
+
+; [ Breath of Fire III (USA) (1998) (Capcom Entertainment) {SLUS-00422} <bof3> ]
+:SLUS-00422
+#Widescreen 16-9
+80179888 0C00
+8017988A 2409
+
+; [ Breath of Fire IV (USA) (2000) (Capcom Entertainment) {SLUS-01324} <bof4> ]
+:SLUS-01324
+#Widescreen 16-9
+8016AE1C 0C00
+8016AE1E 240A
+8016AE24 1000
+8016AE26 240A
+8016AE94 0C00
+8016AE96 240A
+8016AE9C 1000
+8016AE9E 240A
+
+; [ Bomberman Fantasy Race (USA) (1999) (Atlus Software) {SLUS-00823} <bombfntr> ]
+:SLUS-00823
+#Widescreen 16-9
+8003F89C 0C00
+8003F89E 2405
+
+; [ Brahma Force - The Assault on Beltlogger 9 (USA) (1997) (Jaleco USA) {SLUS-00444} <brahmafc> ]
+:SLUS-00444
+#Widescreen 16-9 (Vert-)
+8008DD54 1555
+
+; [ Bubsy 3D - Furbitten Planet (USA) (1996) (Accolade) {SLUS-00110} <bubsy3d> ]
+:SLUS-00110
+#Widescreen 16-9
+A71CBF20 10000C00
+
+; [ Bugs Bunny - Lost in Time (USA) (2000) (Infogrames) {SLUS-00838} <bugsblit> ]
+:SLUS-00838
+#Select Widescreen\16-9
+A7076150 10000C00
+#Select Widescreen\Eyefinity:GPU Intense, massive slowdown, de-syncs+/breaks cutscenes
+A7076150 10000400
+
+:SLUS-01538
+#Widescreen 16-9
+80027DC0 4CCC
+80027DC8 CCCD
+
+; [ Disney/Pixar A Bug's Life (USA, v1.0) (1998) (Sony Computer Entertainment America) {SCUS-94288} <bugslifea> ]
+:SCUS-94288
+#Widescreen 16-9
+80027DC0 4CCC
+80027DC8 CCCD
+
+; [ Disney/Pixar Buzz Lightyear of Star Command (USA) (2000) (Activision) {SLUS-01192} <buzzlght> ]
+:SLUS-01192
+#Widescreen 16-9
+8002E804 4CCC
+8002E80C CCCC
+#Widescreen 16:9 (ASM)
+D002E804 6666
+8002E804 4CCC
+D002E808 6667
+8002E808 CCCC
+
+; [ Chicken Run (USA) (2000) (Eidos Interactive) {SLUS-01304} <chickrun> ]
+:SLUS-01304
+#Widescreen
+800B3234 0C00
+
+; [ Clock Tower (USA) (1997) (ASCII Entertainment Software) {SLUS-00539} <clocktow> ]
+:SLUS-00539
+#Widescreen 16-9
+A7066144 10000C00
+
+; [ Clock Tower II - The Struggle Within (USA) (1999) (Agetec) {SLUS-00695} <clocktw2> ]
+:SLUS-00695
+#Widescreen 16-9
+A706F7B8 10000C00
+
+; [ Contender 2 (USA) (2000) (BAM! Entertainment) {SLUS-01305} <contend2> ]
+:SLUS-01305
+#Widescreen 16-9
+800BC338 0C00
+
+; [ Contender (USA) (1999) (Sony Computer Entertainment America) {SCUS-94294} <contendr> ]
+:SCUS-94294
+#Widescreen 16-9
+80059958 0C00
+
+; [ C - The Contra Adventure (USA) (1998) (Konami of America) {SLUS-00499} <contradv> ]
+:SLUS-00499
+#Widescreen 16-9
+A70EC508 10000C00
+
+; [ Contra - Legacy of War (USA) (1996) (Konami of America) {SLUS-00288} <contralw> ]
+:SLUS-00288
+#Widescreen 16-9
+A70DCA08 10000C00
+
+; [ Crash Bandicoot (USA) (1996) (Sony Computer Entertainment America) {SCUS-94900} <crash> ]
+:SCUS-94900
+#Widescreen 16-9
+80017A4C 0C00
+80017A4E 2402
+80017A8E A433
+
+; [ Crash Bandicoot 8 april proto ]
+:UNKNOWN
+#Unlock 60fps
+A7034FBE 04812400
+
+; [ Crash Bandicoot 2 - Cortex Strikes Back (USA) (1997) (Sony Computer Entertainment America) {SCUS-94154} <crash2> ]
+:SCUS-94154
+#Widescreen 16-9
+80017BFC 0C00
+80017BFE 241B
+80017C00 1000
+80017C02 2402
+80017C1E A67B
+
+:SCUS-94244
+#Widescreen 16-9
+80018A90 0C00
+80018A92 2402
+80018A94 1000
+80018A96 2413
+80018AB2 A633
+#Enable 60 FPS (Play with Overclock to get preferred speed)
+A704B40E 10401000
+#Enable 60 FPS Alternative (Play with Overclock to get preferred speed)
+A704B2E2 04812400
+
+; [ Crash Bash (USA) (2000) (Sony Computer Entertainment America) {SCUS-94570} <crashbsh> ]
+:SCUS-94570
+#Widescreen 16-9
+8001443C 0900
+8001443E 2402
+
+; [ Cardinal Syn (USA) (1998) (989 Studios) {SCUS-94156} <cardsyn> ]
+:SCUS-94156
+#Widescreen 16-9
+A71EAD78 10000C00
+
+; [ Criticom (USA) (1995) (Vic Tokai) {SLUS-00046} <criticom> ]
+:SLUS-00046
+#Widescreen 16-9
+A70DC888 10000C00
+
+; [ Croc - Legend of the Gobbos (USA) (1997) (Fox Interactive) {SLUS-00530} <croc> ]
+:SLUS-00530
+#Widescreen 16-9
+800168EC 2082
+800168EE 0800
+8001C010 0C00
+8001C012 240C
+80008208 FFE0
+8000820A 8486
+8000820C FFE0
+8000820E 2484
+80008210 D883
+80008212 0006
+80008214 3043
+80008216 0006
+80008218 3021
+8000821A 00DB
+8000821C 0000
+8000821E A486
+80008220 0004
+80008222 8486
+80008224 0000
+80008226 0000
+80008228 D883
+8000822A 0006
+8000822C 3043
+8000822E 0006
+80008230 3021
+80008232 00DB
+80008234 5A3D
+80008236 0800
+80008238 0004
+8000823A A486
+#FPS uncap + 60FPS lock
+A7014606 14521000
+
+; [ Croc 2 (USA) (1999) (Fox Interactive) {SLUS-00634} <croc2> ]
+:SLUS-00634
+#Widescreen 16-9
+80014C64 C410
+80014C66 0801
+90071040 84880000
+90071044 00000000
+90071048 01084821
+9007104C 01284021
+90071050 00084083
+90071054 A4880000
+90071058 84880004
+9007105C 00000000
+90071060 01084821
+90071064 01284021
+90071068 00084083
+9007106C 0C014B24
+90071070 A4880004
+90071074 0800531B
+90071078 00000000
+
+; [ Critical Depth (USA) (1997) (GT Interactive Software) {SLUS-00428} <crtdepth> ]
+:SLUS-00428
+#Widescreen 16-9
+A71CF2A4 10000C00
+A71CF304 10000C00
+A71CF364 10000C00
+
+; [ CTR - Crash Team Racing (USA) (1999) (Sony Computer Entertainment America) {SCUS-94426} <ctr> ]
+:SCUS-94426
+#Widescreen
+9002305C 24040C00
+800230C6 000E
+900230A0 00037300
+90022608 08002080
+9002260C 84510000
+90008200 241B0003
+90008204 03710019
+90008208 00008812
+9000820C 00118883
+90008210 08008984
+90008214 2442003A
+8006C2F8 0C00
+90043168 24040400
+#Widescreen 16-9 ALT
+8006C2F8 0C00
+8006C2EE 3000
+90043168 24040400
+9002305C 24040C00
+800230C6 000E
+900230A0 00037300
+90022608 08002080
+9002260C 84510000
+90008200 241B0003
+90008204 03710019
+90008208 00008812
+9000820C 00118883
+90008210 08008984
+90008214 2442003A
+900224A4 08002086
+900224A8 84C20000
+90008218 00000000
+9000821C 0002D883
+90008220 00021043
+90008224 0800892B
+90008228 005B1021
+D00B077E AFA2
+800B0778 00C0
+#Widescreen (2)
+8002305C 0C00
+8002305E 2404
+800230C6 000E
+800230A0 7300
+800230A2 0003
+80022608 2080
+8002260A 0800
+8002260C 0000
+8002260E 8451
+80008200 0003
+80008202 241B
+80008204 0019
+80008206 0371
+80008208 8812
+8000820A 0000
+8000820C 8883
+8000820E 0011
+80008210 8984
+80008212 0800
+80008214 003A
+80008216 2442
+8006C2F8 0C00
+80043168 0400
+8004316A 2404
+
+;#P1 Use Nitros Oxide:Press L2 after selecting your character. May not work at all in VS mode for player 1. For Adventure mode, press L1 before entering a portal/challenge. Press L2 before returning to the map. Freezes on some tracks. ? is the character you want to be in Adventure Mode map.
+;D0096AD6 FEFF
+;80086E84 000F
+;D0096AD6 FBFF
+;80086E84 000?
+; [ Colony Wars - Red Sun (USA) (2000) (Midway Home Entertainment) {SLUS-00866} <cwarsrs> ]
+:SLUS-00866
+#Widescreen 16-9
+A7119970 19991333
+
+; [ Dragon Ball GT - Final Bout (USA) (1997) (Bandai America) {SLUS-00493} <dballgt> ]
+:SLUS-00493
+#Widescreen 16-9
+A703BE30 10000C00
+
+; [ Demolition Racer (USA) (1999) (Infogrames) {SLUS-00969} <demracer> ]
+:SLUS-00969
+#Widescreen 16-9
+30065169 000C
+
+; [ Destrega (USA) (1998) (Koei) {SLUS-00732} <destrega> ]
+:SLUS-00732
+#Widescreen 16-9
+A70ED4E8 10000C00
+
+; [ Digimon World (USA) (1999) (Bandai America) {SLUS-01032} <digiwld> ]
+:SLUS-01032
+#Widescreen 16-9
+A7136F64 10000C00
+
+; [ Digimon World 2 (USA) (2001) (Bandai America) {SLUS-01193} <digiwld2> ]
+:SLUS-01193
+#Widescreen 16-9
+A7061A28 10000C00
+
+:SLUS-01436
+#Widescreen 16-9
+A7080B10 10000C00
+
+; [ Dino Crisis (USA, v1.1) (1999) (Capcom Entertainment) {SLUS-00922} <dinocris> ]
+:SLUS-00922
+#60 FPS (Doubles game speed)
+A7087972 0C021400
+
+; [ Dead or Alive (USA) (1998) (Tecmo) {SLUS-00606} <doa> ]
+:SLUS-00606
+#Widescreen 16-9
+A7049F10 10000C00
+
+; [ Doom (USA) (1995) (Williams Entertainment) {SLUS-00077} <doom> ]
+:SLUS-00077
+#Widescreen 16-9
+80030724 2082
+80030726 0800
+90008208 84226534
+9000820C 00000000
+90008210 0002D883
+90008214 00021043
+90008218 005B1021
+9000821C A4226534
+90008220 84226530
+90008224 00000000
+90008228 0002D883
+9000822C 00021043
+90008230 005B1021
+90008234 0800C1CB
+90008238 A4226530
+
+; [ Dora the Explorer - Barnyard Buddies (USA) (2003) (Global Star Software) {SLUS-01576} <doraexp> ]
+;:SLUS-01576
+;This game currently has no cheats
+; [ Dragon Seeds (USA) (1998) (Jaleco USA) {SLUS-00734} <drgnseed> ]
+:SLUS-00734
+#Widescreen 16-9
+A7097408 10000C00
+
+:SLUS-00842
+#Widescreen 16-9
+A708AA38 19991333
+
+:SLUS-01318
+#Widescreen 16-9
+A707EC48 10000C00
+; [ Dune 2000 (USA) (1999) (Electronic Arts / Westwood Studios) {SLUS-00973} <dune2000> ]
+#Widescreen 16-9 (2)
+A707F170 10000C00
+
+:SLUS-00973
+#Widescreen 16-9
+80183028 1558
+80183068 0C00
+
+:SLUS-01346
+#Widescreen 16-9
+A7026544 10000C00
+A7026554 10000C00
+
+; [ Dynasty Warriors (USA) (1997) (Koei) {SLUS-00438} <dynwarr> ]
+:SLUS-00438
+#Widescreen 16-9
+A70BBB94 10000C00
+
+; [ Ehrgeiz - God Bless the Ring (USA) (1999) (Square Electronic Arts) {SLUS-00809} <ehrgeiz> ]
+:SLUS-00809
+#Widescreen 16-9
+D0057A9A AC64
+80057A88 2080
+D0057A9A AC64
+80057A8A 0C00
+D0057A9A AC64
+80057A8C 0000
+D0057A9A AC64
+80057A8E 8C44
+90008200 24050003
+90008204 00850019
+90008208 00002012
+9000820C 00042083
+90008210 03E00008
+90008214 8C450004
+
+; [ Einhänder (USA) (1998) (Sony Computer Entertainment America) {SCUS-94243} <einhandr> ]
+:SCUS-94243
+#Widescreen 16-9
+A713EFF8 10000C00
+
+; [ ESPN MLS Gamenight (USA) (2000) (Konami of America) {SLUS-01186} <espnmls> ]
+:SLUS-01186
+#Widescreen 16-9
+A707D288 10000C00
+
+; [ Evil Zone (USA) (1999) (Titus Software Corporation) {SLUS-00855} <evilzone> ]
+:SLUS-00855
+#Widescreen 16-9
+800297F4 0C00
+#Widescreen 16-9 (Alt)
+800297F4 0C00
+8002D91C 0C00
+
+; [ Fatal Fury - Wild Ambition (USA) (1999) (SNK of America) {SLUS-01001} <fatfurwa> ]
+:SLUS-01001
+#Widescreen 16-9
+A707B59C 10000C00
+
+; [ Fighter Maker (USA) (1999) (Agetec) {SLUS-00641} <fightmkr> ]
+:SLUS-00641
+#Widescreen 16-9
+A71EF410 10000C00
+
+:SLUS-01172
+#Widescreen 16-9
+A70A4818 10000C00
+
+; [ Gekido - Urban Fighters (USA) (2000) (Interplay Entertainment) {SLUS-00970} <gekido> ]
+:SLUS-00970
+#Widescreen 16-9
+A70119E0 10000C00
+
+; [ Gex - Enter the Gecko (USA) (1998) (Crystal Dynamics) {SLUS-00598} <gex2> ]
+:SLUS-00598
+#Widescreen 16-9
+8003EB14 0C00
+8003EB24 0034
+8003EB26 AFA0
+8003EB28 1000
+8003EB2A 2403
+800324AC 0C00
+800324AE 2402
+8003236C 0C00
+8003236E 2402
+800668E4 00BF
+80066920 002A
+80066858 004A
+80066860 005A
+800668AC 01B5
+800668B4 01C5
+80032F48 0C00
+80032F4A 240C
+80033532 001F
+
+; [ Gex 3 - Deep Cover Gecko (USA) (1999) (Eidos Interactive) {SLUS-00806} <gex3> ]
+:SLUS-00806
+#Widescreen 16-9
+800311CC 0C00
+800311DC 0034
+800311DE AFA0
+800311E0 1000
+800311E2 2403
+
+; [ The Granstream Saga (USA) (1998) (THQ) {SLUS-00597} <granstrm> ]
+:SLUS-00597
+#Widescreen 16-9
+800C0570 0C00
+
+; [ Grid Runner (USA) (1996) (Virgin Interactive Entertainment) {SLUS-00323} <gridrun> ]
+:SLUS-00323
+#Widescreen 16-9
+80079672 0C00
+8009D3BC 0C00
+8009D3F4 0C00
+
+; [ The Grinch (USA) (2000) (Konami of America) {SLUS-01197} <grinch> ]
+:SLUS-01197
+#Widescreen 16-9
+A709A704 10000C00
+
+; [ Grind Session (USA) (2000) (Sony Computer Entertainment America) {SCUS-94568} <grindses> ]
+:SCUS-94568
+#Widescreen 16-9
+80089288 0C00
+#Widescreen 16-9 (Vert-)
+80089290 1555
+#Widescreen 16-9 (Vert- Adjusted)
+80089290 1555
+80089298 1040
+
+; [ Gran Turismo (USA, v1.1) (1998) (Sony Computer Entertainment America) {SCUS-94194} <gt1> ]
+:SCUS-94194
+#60 FPS (+Re-enable tire smoke, Re-enable rear view mirror)
+A60B6348 00020001
+A702E548 00020001
+A702AA3C 00020001
+; [ Gran Turismo (USA, v1.0) (1998) (Sony Computer Entertainment America) {SCUS-94194} <gt1a> ]
+#60 FPS (+e-enable tire smoke, re-enable rear view mirror)
+A60B6318 00020001
+A702E580 00020001
+A702AA74 00020001
+
+; [ Gran Turismo 2 (USA, v1.2) (1999) (Sony Computer Entertainment America) {SCUS-94488} <gt2> ]
+:SCUS-94488
+#Widescreen 16-9
+D0010000 FFE8
+8007B39C 0156
+D0010000 FFD0
+8007B39C 03DE
+D0010000 FFE0
+8007B39C 01AC
+8007B39E 3402
+#Widescreen 16-9 option Better Graphics
+800674EC 0060
+800674EE 3404
+#16:9 Widescreen 2.0
+;"Help" the game unload segments that normally are left unwritten to,
+;so further cheat detection is more reliable. This is safe as it overwrites dead code.
+;Reset the race overlay for Arcade
+A40529DC 801EFB39
+8005D5DC 0000
+80057054 0000
+00000000 FFFF
+;Reset the race overlay for Simulation
+A4052A70 000000F6
+8005D5DC 0000
+80057054 0000
+00000000 FFFF
+;Car Selection (Arcade)
+A4020A90 3084007F
+A701E578 FF80FF56
+A701E580 008000AA
+;Car Selection 2P Battle (Arcade)
+A70201C4 FF97FF74
+A70201CC 0069008C
+;Pre-race screen (Arcade)
+A701536C 014001AA
+00000000 FFFF
+;Race
+A401F888 AEB40008
+A70100D0 FF60FF2B
+A70100D4 00A000D5
+00000000 FFFF
+;Race (Rear view mirror)
+A403EC74 02602021
+A70295EC FFC4FFB0
+A70295F0 003C0050
+00000000 FFFF
+;Post-race screen #1
+A4057054 260201C0
+;a1 -> t1, *will* change visuals of some screens!
+;Other screens will get slightly resized to compensate for this.
+A70497CA A485A489
+A7049F48 00C8010A
+A7049F50 302100C8
+A7049F52 00A03406
+A704C194 00C8010A
+A704C19C 302100C8
+A704C19E 00A03406
+;Bonus screen (Licenses)
+;Use free space to re-fit li $a1, 160h \ sh $a1, C4h($a0)
+A704E07C 00000160
+A704E07E 00002405
+A704E088 022000C4
+A704E08A 8FB2A485
+A704E064 016001D5
+;Results screen
+A7050C14 FF50FF16
+A7050C1C 00B000EA
+00000000 FFFF
+;Post-race screen #2
+A405D5DC 8005A5F8
+A7058070 00C8010A
+A7058078 302100C8
+A705807A 00A03406
+A7058924 00C8010A
+A705892C 302100C8
+A705892E 00A03406
+;Bonus screen (Trophy)
+A7059A08 016001D5
+00000000 FFFF
+;GT Mode screens (Simulation)
+A402442C 800229A8
+A701CDF4 00B30086
+A701CDFC FFCEFFDB
+A701CE04 03200258
+00000000 FFFF
+#21:9 Widescreen 2.0
+;"Help" the game unload segments that normally are left unwritten to,
+;so further cheat detection is more reliable. This is safe as it overwrites dead code.
+;Reset the race overlay for Arcade
+A40529DC 801EFB39
+8005D5DC 0000
+80057054 0000
+00000000 FFFF
+;Reset the race overlay for Simulation
+A4052A70 000000F6
+8005D5DC 0000
+80057054 0000
+00000000 FFFF
+;Car Selection (Arcade)
+A4020A90 3084007F
+A701E578 FF80FF20
+A701E580 008000E0
+;Car Selection 2P Battle (Arcade)
+A70201C4 FF97FF49
+A70201CC 006900B7
+;Pre-race screen (Arcade)
+A701536C 01400230
+00000000 FFFF
+;Race
+A401F888 AEB40008
+A70100D0 FF60FEE8
+A70100D4 00A00118
+00000000 FFFF
+;Race (Rear view mirror)
+A403EC74 02602021
+A70295EC FFC4FF97
+A70295F0 003C0069
+00000000 FFFF
+;Post-race screen #1
+A4057054 260201C0
+;a1 -> t1, *will* change visuals of some screens!
+;Other screens will get slightly resized to compensate for this.
+A70497CA A485A489
+A7049F48 00C8015E
+A7049F50 302100C8
+A7049F52 00A03406
+A704C194 00C8015E
+A704C19C 302100C8
+A704C19E 00A03406
+;Bonus screen (Licenses)
+;Use free space to re-fit li $a1, 160h \ sh $a1, C4h($a0)
+A704E07C 00000160
+A704E07E 00002405
+A704E088 022000C4
+A704E08A 8FB2A485
+A704E064 01600268
+;Results screen
+A7050C14 FF50FECC
+A7050C1C 00B00134
+00000000 FFFF
+;Post-race screen #2
+A405D5DC 8005A5F8
+A7058070 00C8015E
+A7058078 302100C8
+A705807A 00A03406
+A7058924 00C8015E
+A705892C 302100C8
+A705892E 00A03406
+;Bonus screen (Trophy)
+A7059A08 01600268
+00000000 FFFF
+;GT Mode screens (Simulation)
+A402442C 800229A8
+A701CDF4 00B30066
+A701CDFC FFCEFFE4
+A701CE04 032001C9
+00000000 FFFF
+#60 FPS (+Re-enable tire smoke, sky in the read view mirror, rear view mirror)
+E01D5864 0002
+301D5864 0001
+A401F888 AEB40008
+;Re-enable tire smoke
+A70168C8 00020000
+;Re-enable sky in the read view mirror
+A7019644 00020000
+00000000 FFFF
+;Re-enable rear view mirror
+A003EC74 02602021
+A7029550 00020000
+#Widescreen 16-9 (2)
+D0010000 FFE8
+8007B2AC 0156
+D0010000 FFD0
+8007B2AC 03DE
+D0010000 FFE0
+8007B2AC 01AC
+8007B2AE 3402
+#Aspect ratio Widescreen
+D0010000 FFE8
+8007B2AC 0155
+D0010000 FFD0
+8007B2AC 0370
+D0010000 FFE0
+8007B2AC 01AC
+8007B2AE 3402
+
+; [ Gran Turismo 2 (USA, v1.1) (1999) (Sony Computer Entertainment America) {SCUS-94455} <gt2a> ]
+:SCUS-94455
+#16:9 Widescreen
+;"Help" the game unload segments that normally are left unwritten to,
+;so further cheat detection is more reliable. This is safe as it overwrites dead code.
+;Reset the race overlay for Arcade
+A4052A64 801EF8EF
+8005D598 0000
+80057010 0000
+00000000 FFFF
+;Reset the race overlay for Simulation
+A4052B20 000000E7
+8005D598 0000
+80057010 0000
+00000000 FFFF
+;Car Selection (Arcade)
+A4020A74 3084007F
+A701E55C FF80FF56
+A701E564 008000AA
+;Car Selection 2P Battle (Arcade)
+A70201A8 FF97FF74
+A70201B0 0069008C
+;Pre-race screen (Arcade)
+A7015350 014001AA
+00000000 FFFF
+;Race
+A401F888 AEB40008
+A70100D0 FF60FF2B
+A70100D4 00A000D5
+00000000 FFFF
+;Race (Rear view mirror)
+A403EC6C 02602021
+A70295E4 FFC4FFB0
+A70295E8 003C0050
+00000000 FFFF
+;Post-race screen #1
+A4057010 260201C0
+;a1 -> t1, *will* change visuals of some screens!
+;Other screens will get slightly resized to compensate for this.
+A7049736 A485A489
+A7049EB4 00C8010A
+A7049EBC 302100C8
+A7049EBE 00A03406
+A704C100 00C8010A
+A704C108 302100C8
+A704C10A 00A03406
+;Bonus screen (Licenses)
+;Use free space to re-fit li $a1, 160h \ sh $a1, C4h($a0)
+A704DFE8 00000160
+A704DFEA 00002405
+A704DFF4 022000C4
+A704DFF6 8FB2A485
+A704DFD0 016001D5
+;Results screen
+A7050B80 FF50FF16
+A7050B88 00B000EA
+00000000 FFFF
+;Post-race screen #2
+A405D598 8005A5B4
+A705802C 00C8010A
+A7058034 302100C8
+A7058036 00A03406
+A70588E0 00C8010A
+A70588E8 302100C8
+A70588EA 00A03406
+;Bonus screen (Trophy)
+A70599C4 016001D5
+00000000 FFFF
+;GT Mode screens (Simulation)
+A40244EC 800229D8
+A701CDF4 00B30086
+A701CDFC FFCEFFDB
+A701CE04 03200258
+00000000 FFFF
+#21:9 Widescreen
+;"Help" the game unload segments that normally are left unwritten to,
+;so further cheat detection is more reliable. This is safe as it overwrites dead code.
+;Reset the race overlay for Arcade
+A4052A64 801EF8EF
+8005D598 0000
+80057010 0000
+00000000 FFFF
+;Reset the race overlay for Simulation
+A4052B20 000000E7
+8005D598 0000
+80057010 0000
+00000000 FFFF
+;Car Selection (Arcade)
+A4020A74 3084007F
+A701E55C FF80FF20
+A701E564 008000E0
+;Car Selection 2P Battle (Arcade)
+A70201A8 FF97FF49
+A70201B0 006900B7
+;Pre-race screen (Arcade)
+A7015350 01400230
+00000000 FFFF
+;Race
+A401F888 AEB40008
+A70100D0 FF60FEE8
+A70100D4 00A00118
+00000000 FFFF
+;Race (Rear view mirror)
+A403EC6C 02602021
+A70295E4 FFC4FF97
+A70295E8 003C0069
+00000000 FFFF
+;Post-race screen #1
+A4057010 260201C0
+;a1 -> t1, *will* change visuals of some screens!
+;Other screens will get slightly resized to compensate for this.
+A7049736 A485A489
+A7049EB4 00C8015E
+A7049EBC 302100C8
+A7049EBE 00A03406
+A704C100 00C8015E
+A704C108 302100C8
+A704C10A 00A03406
+;Bonus screen (Licenses)
+;Use free space to re-fit li $a1, 160h \ sh $a1, C4h($a0)
+A704DFE8 00000160
+A704DFEA 00002405
+A704DFF4 022000C4
+A704DFF6 8FB2A485
+A704DFD0 01600268
+;Results screen
+A7050B80 FF50FECC
+A7050B88 00B00134
+00000000 FFFF
+;Post-race screen #2
+A405D598 8005A5B4
+A705802C 00C8015E
+A7058034 302100C8
+A7058036 00A03406
+A70588E0 00C8015E
+A70588E8 302100C8
+A70588EA 00A03406
+;Bonus screen (Trophy)
+A70599C4 01600268
+00000000 FFFF
+;GT Mode screens (Simulation)
+A40244EC 800229D8
+A701CDF4 00B30066
+A701CDFC FFCEFFE4
+A701CE04 032001C9
+00000000 FFFF
+#60 FPS (+Re-enable tire smoke, sky in the read view mirror, rear view mirror)
+E01D5634 0002
+301D5634 0001
+A401F888 AEB40008
+;Re-enable tire smoke
+A70168C8 00020000
+;Re-enable sky in the read view mirror
+A7019644 00020000
+00000000 FFFF
+;Re-enable rear view mirror
+A003EC6C 02602021
+A7029548 00020000
+; [ Gran Turismo 2 (USA, v1.0) (1999) (Sony Computer Entertainment America) {SCUS-94455} <gt2b> ]
+#Widescreen 16-9
+D0010000 FFE8
+8007B2AC 0155
+D0010000 FFD0
+8007B2AC 0370
+D0010000 FFE0
+8007B2AC 01AC
+8007B2AE 3402
+#Widescreen 16-9 option Better Graphics
+800673FC 0060
+800673FE 3404
+#Widescreen 16-9 (2)
+D0010000 FFE8
+8007B2AC 0156
+D0010000 FFD0
+8007B2AC 03DE
+D0010000 FFE0
+8007B2AC 01AC
+8007B2AE 3402
+
+; [ Gran Turismo 2 - Music at the Speed of Sound - The Album (USA, Bonus PlayStation Disc) (2000) (Sony Computer Entertainment America) {SCUS-94588} <gt2music> ]
+;:SCUS-94588
+;This game currently has no cheats
+; [ Hellboy - Asylum Seeker (USA) (2003) (DreamCatcher Interactive) {SLUS-01414} <hellboy> ]
+:SLUS-01414
+#Widescreen 16-9
+8007663C 1333
+
+; [ Mat Hoffman's Pro BMX (USA) (2001) (Activision) {SLUS-01113} <hoffbmx> ]
+:SLUS-01113
+#Widescreen 16-9 (Vert-)
+80028130 1333
+
+; [ Hogs of War (USA) (2000) (Infogrames) {SLUS-01195} <hogsowar> ]
+:SLUS-01195
+#60 FPS unlock (Needs overclock)
+A7085522 14402400
+#30 FPS unlock (Gameshark Assembly Codes)
+D0013AFE 1443
+80013AFE 2400
+#60 FPS unlock (Needs overclock) (Gameshark Assembly Codes)
+D0085522 1440
+80085522 2400
+
+; [ Hot Wheels - Turbo Racing (USA) (1999) (Electronic Arts) {SLUS-00964} <hotwhltr> ]
+:SLUS-00964
+#Widescreen 16-9
+A711A7DC 10000C00
+
+; [ Harry Potter and the Chamber of Secrets (USA) (2002) (Electronic Arts) {SLUS-01503} <hpotcsec> ]
+:SLUS-01503
+#Widescreen 16-9
+A7075C6E 10002000
+
+; [ Harry Potter and the Sorcerer's Stone (USA) (2001) (Electronic Arts) {SLUS-01415} <hpotsors> ]
+:SLUS-01415
+#Widescreen 16-9
+800710F2 2000
+
+; [ I.Q - Intelligent Qube (USA) (1997) (Sony Computer Entertainment America) {SCUS-94181} <iqube> ]
+:SCUS-94181
+#Widescreen 16-9
+A7097E00 10000C00
+
+; [ ISS Pro Evolution (USA) (2000) (Konami of America) {SLUS-01014} <issproev> ]
+:SLUS-01014
+#Widescreen 16-9
+A70719D0 10000C00
+
+; [ Um Jammer Lammy (USA) (1999) (Sony Computer Entertainment America) {SCUS-94448} <jamlammy> ]
+:SCUS-94448
+#Widescreen 16-9
+A71C4B28 10000C00
+
+; [ Jackie Chan Stuntmaster (USA) (2000) (Midway Home Entertainment) {SLUS-00684} <jchan> ]
+:SLUS-00684
+#Widescreen hack
+A7073FBA 0C022400
+A7073EEA 0C022400
+#Widescreen hack (ASM)
+D0073FBA 0C02
+80073FBA 2400
+D0073EEA 0C02
+80073EEA 2400
+
+; [ Jersey Devil (USA) (1998) (Sony Computer Entertainment America) {SCUS-94907} <jerseydv> ]
+:SCUS-94907
+#Widescreen 16-9
+A7048164 10000C00
+
+; [ Jet Moto 2 - Championship Edition (USA) (1997) (Sony Computer Entertainment America) {SCUS-94167} <jmoto2ce> ]
+:SCUS-94167
+#Widescreen 16-9
+A719848C 10000C00
+A71983CC 10000C00
+A719842C 10000C00
+A71982AC 10000C00
+A719830C 10000C00
+; [ Jet Moto (USA) (1996) (Sony Computer Entertainment America) {SCUS-94309} <jetmoto> ]
+#Widescreen 16-9 (2)
+A71948F0 10000C00
+A7194830 10000C00
+A7194890 10000C00
+A7194710 10000C00
+A7194770 10000C00
+
+; [ K-1 The Arena Fighters (USA) (1997) (THQ) {SLUS-00414} <k1arena> ]
+:SCUS-94309
+#Widescreen 16-9
+A716EBBC 10000C00
+A716E91C 10000C00
+A716E97C 10000C00
+A716EA3C 10000C00
+A716EA9C 10000C00
+
+; [ Jet Moto 2 (USA) (1997) (Sony Computer Entertainment America) {SCUS-94167} <jetmoto2> ]
+:SLUS-00414
+#Widescreen 16-9
+A70FE91C 10000C00
+
+; [ K-1 Grand Prix (USA) (2000) (Jaleco USA) {SLUS-00941} <k1gp> ]
+:SLUS-00941
+#Widescreen 16-9
+A70C6A68 10000C00
+
+; [ K-1 Revenge (USA) (1999) (Jaleco USA) {SLUS-00766} <k1rev> ]
+:SLUS-00766
+#Widescreen 16-9
+A7109F90 10000C00
+
+; [ Kagero - Deception II (USA) (1998) (Tecmo) {SLUS-00677} <kagero> ]
+:SLUS-00677
+#Widescreen 16-9
+A70EECE0 10000C00
+
+; [ Legacy of Kain - Soul Reaver (USA) (1999) (Eidos Interactive) {SLUS-00708} <kain2> ]
+:SLUS-00708
+#Widescreen 16-9
+8003A374 0C00
+8003A384 0034
+8003A386 AFA0
+8003A388 1000
+8003A38A 2403
+
+; [ Kensei - Sacred Fist (USA) (1998) (Konami of America) {SLUS-00600} <kensei> ]
+:SLUS-00600
+#Widescreen 16-9
+A70C7F40 10000C00
+
+; [ Killing Zone (USA) (1996) (Acclaim Entertainment) {SLUS-00369} <killzone> ]
+:SLUS-00369
+#Widescreen 16-9
+A70BE58C 10000C00
+
+; [ Kingsley's Adventure (USA) (1999) (Psygnosis) {SLUS-00801} <kingsadv> ]
+:SLUS-00801
+#Widescreen 16-9
+800E6F6C 0F00
+
+; [ King's Field II (USA) (1996) (ASCII Entertainment Software) {SLUS-00255} <kingsfl2> ]
+:SLUS-00255
+#Uncap Game at 60 FPS (160 Overclock for stable 60 FPS)
+A7019656 14402400
+A7079272 10401000
+#Uncap game at 30 FPS (GS) '200 OC for stable 30 FPS'
+80019656 2400
+#Uncap Game at 60 FPS (GS) '160 OC for stable 60 FPS'
+80019656 2400
+80079272 1000
+
+; [ Klonoa - Door to Phantomile (USA) (1998) (Namco Hometek) {SLUS-00585} <klonoa> ]
+:SLUS-00585
+#Widescreen 16-9
+A710A440 10000C00
+A70C47EC 10000C00
+A70C4808 10000C00
+A70C4824 10000C00
+A70C47EC 10000C00
+#Widescreen 16-9 [ALT]:Fixes Most Sprites and 3D environment.
+A7019FA0 00000C00
+A7019FA2 8CE22402
+A7019490 00000C00
+A7019492 8CA22402
+
+:SCUS-94586
+#Widescreen 16-9
+A70C3588 10000C00
+
+; [ Loaded (USA) (1995) (Interplay Productions) {SLUS-00076} <loaded> ]
+:SLUS-00076
+#Widescreen 16-9
+8002CB16 0C00
+
+; [ Colin McRae Rally 2.0 (USA) (2000) (Sony Computer Entertainment America) {SLUS-01222} <mcrae20> ]
+:SLUS-01222
+#Widescreen 16-9
+80056BB0 2EEE
+80056BB2 0001
+
+; [ MDK (USA) (1997) (Playmates Interactive Entertainment) {SLUS-00426} <mdk> ]
+:SLUS-00426
+#Widescreen 16-9
+80007600 0C00
+80007602 2401
+80007604 0018
+80007606 0181
+80007608 6012
+8000760C 0018
+8000760E 0161
+80007610 5812
+80007614 6302
+80007616 000C
+80007618 5B02
+8000761A 000B
+8000761E A4AC
+80007620 000C
+80007622 A4AB
+80007624 4351
+80007626 0802
+80090D3C 1D80
+80090D3E 0800
+80071D24 00A2
+80071D26 2402
+30071D4C 00F8
+80071F74 00A2
+80071F76 2402
+30071F94 00F8
+
+; [ MediEvil (USA) (1998) (Sony Computer Entertainment America) {SCUS-94227} <medievil> ]
+:SCUS-94227
+#Widescreen 16-9
+A7AF88FC 19991333
+
+; [ MediEvil II (USA) (2000) (Sony Computer Entertainment America) {SCUS-94564} <medievl2> ]
+:SCUS-94564
+#Widescreen 16-9
+A7129044 19991333
+
+:SLUS-00776
+#Widescreen 16-9
+8001F6E0 4415
+8001F6E2 0800
+80011054 0000
+80011056 84A2
+80011058 0000
+8001105A 0000
+8001105C D883
+8001105E 0002
+80011060 1043
+80011062 0002
+80011064 1021
+80011066 005B
+80011068 0000
+8001106A A4A2
+8001106C 0004
+8001106E 84A2
+80011070 0000
+80011072 0000
+80011074 D883
+80011076 0002
+80011078 1043
+8001107A 0002
+8001107C 1021
+8001107E 005B
+80011080 0008
+80011082 03E0
+80011084 0004
+80011086 A4A2
+
+:SLUS-00974
+#Widescreen 16-9
+80048FEC B892
+80048FEE 0C00
+80048FF0 0000
+80048FF2 0000
+8004900C B892
+8004900E 0C00
+80049010 0000
+80049012 0000
+8002E248 000C
+8002E24A 2403
+8002E24C 0018
+8002E24E 0043
+8002E250 1012
+8002E254 10C3
+8002E256 0002
+8002E258 0008
+8002E25A 03E0
+8007E1F4 B898
+8007E1F6 0800
+8002E264 0009
+8002E266 240C
+8002E268 2900
+8002E26A 0005
+8002E26C 001A
+8002E26E 00AC
+8002E270 2812
+8002E274 F87F
+8002E276 0801
+8002E278 2180
+8002E27A 0004
+8007B590 0A00
+
+; [ Medal of Honor - Underground (USA) (2000) (Electronic Arts) {SLUS-01270} <mhonrund> ]
+:SLUS-01270
+#Widescreen 16-9
+8004C3BC BE32
+8004C3BE 0C00
+8004C3C0 0000
+8004C3C2 0000
+8004C3DC BE32
+8004C3DE 0C00
+8004C3E0 0000
+8004C3E2 0000
+3002F8C8 000C
+8002F8CA 2403
+3002F8CC 0018
+3002F8CE 0043
+8002F8D0 1012
+8002F8D4 10C3
+3002F8D6 0002
+3002F8D8 0008
+8002F8DA 03E0
+8008D9DC BE39
+8008D9DE 0800
+3002F8E4 0009
+8002F8E6 240C
+8002F8E8 2900
+3002F8EA 0005
+3002F8EC 001A
+3002F8EE 00AC
+8002F8F0 2812
+8002F8F4 3679
+8002F8F6 0802
+8002F8F8 2180
+3002F8FA 0004
+8008A820 0A00
+
+; [ Mission - Impossible (USA) (1999) (Infogrames) {SLUS-01016} <missimp> ]
+:SLUS-01016
+#Widescreen 16-9
+80077F34 1555
+
+:SLUS-00603
+#Widescreen 16-9
+80038058 2082
+8003805A 0800
+80008208 00C0
+8000820A 8485
+8000820C 0000
+8000820E 0000
+80008210 D883
+80008212 0005
+80008214 2843
+80008216 0005
+80008218 2821
+8000821A 00BB
+8000821C 00C0
+8000821E A485
+80008220 00CC
+80008222 8485
+80008224 0000
+80008226 0000
+80008228 D883
+8000822A 0005
+8000822C 2843
+8000822E 0005
+80008230 2821
+80008232 00BB
+80008234 00CC
+80008236 A485
+80008238 00C0
+8000823A 2484
+8000823C E018
+8000823E 0800
+80008240 1F80
+80008242 3C05
+
+; [ Monkey Magic (USA) (1999) (Sunsoft) {SLUS-00930} <monkeymg> ]
+:SLUS-00930
+#Widescreen 16-9
+800B22BA 4006
+800248b4 000C
+800557E2 00C0
+
+; [ Monster Rancher (USA) (1997) (Tecmo) {SLUS-00568} <mrancher> ]
+:SLUS-00568
+#Widescreen 16-9
+800E7E60 0C00
+
+; [ Monster Rancher 2 (USA) (1999) (Tecmo) {SLUS-00917} <mranchr2> ]
+:SLUS-00917
+#Widescreen 16-9
+A708E5A0 10000C00
+
+; [ Ms. Pac-Man Maze Madness (USA, v1.1) (2000) (Namco Hometek) {SLUS-01018} <mspacmm> ]
+:SLUS-01018
+#Widescreen 16-9
+A71F3828 10000C00
+
+; [ Ms. Pac-Man Maze Madness (USA, v1.0) (2000) (Namco Hometek) {SLUS-01018} <mspacmma> ]
+; [ Muppet RaceMania (USA) (2000) (Midway Home Entertainment) {SLUS-01237} <mupprace> ]
+:SLUS-01237
+#Widescreen 16-9
+8002CED8 4CCC
+8002CFE0 CCCD
+
+; [ Brave Fencer Musashi (USA) (1998) (Square Electronic Arts) {SLUS-00726} <musashi> ]
+:SLUS-00726
+#Widescreen 16-9
+A70AE7F0 10000C00
+
+; [ Ninja - Shadow of Darkness (USA) (1998) (Eidos Interactive) {SLUS-00435} <ninjasod> ]
+:SLUS-00435
+#Widescreen 16-9
+800162E8 0C00
+
+; [ OverBlood (USA) (1997) (Electronic Arts) {SLUS-00464} <overblod> ]
+:SLUS-00464
+#Widescreen 16-9
+A70EBB90 10000C00
+#Widescreen 16-9 [ALT]
+A7076370 10000C00
+
+:SLUS-00439
+#Widescreen 16-9
+A7150FF0 10000C00
+
+; [ Pandemonium 2 (USA) (1997) (Midway Home Entertainment) {SLUS-00578} <pandemn2> ]
+:SLUS-00578
+#Widescreen 16-9
+80008200 0000
+80008202 8C88
+80008204 8001
+80008206 3C1B
+80008208 0180
+8000820A 237B
+8000820C 0002
+8000820E 1764
+80008212 2400
+80008214 0C00
+80008216 2408
+80008218 FA0F
+8000821A 0801
+8000821E 2400
+8007E834 2080
+8007E836 0800
+80064414 0C00
+80064416 240C
+
+; [ Pandemonium! (USA) (1996) (Crystal Dynamics) {SLUS-00232} <pandemon> ]
+:SLUS-00232
+#Widescreen 16-9
+80066F64 2080
+80066F66 0800
+80008200 0000
+80008202 8C88
+80008204 8000
+80008206 3C1B
+80008208 D824
+8000820A 009B
+8000820C 0002
+8000820E 101B
+80008212 2400
+80008214 0C00
+80008216 2408
+80008218 9BDB
+8000821A 0801
+8000821E 2400
+8004D8AC 0C00
+8004D8AE 240D
+
+; [ PaRappa the Rapper (USA) (1997) (Sony Computer Entertainment America) {SCUS-94183} <parappa> ]
+:SCUS-94183
+#Widescreen 16-9
+A70928A8 10000C00
+
+:SLUS-01055
+#Force and cap game to 60 FPS
+A7014D42 0C002400
+
+:SLUS-01339
+#Widescreen 16-9
+A708B3E8 10000C00
+
+; [ Power Move Pro Wrestling (USA) (1996) (Activision) {SLUS-00408} <pmpwrest> ]
+:SLUS-00408
+#Widescreen 16-9
+8002C63C 0C00
+8002C6D0 0C00
+
+; [ Porsche Challenge (USA) (1997) (Sony Computer Entertainment America) {SCUS-94187} <porschec> ]
+:SCUS-94187
+#Widescreen 16-9
+A70CA584 19991333
+
+; [ Powerslave (USA) (1997) (Playmates Interactive Entertainment) {SLUS-00102} <powerslv> ]
+:SLUS-00102
+#Widescreen 16-9
+80042A64 1550
+
+; [ Poy Poy (USA) (1997) (Konami of America) {SLUS-00486} <poypoy> ]
+:SLUS-00486
+#Widescreen 16-9
+A710D54C 10000C00
+
+; [ Psychic Force (USA) (1997) (Acclaim Entertainment) {SLUS-00419} <psyforce> ]
+:SLUS-00419
+#Widescreen 16-9
+A71CE644 10000C00
+
+; [ Power Shovel (USA) (2001) (Acclaim Entertainment) {SLUS-01343} <pwrshovl> ]
+:SLUS-01343
+#Widescreen 16-9
+A70D06B8 10000C00
+
+; [ Quake II (USA) (1999) (Activision) {SLUS-00757} <quake2> ]
+:SLUS-00757
+#Widescreen 16-9
+81055DF4 4CCC
+81055DF8 CCCD
+#60 FPS Hack (Use Overclock)
+D00895D2 0C02
+800895D2 2400
+
+; [ Rage Racer (USA) (1997) (Namco Hometek) {SLUS-00403} <ragerace> ]
+:SLUS-00403
+#Widescreen 16-9
+8001A660 2082
+8001A662 0800
+80008208 0000
+8000820A 84A7
+8000820C 0000
+8000820E 0000
+80008210 D883
+80008212 0007
+80008214 3843
+80008216 0007
+80008218 3821
+8000821A 00FB
+8000821C 0000
+8000821E A4A7
+80008220 0004
+80008222 84A7
+80008224 0000
+80008226 0000
+80008228 D883
+8000822A 0007
+8000822C 3843
+8000822E 0007
+80008230 3821
+80008232 00FB
+80008234 A22A
+80008236 0C01
+80008238 0004
+8000823A A4A7
+8000823C 699A
+8000823E 0800
+80008240 0000
+80008242 0000
+
+; [ Rayman 2 - The Great Escape (USA) (2000) (Ubi Soft Entertainment Software) {SLUS-01235} <rayman2> ]
+:SLUS-01235
+#Select 60 FPS Unlock\Needs slight overclock
+A701217A 14802400
+A7012232 14432400
+#Select 60 FPS Unlock\Needs Higher overclock but may be more Stable
+A7012232 14432400
+
+; [ Ray Tracers (USA) (1997) (THQ) {SLUS-00534} <raytracr> ]
+:SLUS-00534
+#Widescreen 16-9
+A705F600 10000C00
+
+; [ Razor Freestyle Scooter (USA) (2000) (Crave Entertainment) {SLUS-01322} <razorfs> ]
+:SLUS-01322
+#Widescreen 16-9
+8007BBD8 0C00
+#Widescreen 16-9 (Vert-)
+8007BBE0 1555
+#Widescreen 16-9 (Vert- Adjusted)
+8007BBE0 1555
+8007BBE8 1040
+
+; [ Red Asphalt (USA) (1998) (Interplay Productions) {SLUS-00282} <rdasphlt> ]
+:SLUS-00282
+#Widescreen 16-9
+80099750 0C00
+
+; [ ReBoot (USA) (1998) (Electronic Arts) {SLUS-00274} <reboot> ]
+:SLUS-00274
+#Widescreen 16-9
+A70F0B8C 19991333
+
+:SLUS-00923
+#60 FPS Beta
+800101BC 0000FFFF
+10027F44 00000001
+D0027F44 00000002
+80027F44 00000000
+100271D0 00000001
+D30271D0 00000002
+800271D0 00000000
+E00CCBC9 0000000B
+800101BC 00000001
+E00CCBC9 0000000E
+800101BC 00000001
+E00CCBC9 0000000A
+800101BC 00000001
+E00CCBC9 0000000F
+800101BC 00000001
+
+; [ Resident Evil - Survivor (USA) (2000) (Capcom Entertainment) {SLUS-01087} <revilsrv> ]
+:SLUS-01087
+#Widescreen 16-9
+A7065B90 10000C00
+
+; [ Runabout 2 (USA) (2000) (HOT-B USA) {SLUS-01135} <rnabout2> ]
+:SLUS-01135
+#Widescreen 16-9 (In-Game)
+800475A8 1555
+80095998 0C00
+#Widescreen 16-9 (Alt)
+8008F5C8 0C00
+
+; [ Rock 'Em Sock 'Em Robots Arena (USA) (2000) (Mattel Interactive) {SLUS-01124} <robarena> ]
+:SLUS-01124
+#Widescreen 16-9
+A7064394 19991333
+
+; [ Robo Pit (USA) (1996) (Kokopeli Digital Studios) {SLUS-00316} <robopit> ]
+:SLUS-00316
+#Widescreen 16-9
+80156450 0C00
+
+; [ Roll Away (USA) (1998) (Psygnosis) {SLUS-00724} <rollaway> ]
+:SLUS-00724
+#Widescreen 16-9
+A70A33D8 10000C00
+
+:SLUS-90049
+#Widescreen 16-9
+A706E458 10000E00
+
+; [ R-Type Delta (USA) (1999) (Agetec) {SLUS-00877} <rtyped> ]
+:SLUS-00877
+#Widescreen 16-9
+A7193DE0 10000C00
+
+; [ Running Wild (USA) (1998) (989 Studios) {SCUS-94272} <runwild> ]
+:SCUS-94272
+#Widescreen 16-9 (1P & Main Menu)
+800C7E6C 1333
+800C815C 1333
+#Widescreen 16-9 (2P Only)
+800C80A0 0CD0
+800C7DB0 0CD0
+800C7E6C 0CD0
+800C815C 0CD0
+#Widescreen 16-9 (3P & 4P Only)
+800C7C38 0990
+800C7F28 0990
+800C7CF4 0990
+800C7FE4 0990
+800C7DB0 0990
+800C80A0 0990
+800C7E6C 0990
+800C815C 0990
+
+:SLUS-00771
+#Widescreen 16-9
+A71F6120 10000C00
+
+; [ Saiyuki - Journey West (USA) (2001) (Koei) {SLUS-01381} <saiyuki> ]
+:SLUS-01381
+#Widescreen 16-9
+A7199174 10000C00
+
+; [ Samurai Shodown - Warriors Rage (USA) (2000) (SNK of America) {SLUS-01039} <samshowr> ]
+:SLUS-01039
+#Widescreen 16-9
+A709ACB8 10000C00
+
+; [ Super Bubble Pop (USA) (2002) (Jaleco USA) {SLUS-01528} <sbubblep> ]
+:SLUS-01528
+#Widescreen 16-9
+A70D6D44 10000C00
+
+; [ Street Fighter EX2 Plus (USA) (2000) (Capcom Entertainment) {SLUS-01105} <sfex2p> ]
+:SLUS-01105
+#Widescreen 16-9
+A71F73E8 10000C00
+
+; [ Street Fighter EX Plus Alpha (USA) (1997) (Capcom Entertainment) {SLUS-00548} <sfexpa> ]
+:SLUS-00548
+#Widescreen 16-9
+A71DD2E0 10000C00
+
+; [ Silent Hill (USA) (1999) (Konami of America) {SLUS-00707} <silenth> ]
+:SLUS-00707
+#Widescreen 16-9
+A70C6FE0 10000C00
+A70C6FF0 10000C00
+#60 FPS
+A70A8FF0 00020001
+A70AB38C 00020001
+
+; [ The Simpsons Wrestling (USA) (2001) (Activision) {SLUS-01227} <simpwrst> ]
+:SLUS-01227
+#Widescreen 16-9
+80047B28 0C00
+
+:SLUS-00955
+#Widescreen 16-9
+A70E0128 19991333
+
+; [ Smurf Racer! (USA) (2001) (Infogrames) {SLUS-01359} <smurfrac> ]
+:SLUS-01359
+#Widescreen 16-9
+A709C96C 10000C00
+
+; [ SnoCross Championship Racing (USA) (2000) (Crave Entertainment) {SLUS-01093} <snocross> ]
+:SLUS-01093
+#Widescreen 16-9
+8012DF84 1333
+
+; [ Soul Blade (USA, v1.1) (1998) (Namco Hometek) {SLUS-00240} <soulblad> ]
+:SLUS-00240
+#Widescreen 16-9
+A7030CB4 10000C00
+
+; [ Soul Blade (USA, v1.0) (1997) (Namco Hometek) {SLUS-00240} <soulblada> ]
+; [ Speed Racer (USA) (1998) (Jaleco USA) {SLUS-00613} <spdracer> ]
+:SLUS-00613
+#Widescreen 16-9
+80100D50 0C00
+#Widescreen 16-9 (Vert-)
+80100D58 1555
+
+; [ Spider-Man (USA) (2000) (Activision) {SLUS-00875} <spidermn> ]
+:SLUS-00875
+#Widescreen 16-9
+A70B5930 10000400
+A70B5934 19990666
+#Widescreen 16-9 (Vert-)
+A70B5934 19991333
+
+:SLUS-01378
+#Widescreen 16-9
+A70C2A90 10000400
+A70C2A94 19990666
+#Widescreen 16-9 (Vert-)
+A70C2A94 19991333
+#Widescreen 16-9 (for Rev 1; Vert-)
+800C2A8C 1333
+
+:SCUS-94228
+#Widescreen 16-9
+8001EDDE 241B
+8001EDDC 0C00
+80033C92 A7BB
+
+;;******PUGSY NOTE, WTW Info - on the first level you hit a BP on 800442A8 when you touch the wall
+:SCUS-94425
+#Widescreen 16-9
+8001C354 2081
+8001C356 0800
+80008204 0000
+80008206 A5CD
+80008208 8007
+8000820A 3C04
+8000820C A9F6
+8000820E 8484
+80008210 8001
+80008212 2405
+80008214 0002
+80008216 14A4
+80008218 0C00
+8000821A 2405
+8000821C 0000
+8000821E A5C5
+80008220 70D7
+80008222 0800
+80008224 000A
+80008226 A5C2
+
+; [ Spyro - Year of the Dragon (USA, v1.1) (2000) (Sony Computer Entertainment America) {SCUS-94467} <spyro3> ]
+:SCUS-94467
+#Widescreen 16-9:Do not play Crash Bash demo
+8004F744 2081
+8004F746 0800
+80008204 0000
+80008206 A5CD
+80008208 8007
+8000820A 3C04
+8000820C 162A
+8000820E 8484
+80008210 8001
+80008212 2405
+80008214 0002
+80008216 14A4
+80008218 0C00
+8000821A 2405
+8000821C 0000
+8000821E A5C5
+80008220 3DD3
+80008222 0801
+80008224 000A
+80008226 A5C2
+#Crash Bash Demo Widescreen 16-9
+D00127C4 1012
+800127C8 0900
+D00127C4 1012
+800127C8 2402
+
+; [ Spyro - Year of the Dragon (USA, v1.0) (2000) (Sony Computer Entertainment America) {SCUS-94467} <spyro3a> ]
+; [ Super Shot Soccer (USA) (2002) (Tecmo) {SLUS-01464} <sshotsoc> ]
+:SLUS-01464
+#Widescreen 16-9
+A711E878 10000C00
+
+; [ Star Gladiator - Episode I - Final Crusade (USA) (1996) (Capcom Entertainment) {SLUS-00372} <starglad> ]
+:SLUS-00372
+#Widescreen 16-9
+A71D8628 10000C00
+
+; [ Streak Hoverboard Racing (USA) (1998) (GT Interactive Software) {SLUS-00629} <streakhr> ]
+:SLUS-00629
+#Widescreen 16-9
+A71E9984 10000C00
+A71E98C4 10000C00
+A71E9924 10000C00
+A71E97A4 10000C00
+A71E9804 10000C00
+
+; [ Star Wars - Masters of TerÃ¤s KÃ¤si (USA) (1997) (LucasArts Entertainment Company) {SLUS-00562} <swterask> ]
+:SLUS-00562
+#Widescreen 16-9
+8002578C 0C00
+
+; [ Syphon Filter (USA, v1.1) (1999) (989 Studios) {SCUS-94240} <syphonf> ]
+:SCUS-94240
+#Widescreen 16-9
+8012D700 0C00
+8012D9DC 0C00
+
+; [ Test Drive 4 (USA) (1997) (Accolade) {SLUS-00487} <td4> ]
+:SCUS-94492
+#Widescreen 16-9
+80120968 0C00
+80120F08 0C00
+
+; [ Syphon Filter 3 (USA) (2001) (Sony Computer Entertainment America) {SCUS-94640} <syphonf3> ]
+:SCUS-94640
+#Widescreen 16-9
+801236C8 0C00
+80123C68 0C00
+
+; [ Syphon Filter (USA, v1.0) (1999) (989 Studios) {SCUS-94240} <syphonfa> ]
+:SLUS-00487
+#Widescreen 16-9
+A706F2C8 10000C00
+
+; [ Test Drive 5 (USA) (1998) (Accolade) {SLUS-00610} <td5> ]
+:SLUS-00610
+#Widescreen 16-9
+A708815C 199A1334
+
+; [ Test Drive 6 (USA) (1999) (Infogrames) {SLUS-00839} <td6> ]
+:SLUS-00839
+#Widescreen 16-9
+A70A56C0 10000C00
+
+; [ Test Drive Off-Road 2 (USA) (1998) (Accolade) {SLUS-00609} <tdoffr2> ]
+:SLUS-00609
+#Widescreen 16-9
+A7074E28 10000C00
+
+; [ Test Drive Off-Road 3 (USA) (1999) (Infogrames) {SLUS-00840} <tdoffr3> ]
+:SLUS-00840
+#Widescreen 16-9
+A707C6AC 10000C00
+
+; [ Tecmo's Deception - Invitation to Darkness (USA) (1996) (Tecmo) {SLUS-00340} <tecmodec> ]
+:SLUS-00340
+#Widescreen 16-9
+A7073338 10000C00
+
+; [ Tenchu - Stealth Assassins (USA, v1.1) (1998) (Activision) {SLUS-00706} <tenchu> ]
+:SLUS-00706
+#Widescreen 16-9
+A70C4108 10000C00
+
+:SLUS-00939
+#Widescreen 16-9
+A70CD358 10000C00
+
+; [ Tenchu - Stealth Assassins (USA, v1.0) (1998) (Activision) {SLUS-00706} <tenchua> ]
+:SLUS-00860
+#Widescreen 16-9 (Vert-)
+800D2194 1333
+
+:SLUS-01066
+#Widescreen 16-9 (Vert-)
+800D8640 1333
+
+; [ Tony Hawk's Pro Skater 4 (USA) (2002) (Activision) {SLUS-01485} <thps4> ]
+:SLUS-01485
+#Widescreen 16-9
+A70DA240 10000400
+A70DA244 19990666
+
+; [ Threads of Fate (USA) (2000) (Square Electronic Arts) {SLUS-01019} <threads> ]
+:SLUS-01019
+#Widescreen 16-9
+A70BF4A0 19991333
+A709EE4C 10000C00
+
+; [ Tiny Tank (USA) (1999) (Sony Computer Entertainment America) {SCUS-94427} <tinytank> ]
+:SCUS-94427
+#Widescreen 16-9
+80083C80 0C00
+#Widescreen 16-9 (Adjusted)
+80083C80 0C00
+80083C90 0D00
+
+; [ Tomba! 2 - The Evil Swine Return (USA) (1999) (Sony Computer Entertainment America) {SCUS-94454} <tomba2> ]
+:SCUS-94454
+#Uncap FPS At 60 FPS (Needs Slight Overclock to remain stable)
+A7050CDA 00432400
+#Uncap FPS At 60 FPS (ASM) 'Needs Overclock to remain stable'
+80050CDA 2400
+
+:SLUS-00893
+#60 FPS
+800A1174 0001
+800A14D4 0001
+#Widescreen 16-9
+8002CA58 4CCC
+8002CA60 CCCC
+
+; [ Disney/Pixar Toy Story Racer (USA) (2001) (Activision) {SLUS-01214} <toystrac> ]
+; [ Disney/Pixar Toy Story 2 - Buzz Lightyear to the Rescue! (USA, v1.0) (1999) (Activision) {SLUS-00893} <toystor2a> ]
+:SLUS-01214
+#Widescreen 16-9
+A7033E58 66664CCC
+A7033E5C 6667CCCD
+A704DC1C 66664CCC
+A704DC20 6667CCCD
+A704DD00 66664CCC
+A704DD04 6667CCCD
+A704DDB4 66664CCC
+A704DDBC 6667CCCD
+A704E3AC 66664CCC
+A704E3B0 6667CCCD
+A706D948 66664CCC
+A706D950 6667CCCD
+
+; [ Turbo Prop Racing (USA) (1998) (Sony Computer Entertainment America) {SCUS-94229} <tproprac> ]
+:SCUS-94229
+#Widescreen 16-9 (Vert-)
+8002ABB8 0C00
+
+; [ Trap Gunner (USA) (1998) (Atlus Software) {SLUS-00679} <trapgun> ]
+:SLUS-00679
+#Widescreen 16-9
+A7138698 10000C00
+
+; [ Twisted Metal - Small Brawl (USA) (2001) (Sony Computer Entertainment America) {SCUS-94642} <twistmsb> ]
+:SCUS-94642
+#Widescreen 16-9
+A71D2108 10000C00
+
+; [ Twisted Metal (USA) (1995) (Sony Computer Entertainment America) {SCUS-94304} <twistmtl> ]
+:SCUS-94304
+#Widescreen 16-9
+A7173F9C 10000C00
+
+; [ Rogue Trip - Vacation 2012 (USA) (1998) (GT Interactive Software) {SLUS-00643} <vac2012> ]
+:SLUS-00643
+#Widescreen 16-9
+A71C2E5C 10000C00
+A71C2F1C 10000C00
+A71C2F7C 10000C00
+A71C303C 10000C00
+A71C309C 10000C00
+
+; [ Vagrant Story (USA) (2000) (Square Electronic Arts) {SLUS-01040} <vagstory> ]
+:SLUS-01040
+#Widescreen 16-9
+8007AE6C 0D80
+800AED50 12F5
+
+:SLUS-01070
+#Widescreen 16-9
+800710A8 0C00
+800710C8 0C00
+800B7F1C 1000
+800E0B50 1000
+
+; [ Vs. (USA) (1997) (THQ) {SLUS-00513} <vs> ]
+:SLUS-00513
+#Widescreen 16-9
+80183934 1555
+80183938 1555
+
+; [ V-Tennis (USA) (1996) (Acclaim Entertainment) {SLUS-00218} <vtennis> ]
+;:SLUS-00218
+;This game currently has no cheats
+; [ War Gods (USA) (1997) (Midway Home Entertainment) {SLUS-00328} <wargods> ]
+:SLUS-00328
+#Widescreen 16-9
+A70D4CAE 10000C00
+
+; [ Warhawk - The Red Mercury Missions (USA) (1995) (Sony Computer Entertainment America) {SCUS-94305} <warhawk> ]
+:SCUS-94305
+#Widescreen 16-9
+A7173AD0 10000C00
+
+; [ Warpath - Jurassic Park (USA) (1999) (Electronic Arts) {SLUS-00976} <warpath> ]
+:SLUS-00976
+#Widescreen 16-9
+A7041558 10000C00
+
+; [ WCW vs. The World (USA) (1997) (THQ) {SLUS-00455} <wcwvstw> ]
+:SLUS-00455
+#Widescreen 16-9:When booting with the code enabled, you'll want skip the intro videos quickly in case they freeze the game.
+800D42E4 0C00
+
+; [ WarGames - Defcon 1 (USA) (1998) (MGM Interactive) {SLUS-00599} <wgdefc1> ]
+:SLUS-00599
+#Widescreen 16-9
+800D1450 0C00
+
+; [ Wu-Tang - Shaolin Style (USA) (1999) (Activision) {SLUS-00929} <wutang> ]
+:SLUS-00929
+#Widescreen 16-9
+A709BEF0 19991333
+
+; [ WWF SmackDown! 2 - Know Your Role (USA) (2000) (THQ) {SLUS-01234} <wwfsmac2> ]
+:SLUS-01234
+#Widescreen 16-9 (In-Game/Demo)
+80021668 0C00
+#Widescreen 16-9 (Create A Superstar)
+80110DF4 0C00
+#Widescreen 16-9 (Create A Taunt)
+80100520 0C00
+
+:SLUS-00927
+#Widescreen 16-9 (In-Game,Demo)
+800216FC 0C00
+#Widescreen 16-9 (Create A Superstar)
+80108C7C 0C00
+
+; [ Xevious 3D/G+ (USA) (1997) (Namco Hometek) {SLUS-00461} <xevi3dgp> ]
+:SLUS-00461
+#Widescreen 16-9 (3D/G)
+80178740 0C00
+#Widescreen 16-9 (Main Menu)
+8018F330 0C00
+
+; [ X-Men - Mutant Academy (USA) (2000) (Activision) {SLUS-00774} <xmenma> ]
+:SLUS-00774
+#Widescreen 16-9
+A7096A00 19991333
+
+; [ X-Men - Mutant Academy 2 (USA) (2001) (Activision) {SLUS-01382} <xmenma2> ]
+:SLUS-01382
+#Widescreen 16-9
+A70A26FC 19991333
+
+:SCPS-10132
+#Widescreen 16-9
+A7161F60 10000C00
+#Widescreen 16-9 (Cut Scenes)
+A7066F70 10000C00
+A7071F40 10000C00
+A707B4F0 10000C00
+A7116A68 10000C00
+
+; [ Aizouban Houshin Engi (Jpn) (1999) (Koei) {SLPM-86209} <aizhosen> ]
+:SLPM-86209
+#Widescreen 16-9
+801792B0 0C04
+
+; [ Akagawa Jirou Majo-tachi no Nemuri - Fukkatsu Matsuri (Jpn) (1999) (Victor Interactive Software) {SLPS-01863} <ajmajonm> ]
+;:SLPS-01863
+;This game currently has no cheats
+; [ Akagawa Jirou - Yasoukyoku 2 (Jpn) (2001) (Victor Interactive Software) {SLPS-03213} <akagawaj> ]
+;:SLPS-03213
+;This game currently has no cheats
+; [ Armed Fighter (Jpn) (1999) (Banpresto) {SLPS-01598} <armedfgt> ]
+:SLPS-01598
+#Widescreen 16-9
+80066080 0C00
+
+; [ Agent Armstrong - Himitsu Shirei Daisakusen (Jpn) (1997) (WENet) {SLPS-01073 (WG 0005)} <armstrng> ]
+;:SLPS-01073
+;This game currently has no cheats
+; [ Art Camion - Geijutsuden (Jpn, Re-release 2002) (2002) (TYO) {SLPM-87186} <artcam> ]
+;:SLPM-87186
+;This game currently has no cheats
+; [ Bugi (Jpn) (1998) (Konami) {SLPM-86133 (VX084-J1)} <bugi> ]
+:SLPM-86133
+#Widescreen 16-9
+800CA808 0C00
+
+; [ Burn Out (Jpn, SuperLite 1500 Series) (2000) (Success) {SLPM-86598} <burnout> ]
+;:SLPM-86598
+;This game currently has no cheats
+; [ Buttsubushi (Jpn) (2001) (Selen) {SLPS-03162 (SLSA-0001)} <buttsubu> ]
+;:SLPS-03162
+;This game currently has no cheats
+; [ Circuit Beat (Jpn) (1996) (Prism Arts) {SLPS-00311} <circbeat> ]
+:SLPS-00311
+#Widescreen 16-9
+301D4DED 000C
+
+:SLPS-01913
+#Widescreen 16-9
+800EC098 0C00
+
+; [ Cyber War (Jpn) (1995) (Coconuts Japan) {SLPS-00055~SLPS-00057} <cyberwar> ]
+;:SLPS-00055
+;:SLPS-00056
+;:SLPS-00057
+;This game currently has no cheats
+; [ Dark Tales from the Lost Soul (Jpn) (1999) (Sammy) {SLPS-02316} <darktale> ]
+:SLPS-02316
+#Widescreen 16-9
+800BC580 0C00
+
+; [ Dr. Slump (Jpn) (1999) (Bandai) {SLPS-01934} <drslump> ]
+:SLPS-01934
+#Widescreen 16-9
+801FC384 0C00
+
+; [ Elder Gate (Jpn) (2000) (Konami) {SLPM-86494 (VX160-J1)} <eldrgate> ]
+:SLPM-86494
+#Widescreen 16-9
+8008D5B8 0C00
+
+; [ Genei Tougi - Shadow Struggle (Jpn) (1996) (Banpresto) {SLPS-00491} <geneitou> ]
+:SLPS-00491
+#Widescreen 16-9
+800E9980 0C00
+
+; [ Goiken Muyou II (Jpn) (1998) (KSS) {SLPS-01542} <gomuyo2> ]
+:SLPS-01542
+#Widescreen 16-9
+8013BA70 0C00
+
+; [ Golgo 13 - 1 - Karairu no Yabou (Jpn) (1998) (Daiki) {SLPS-01712} <golgo13k> ]
+;:SLPS-01712
+;This game currently has no cheats
+; [ Heaven's Gate (Jpn) (1996) (Atlus) {SLPS-00667} <hvnsgate> ]
+:SLPS-00667
+#Widescreen 16-9
+8011AC6C 0C00
+
+; [ Shiritsu Justice Gakuen - Nekketsu Seishun Nikki 2 (Jpn) (1999) (Capcom) {SLPS-02120} <jgakuen2> ]
+:SLPS-02120
+#Widescreen 16-9
+801F6120 0C00
+
+; [ Jigsaw World (Jpn, Honkakuha de 1300Yen Series) (1999) (Hect) {SLPS-02251} <jigsawld> ]
+;:SLPS-02251
+;This game currently has no cheats
+; [ Fighting Illusion - K-1 Grand Prix '98 (Jpn) (1998) (Xing) {SLPS-01696} <k1gp98> ]
+:SLPS-01696
+#Widescreen 16-9
+800C6DF0 0C00
+
+; [ Kero Kero King (Jpn) (2000) (Media Factory) {SLPM-86621} <keroking> ]
+:SLPM-86621
+#Widescreen 16-9
+80078630 0C00
+
+; [ Khamrai (Jpn) (2000) (Namco) {SLPS-02640} <khamrai> ]
+:SLPS-02640
+#Widescreen 16-9
+800E5C28 0C00
+800C1B74 0C00
+
+; [ Killer Bass (Jpn) (2000) (Magical) {SLPS-02747} <killbass> ]
+;:SLPS-02747
+;This game currently has no cheats
+; [ Kindaichi Shounen no Jikenbo 3 - Seiryuu Densetsu Satsujin Jiken (Jpn) (1999) (Kodansha) {SLPS-02223~SLPS-02224} <kindajk3> ]
+;:SLPS-02223
+;:SLPS-02224
+;This game currently has no cheats
+; [ King of Bowling 2 - Professional-Hen (Jpn) (1998) (Coconuts Japan) {SLPS-01541} <kingbow2> ]
+;:SLPS-01541
+;This game currently has no cheats
+; [ Love & Destroy (Jpn) (1999) (SCEI) {SCPS-10124} <lovedest> ]
+:SCPS-10124
+#Widescreen 16-9
+80152FA0 0CD3
+
+; [ LSD - Dream Emulator (Jpn, Limited Edition) (1998) (Asmik Ace) {SLPS-01556} <lsd> ]
+:SLPS-01556
+#Widescreen 16-9
+8008E98C 0C00
+
+; [ Lucifer Ring (Jpn) (1998) (Toshiba EMI) {SLPS-01784} <lucifer> ]
+:SLPS-01784
+#Widescreen 16-9
+8009BD00 0C00
+
+; [ Mad Panic Coaster (Jpn) (1997) (Hakuhodo) {SLPS-00880} <madpanic> ]
+:SLPS-00880
+#Widescreen 16-9
+801EFAA8 0C00
+801E56E0 0C00
+
+; [ The Master's Fighter (Jpn) (1997) (Cinema Supply) {SLPS-00722} <mastfght> ]
+:SLPS-00722
+#Widescreen 16-9
+800E178C 0C00
+
+; [ Mizzurna Falls (Jpn) (1998) (Human) {SLPS-01783} <mizzurna> ]
+:SLPS-01783
+#Widescreen 16-9
+800FE2B0 0C00
+
+; [ Pepsiman (Jpn) (1999) (KID) {SLPS-01762} <pepsiman> ]
+:SLPS-01762
+#Widescreen 16-9
+800E4858 0C00
+
+; [ Poitter's Point 2 - Sodom no Inbou (Jpn) (1998) (Konami) {SLPM-86061 (VX091-J1)} <poitpnt2> ]
+:SLPM-86061
+#Widescreen 16-9
+800E69D8 0C00
+
+; [ Policenauts - Private Collection (Jpn) (1996) (Konami) {SLPS-00228} <policnpc> ]
+;:SLPS-00228
+;This game currently has no cheats
+; [ Ranma ½ - Battle Renaissance (Jpn) (1996) (Shogakukan) {SLPS-00522} <ranma> ]
+:SLPS-00522
+#Widescreen 16-9
+800C2894 0C00
+
+; [ Shura no Mon (Jpn) (1998) (Kodansha) {SLPS-01202} <shuramon> ]
+:SLPS-01202
+#Widescreen 16-9
+80071C44 0C00
+80071BCC 0C00
+80064EE4 0C00
+
+; [ Side Pocket 3 - 3D Polygon Billiard Game (Jpn) (1998) (Data East) {SLPS-01079} <sidepck3> ]
+;:SLPS-01079
+;This game currently has no cheats
+; [ Slap Happy Rhythm Busters (Jpn) (2000) (ASK) {SLPS-02789} <slaphapp> ]
+:SLPS-02789
+#Widescreen 16-9
+80200464 0C00
+
+; [ Snobow Kids Plus (Jpn) (1999) (ASCII) {SLPS-01823} <snobokid> ]
+:SLPS-01823
+#Widescreen 16-9
+8013F870 0C00
+
+; [ Virtual Hiryuu no Ken (Jpn) (1997) (Culture Brain) {SLPS-00338} <vhiryukn> ]
+:SLPS-00338
+#Widescreen 16-9
+8009AA48 0C00
+
+; [ Victory Zone - Real Pachinko Simulator (Jpn) (1995) (SCEI) {SCPS-10002} <victzone> ]
+;:SCPS-10002
+;This game currently has no cheats
+; [ TV Animation X - Unmei no Tatakai (Jpn) (2002) (Bandai) {SLPS-03459} <xuntata> ]
+:SLPS-03459
+#Widescreen 16-9
+80096238 0C00
+
+; [ Zeiramzone (Jpn) (1996) (Banpresto) {SLPS-00575} <zeiramzn> ]
+:SLPS-00575
+#Widescreen 16-9
+800C5BA0 0C00
+
+; [ Ape Escape (Euro) (1999) (Sony Computer Entertainment Europe) {SCES-01564} <apescapee> ]
+:SCES-01564
+#Widescreen 16-9
+800AF050 0C00
+
+; [ Autumn/Christmas Releases '96 (Euro) (1996) (Sony Computer Entertainment Europe) {SCED-00273 (9636229)} <acrels96> ]
+;:SCED-00273
+;This game currently has no cheats
+; [ Crash Bash (Euro) (2000) (Sony Computer Entertainment Europe) {SCES-02834, SCES-02834-P} <crashbshe> ]
+:SCES-02834
+#Widescreen 16-9
+80052AF0 0004
+80052AF4 0003
+
+; [ Demo One (Version 1) (Euro) (1995?) (Sony Computer Entertainment Europe) {SCES-00048} <demo1_1> ]
+;:SCES-00048
+;This demo currently has no cheats
+; [ Demo One (Version 2) (Euro) (1995?) (Sony Computer Entertainment Europe) {SCES-00120} <demo1_2> ]
+;:SCES-00120
+;This demo currently has no cheats
+; [ Demo One (Version 4) (Ger) (1996?) (Sony Computer Entertainment Europe) {SCED-00457 (9644224)} <demo1_4g> ]
+;:SCED-00457
+;This demo currently has no cheats
+:SCES-12380
+#16:9 Widescreen
+;"Help" the game unload segments that normally are left unwritten to,
+;so further cheat detection is more reliable. This is safe as it overwrites dead code.
+;Reset the race overlay for Arcade
+A4052988 801EFB69
+8005D624 0000
+80057090 0000
+00000000 FFFF
+;Reset the race overlay for Simulation
+A40529DC 000000F6
+8005D624 0000
+80057090 0000
+00000000 FFFF
+;Car Selection (Arcade)
+A4020A3C 3084007F
+A701E524 FF80FF56
+A701E52C 008000AA
+;Car Selection 2P Battle (Arcade)
+A7020170 FF97FF74
+A7020178 0069008C
+;Pre-race screen (Arcade)
+A701536C 014001AA
+00000000 FFFF
+;Race
+A401F884 AEB40008
+A70100D0 FF60FF2B
+A70100D4 00A000D5
+00000000 FFFF
+;Race (Rear view mirror)
+A403EC50 02602021
+A70295E8 FFC4FFB0
+A70295EC 003C0050
+00000000 FFFF
+;Post-race screen #1
+A4057090 260201C0
+;a1 -> t1, *will* change visuals of some screens!
+;Other screens will get slightly resized to compensate for this.
+A7049822 A485A489
+A7049FA0 00C8010A
+A7049FA8 302100C8
+A7049FAA 00A03406
+A704C1EC 00C8010A
+A704C1F4 302100C8
+A704C1F6 00A03406
+;Bonus screen (Licenses)
+;Use free space to re-fit li $a1, 160h \ sh $a1, C4h($a0)
+A704E09C 00000160
+A704E09E 00002405
+A704E0A8 022000C4
+A704E0AA 8FB2A485
+A704E084 016001D5
+;Results screen
+A7050C48 FF50FF16
+A7050C50 00B000EA
+00000000 FFFF
+;Post-race screen #2
+A405D624 8005A640
+A70580AC 00C8010A
+A70580B4 302100C8
+A70580B6 00A03406
+A7058960 00C8010A
+A7058968 302100C8
+A705896A 00A03406
+;Bonus screen (Trophy)
+A7059A50 016001D5
+00000000 FFFF
+;GT Mode screens (Simulation)
+A4024398 80022914
+A701CD68 00B30086
+A701CD70 FFCEFFDB
+A701CD78 03200258
+00000000 FFFF
+#21:9 Widescreen
+;"Help" the game unload segments that normally are left unwritten to,
+;so further cheat detection is more reliable. This is safe as it overwrites dead code.
+;Reset the race overlay for Arcade
+A4052988 801EFB69
+8005D624 0000
+80057090 0000
+00000000 FFFF
+;Reset the race overlay for Simulation
+A40529DC 000000F6
+8005D624 0000
+80057090 0000
+00000000 FFFF
+;Car Selection (Arcade)
+A4020A3C 3084007F
+A701E524 FF80FF20
+A701E52C 008000E0
+;Car Selection 2P Battle (Arcade)
+A7020170 FF97FF49
+A7020178 006900B7
+;Pre-race screen (Arcade)
+A701536C 01400230
+00000000 FFFF
+;Race
+A401F884 AEB40008
+A70100D0 FF60FEE8
+A70100D4 00A00118
+00000000 FFFF
+;Race (Rear view mirror)
+A403EC50 02602021
+A70295E8 FFC4FF97
+A70295EC 003C0069
+00000000 FFFF
+;Post-race screen #1
+A4057090 260201C0
+;a1 -> t1, *will* change visuals of some screens!
+;Other screens will get slightly resized to compensate for this.
+A7049822 A485A489
+A7049FA0 00C8015E
+A7049FA8 302100C8
+A7049FAA 00A03406
+A704C1EC 00C8015E
+A704C1F4 302100C8
+A704C1F6 00A03406
+;Bonus screen (Licenses)
+;Use free space to re-fit li $a1, 160h \ sh $a1, C4h($a0)
+A704E09C 00000160
+A704E09E 00002405
+A704E0A8 022000C4
+A704E0AA 8FB2A485
+A704E084 01600268
+;Results screen
+A7050C48 FF50FECC
+A7050C50 00B00134
+00000000 FFFF
+;Post-race screen #2
+A405D624 8005A640
+A70580AC 00C8015E
+A70580B4 302100C8
+A70580B6 00A03406
+A7058960 00C8015E
+A7058968 302100C8
+A705896A 00A03406
+;Bonus screen (Trophy)
+A7059A50 01600268
+00000000 FFFF
+;GT Mode screens (Simulation)
+A4024398 80022914
+A701CD68 00B30066
+A701CD70 FFCEFFE4
+A701CD78 032001C9
+00000000 FFFF
+
+; [ Porsche Challenge (Euro) (1997) (Sony Computer Entertainment Europe) {SCES-00409, SCES-00409#} <porschece> ]
+:SCES-00409
+#Widescreen 16-9
+800C9DA4 1222
+
+; [ Power Source (Euro) (1997?) (Sony Computer Entertainment Europe) {SCES-00667} <powrsrc> ]
+;:SCES-00667
+;This game currently has no cheats
+; [ Resident Evil: Survivor (Euro) (2000) (Eidos Interactive) {SLES-02732} <revilsrve> ]
+:SLES-02732
+#Widescreen 16-9
+80065B80 0C00
+
+; [ Silent Hill (Euro) (1999) (Konami Digital Entertainment) {SLES-01514, SLES-01514 - P} <silenthe> ]
+:SLES-01514
+#Widescreen 16-9
+A70C65D0 10000C00
+A70C65E0 10000C00
+
+; [ Sphere 360° (Euro) (1999?) (ASCII Entertainment Europe) {SLED-01711 (2083014)} <sphere360> ]
+;:SLED-01711
+;This game currently has no cheats
+; [ Test Drive 6 (Euro) (2000) (Cryo Interactive Entertainment) {SLES-02752} <td6e> ]
+:SLES-02752
+#Widescreen 16-9
+8009806C 0C00
+#Widescreen part 2 (Camera distance)
+A706E29C 30820000
+A706E29E 00060000
+
+; [ Theme Hospital (Euro) (1998) (Electronic Arts) {SLES-00627} <themehose> ]
+;:SLES-00627
+;This game currently has no cheats
+; [ Warpath: Jurassic Park (Euro) (1999) (Electronic Arts) {SLES-02253} <warpathe> ]
+:SLES-02253
+#Widescreen 16-9
+80041BA8 0C00
+
+; [ Thrill Kill (USA, Prototype) (1998) (Virgin Interactive) {SLUS-00752?} <thkillu> ]
+:SLUS-00752
+#Widescreen 16-9
+A70977FC 19991333
+
+; [ Resident Evil 2 Preview (Euro, CD Consoles No.38) (1997) (Capcom) {SLED-00977} <revil2d> ]
+;:SLED-00977
+;This game currently has no cheats
+; [ ...Iru! (Japan) {SLPS-00965} ]
+:SLPS-00965
+#Widescreen 16-9
+800929E4 0C00
+801191F0 0C00
+
+; [ 0 kara no Mahjong: Mahjong Youchien Tamago-gumi (Japan) {SLPS-01311} ]
+; [ 0 kara no Shougi: Shougi Youchien Ayumi-gumi (Japan) (Genteiban, Renkaban) {SLPS-01986} ]
+; [ 007 Racing (Europe) {SLES-03355} ]
+; [ 007 Racing (France) {SLES-03356} ]
+; [ 3, 2, 1, Smurf! My First Racing Game (Europe) {SLES-03120} ]
+:SLES-03120
+#Widescreen 16-9
+8009D038 0C00
+
+; [ 4x4 World Trophy (Europe) {SLES-02017} ]
+:SLES-02017
+#Widescreen 16-9
+8007E7B0 0C00
+
+; [ 5 Star Racing (Europe) {SLES-04064} ]
+; [ 70's Robot Anime: Geppy-X (Japan) Demo {SLP-80387} ]
+; [ A Ressha de Ikou 4: Evolution (Japan) (Hatsubai Kinen Gentei Set) {SLPS-00011} ]
+; [ A Ressha de Ikou 4: Evolution (Japan) Rev 1 {SLPS-00004} ]
+; [ A Ressha de Ikou 4: Evolution (Japan) {SLPS-00004} ]
+; [ Action Man: Destruction X (Europe) {SLES-03083} ]
+:SLES-03083
+#Widescreen 16-9
+80068258 0C00
+801C058C 1555
+
+; [ Action Man: Mission Xtreme (Europe) (EDC Best of Infogrames) {SLES-01761} ]
+; [ Action Man: Mission Xtreme (Europe) {SLES-01761} ]
+:SLES-01761
+#Widescreen 16-9
+800C08EC 0C00
+
+; [ Action Replay (Europe) {Unlicensed} ]
+; [ Action Replay 2 (Disc 2\2\2\2\2) (France) (Unlicensed) {Unlicensed | Unlicensed | Unlicensed | Unlicensed | Unlicensed} ]
+; [ Action Replay CDX Version 3.3 (France) {Unlicensed} ]
+; [ Action Replay Ultimate Codes for Final Fantasy Compilation Pack (USA) {Unlicensed} ]
+; [ Action Replay for PSX & PSone (USA) {Unlicensed} ]
+; [ Actua Golf (Europe) {SLES-00015} ]
+; [ Actua Golf (Japan) {SLPS-00298} ]
+; [ Advanced V.G. 2 (Japan) {SLPS-01318} ]
+:SLPS-01318
+#Widescreen 16-9
+800D9C58 0C00
+
+; [ Aerodive (Japan) {SLPS-02367} ]
+; [ Affect Taikenban Vol. 1 (Japan) Demo {SLP-80552} ]
+; [ Afraid Gear Another (Japan) {SLP-86834} ]
+; [ Ape Escape (France) {SCES-02028} ]
+:SCES-02028
+#Widescreen 16-9
+D004689A 2484
+800AF190 0C00
+
+; [ Ape Escape (Germany) (Platinum) {SCES-02029} ]
+:SCES-02029
+#Widescreen 16-9
+D004689A 2484
+800AF170 0C00
+
+; [ Ape Escape (Italy) {SCES-02030} ]
+; [ Ape Escape (USA) (EDC Toys R Us) {SCUS-94470} ]
+; [ Ape Escape: La InvasiÃ³n de los Monos (Spain) {SCES-02031} ]
+:SCES-02031
+#Widescreen 16-9
+D004689A 2484
+800AE820 0C00
+
+; [ Apocalypse (Europe) Demo {SLED-01610} ]
+; [ Aqua GT (Europe) {SLES-03390} ]
+:SLES-03390
+#Widescreen 16-9
+8012257C 0E5A
+
+; [ Aquanaut no Kyuujitsu (Japan) {SLPS-00060} ]
+; [ Aquanaut no Kyuujitsu 2 (Japan) (Promotion Disc) {SLP-80449} ]
+; [ Aquanaut no Kyuujitsu: Memories of Summer 1996 (Japan) (Artdink Best Choice) {SLPS-02023} ]
+; [ Aquanaut no Kyuujitsu: Memories of Summer 1996 (Japan) {SLPS-00406} ]
+; [ Aquanaut's Holiday (Europe) {SCES-00241} ]
+; [ Bakusou Kyoudai Let's & Go!! Eternal Wings (Japan) {SLPS-01489} ]
+:SLPS-01489
+#Widescreen 16-9
+8009EF70 0C00
+
+; [ Bakuten Shoot Beyblade 2002: Bey Battle Tournament 2 (Japan) (Gentei Box) {SLP-87130} ]
+; [ Bakuten Shoot Beyblade: Bey Battle Tournament (Japan) {SLP-86980} ]
+; [ Baldies (Europe) {SLES-04091} ]
+; [ Baldy Land (Japan) {SLPS-01074} ]
+; [ BallBlazer Champions (Europe) {SLES-00651} ]
+; [ BallBlazer Champions (Germany) {SLES-00592} ]
+; [ BallBlazer Champions (Italy) {SLES-00641} ]
+; [ BallBlazer Champions (Japan) {SLPS-00796} ]
+; [ BallBlazer Champions (Spain) {SLES-00647} ]
+; [ Big Air (Europe) {SLES-01531} ]
+:SLES-01531
+#Widescreen 16-9
+8006B6E0 0C00
+
+; [ Big Bass Fishing (Europe) {SLES-03847} ]
+; [ Biohazard: Gun Survivor (Japan) {SLPS-02553} ]
+:SLPS-02553
+#Widescreen 16-9
+80066320 0C00
+
+; [ Bloody Roar 2: Bringer of the New Age (Europe) {SLES-01722} ]
+:SLES-01722
+#Widescreen 16-9
+801F0270 1333
+
+; [ Bloody Roar 2: Bringer of the New Age (Japan) Demo {SLP-80373} ]
+; [ Bloody Roar 2: Bringer of the New Age (Japan, Asia) {SCPS-45374} ]
+; [ Bloody Roar 2: Bringer of the New Age (Japan) {SLPS-01842} ]
+:SLPS-01842
+#Widescreen 16-9
+A71EF308 19991333
+
+; [ Bloody Roar: Hyper Beast Duel (Europe) Demo {SLED-00108} ]
+; [ Blue Breaker Burst: Hohoemi o Anata to (Japan) (Shokai Genteiban) {SLPS-01469} ]
+:SLPS-01469
+#Widescreen 16-9
+800DACB0 0C00
+
+; [ Blue Breaker: Egao no Yakusoku (Japan) (Major Wave) {SLP-86646} ]
+; [ Breath of Fire III (Europe) {SLES-01304} ]
+:SLES-01304
+#Widescreen 16-9
+80179D54 0C00
+80179D56 2409
+
+; [ Breath of Fire IV (Europe) {SLES-03552} ]
+:SLES-03552
+#Widescreen 16-9
+80168794 0C00
+80168796 240A
+8016879C 1000
+8016879E 240A
+8016880C 0C00
+8016880E 240A
+80168814 1000
+80168816 240A
+
+; [ Bubsy 3D: Furbitten Planet (Europe) (Prototype) {SLES-00122} ]
+; [ Bubsy 3D: Furbitten Planet (Europe) {SLES-00122} ]
+:SLES-00122
+#Widescreen 16-9
+801CF2C0 0C00
+801DE128 0C00
+
+; [ Bugs Bunny & Taz: Time Busters (Europe) {SLES-02896} ]
+:SLES-02896
+#Widescreen 16-9
+80098A2C 0C00
+
+; [ Bugs Bunny: Lost in Time (Europe) Demo {SLED-02125} ]
+; [ Bugs Bunny: Lost in Time (Europe) {SLES-01726} ]
+:SLES-01726
+#Widescreen 16-9
+80076158 0C00
+
+; [ Bugs Bunny: Lost in Time (USA) Demo {SLUS-90058} ]
+; [ Building Crush! (Japan) {SLPS-00497} ]
+; [ Bundesliga 2000: Der Fussball-Manager (Germany) {SLES-02564} ]
+:SLPS-01233
+#60 FPS (130% overclock works well)
+A70411AE 10401000
+#Widescreen 16-9
+80014388 1334
+
+; [ Bust A Move (Japan) (Otameshi Disc) {PAPX-90028} ]
+:SLPM-86219
+#Widescreen 16-9
+80017E0C 1334
+
+; [ Cardinal Syn (Europe) {SCES-01043} ]
+:SCES-01043
+#Widescreen 16-9
+801EB060 0C00
+
+; [ Cardinal Syn (France) (Promo) {SCES-01077} ]
+; [ Cardinal Syn (Italy) {SCES-01205} ]
+; [ Carnage Heart (Europe) {SCES-00441} ]
+:SCES-00441
+#Widescreen 16-9
+801280F4 0C00
+
+; [ Chaos Break (Europe) {SLES-03107} ]
+:SLES-03107
+#Widescreen 16-9
+A70F2B80 10000C00
+#Widescreen 16-9 (Optional Extra)
+A70F2BA0 10000C00
+
+:SLPM-86363
+#Widescreen 16-9
+A70F3148 10000C00
+#Widescreen 16-9 (Optional Extra)
+A70F3168 10000C00
+
+; [ Chibi Maruko-chan: Maruko Enikki World (Japan) {SLPS-00166} ]
+; [ Chicken Run (Europe) {SLES-03188} ]
+:SLES-03188
+#Widescreen
+800B316C 0C00
+
+; [ Chicken Run (Europe) {SLES-03285} ]
+:SLES-03285
+#Widescreen 16-9
+A70B6D0C 10000C00
+
+; [ Chiki Chiki Machine Mou Race: Wacky Races (Japan) {SLP-86845} ]
+; [ Chill (Europe) Demo {SLED-01194} ]
+; [ Clock Tower (Europe) {SLES-00870} ]
+:SLES-00870
+#Widescreen 16-9
+A70663C4 10000C00
+
+; [ Clock Tower (France) {SLES-00871} ]
+:SLES-00871
+#Widescreen 16-9
+A7066410 10000C00
+
+; [ Clock Tower (Germany) {SLES-00872} ]
+; [ Clock Tower 2 (Japan) Demo {SLP-80062} ]
+; [ Clock Tower 2 (Japan) Demo {SLP-80063} ]
+; [ Colin McRae Rally 2.0 (Europe) Rev 1 {SLES-02605} ]
+; [ Colin McRae Rally 2.0 (Europe) Rev 2 {SLES-02605} ]
+; [ Colin McRae Rally 2.0 (Europe) {SLES-02605} ]
+:SLES-02605
+#Widescreen 16-9
+80056BA0 2EEE
+80056BA2 0001
+
+; [ Colin McRae: The Rally (Japan) Demo {SLP-80380} ]
+; [ Contra: Legacy of War (Europe) {SLES-00608} ]
+:SLES-00608
+#Widescreen 16-9
+800DD4E0 0C00
+
+; [ Crash Bandicoot (Japan, Asia) {SCPS-10031} ]
+:SCPS-10031
+#Widescreen
+A7017DC4 E4C70C00
+A7017DC6 0C002402
+A7017E06 A422A433
+
+; [ Crash Bandicoot 2: Cortex Strikes Back (Europe) (Preview) {Unlicensed} ]
+; [ Crash Bandicoot 2: Cortex no Gyakushuu! (Japan) {SCPS-10047} ]
+:SCPS-10047
+#Select Widescreen Type\Widescreen Hor+
+A7017F04 F5F70C00
+A7017F06 0C00241B
+A7017F08 20231000
+A7017F0A 00042402
+A7017F26 A662A67B
+#Select Widescreen Type\Widescreen Vert-
+A7017F04 F5F71000
+A7017F06 0C00241B
+A7017F08 20231555
+A7017F0A 00042402
+A7017F26 A662A67B
+
+; [ Crash Bandicoot 3: Buttobi! Sekai Isshuu (Japan) (Tentou You Taikenban) {PCPX-96145} ]
+; [ Crash Bandicoot 3: Warped (Europe) {SCES-01420} ]
+:SCES-01420
+#Widescreen 16-9
+80018B48 0C00
+80018B4A 2402
+80018B4C 1000
+80018B4E 2413
+80018B6A A633
+
+; [ Crash Bandicoot Carnival (Japan) Demo {PCPX-96202} ]
+; [ Crime Killer (Europe) {SLES-00954} ]
+:SLES-00954
+#Widescreen 16-9
+801A2500 0C00
+801911D8 0C00
+
+; [ Crime Killer (Germany) Demo {SLED-01305} ]
+; [ Crisis Beat (Europe) {SLES-02793} ]
+:SLES-02793
+#Widescreen 16-9
+8005E510 0C00
+
+; [ Crisis Beat (Japan) {SLPS-01430} ]
+:SLPS-01430
+#Widescreen 16-9
+80061E30 0C00
+
+; [ Critical Blow (Japan) {SLPS-01044} ]
+:SLPS-01044
+#Widescreen 16-9
+80082400 0C00
+
+; [ Critical Depth (Europe) {SLES-00136} ]
+:SLES-00136
+#Widescreen 16-9
+801CF60C 0C00
+801CF66C 0C00
+801CF6CC 0C00
+
+; [ Criticom aka Criticom: Critical Combat (Europe) {SLES-00196} ]
+:SLES-00196
+#Widescreen 16-9
+80106C10 0C00
+
+; [ Criticom: The Critical Combat (Japan) {SLPS-00229} ]
+; [ Croc 2 (Europe) Demo {SLED-02119} ]
+; [ DamDam Stompland (Japan) {SLPS-01135} ]
+:SLPS-01135
+#Widescreen 16-9
+800BE3FC 0C00
+#Widescreen 16-9 (Menus)
+800167B4 0C00
+
+; [ Dance Dance Revolution (Japan) {SLP-86222} ]
+; [ Dance Dance Revolution 2nd Remix (Japan) {SLP-86252} ]
+; [ Dance Dance Revolution 2nd Remix: Append Club Version Vol. 1 (Japan, Asia) {SCPS-45456} ]
+; [ Dance Dance Revolution 2nd Remix: Append Club Version Vol. 2 (Japan) {SLP-86399} ]
+; [ Dance Dance Revolution 3rd Mix (Japan) {SLP-86503} ]
+; [ Dance Dance Revolution 4th Mix (Japan) {SLP-86752} ]
+; [ Dance Dance Revolution 5th Mix (Japan) {SLP-86897} ]
+; [ Dance Dance Revolution: Best Hits (Japan) {SLP-86693} ]
+; [ Dance Dance Revolution: Disney's Rave (Japan) {SLP-86667} ]
+; [ Dance Dance Revolution: Extra Mix (Japan) {SLP-86831} ]
+; [ Dance Europe (Europe) {SLES-04129} ]
+; [ Dance! Dance! Dance! (Japan) Demo {SLP-80348} ]
+; [ Dance! Dance! Dance! (Japan) {SLP-86150} ]
+; [ Dance:UK (UK) {SLES-04121} ]
+; [ Dance:UK eXtra Trax (UK) {SLES-04161} ]
+; [ Dancing Blade Katte ni Momotenshi II: Tears of Eden (Japan) {SLP-86210 | SLP-86211 | SLP-86212} ]
+; [ Dancing Blade Katte ni Momotenshi! (Japan) {SLP-86100 | SLP-86101 | SLP-86102} ]
+; [ Dead or Alive (Europe) {SCES-01259} ]
+:SCES-01259
+#Widescreen 16-9
+80049F30 0C00
+
+; [ Dead or Alive (Japan) {SLPS-01289} ]
+:SLPS-01289
+#Widescreen 16-9
+80049EC0 0C00
+
+; [ Dead or Alive (UK) Demo {SCED-01372} ]
+; [ Dead or Alive (USA) (News Version) {Unlicensed} ]
+; [ Dead or Alive (USA) (Trade Demo) {SLUS-80606} ]
+; [ Demolition Racer (Europe) {SLES-02018} ]
+:SLES-02018
+#Widescreen 16-9
+8005F3D8 0C00
+
+; [ Dengeki Construction: Ochigee Yarou ze! (Japan) {SLPS-01215} ]
+; [ Dengeki PlayStation D (Japan) {SLP-80071} ]
+; [ Dengeki PlayStation D10 (Japan) {SLP-80281} ]
+; [ Dengeki PlayStation D11 (Japan) {SLP-80327} ]
+; [ Dengeki PlayStation D11: Yarudora Series Vol. 3: Sampaguita (Japan) (Bundled with Magazine) {PAPX-90060} ]
+; [ Dengeki PlayStation D12 (Japan) {SLP-80343} ]
+; [ Dengeki PlayStation D13 (Japan) {SLP-80362} ]
+; [ Dengeki PlayStation D14 (Japan) {SLP-80331} ]
+; [ Dengeki PlayStation D15 (Japan) {SLP-80388} ]
+; [ Dengeki PlayStation D16 (Japan) {SLP-80399} ]
+; [ Dengeki PlayStation D17 (Japan) {SLP-80418} ]
+; [ Dengeki PlayStation D18 (Japan) {SLP-80412} ]
+; [ Dengeki PlayStation D19 (Japan) {SLP-80425} ]
+; [ Dengeki PlayStation D2 (Japan) {SLP-80109} ]
+; [ Dengeki PlayStation D20 (Japan) {SLP-80438} ]
+; [ Dengeki PlayStation D21 (Japan) {SLP-80457} ]
+; [ Dengeki PlayStation D21 SCE Special (Japan) {PCPX-96159} ]
+; [ Dengeki PlayStation D22 (Japan) {SLP-80471} ]
+; [ Dengeki PlayStation D23 (Japan) {SLP-80481} ]
+; [ Dengeki PlayStation D24 (Japan) {SLP-80496} ]
+; [ Dengeki PlayStation D25 (Japan) {SLP-80497} ]
+; [ Dengeki PlayStation D26 (Japan) {SLP-80505} ]
+; [ Dengeki PlayStation D27 (Japan) {SLP-80516} ]
+; [ Dengeki PlayStation D28 (Japan) {SLP-80526} ]
+; [ Dengeki PlayStation D29 (Japan) {SLP-80545} ]
+; [ Dengeki PlayStation D3 (Japan) {SLP-80130} ]
+; [ Dengeki PlayStation D30 (Japan) {SLP-80547} ]
+; [ Dengeki PlayStation D31 (Japan) {SLP-80555} ]
+; [ Dengeki PlayStation D32 (Japan) {SLP-80557} ]
+; [ Dengeki PlayStation D33 (Japan) {SLP-80562} ]
+; [ Dengeki PlayStation D34 (Japan) {SLP-80569} ]
+; [ Dengeki PlayStation D35 (Japan) {SLP-80574} ]
+; [ Dengeki PlayStation D36 (Japan) {SLP-80578} ]
+; [ Dengeki PlayStation D37 (Japan) {SLP-80582} ]
+; [ Dengeki PlayStation D38 (Japan) {SLP-80589} ]
+; [ Dengeki PlayStation D39 (Japan) {SLP-80603} ]
+; [ Dengeki PlayStation D4 (Japan) {SLP-80157} ]
+; [ Dengeki PlayStation D41 (Japan) {SLP-80607} ]
+; [ Dengeki PlayStation D42 (Japan) {SLP-80611} ]
+; [ Dengeki PlayStation D43 (Japan) {SLP-80612} ]
+; [ Dengeki PlayStation D44 (Japan) {SLP-80615} ]
+; [ Dengeki PlayStation D45 (Japan) {SLP-80618} ]
+; [ Dengeki PlayStation D5 (Japan) {SLP-80186} ]
+; [ Dengeki PlayStation D6 (Japan) {SLP-80214} ]
+; [ Dengeki PlayStation D7 (Japan) {SLP-80309} ]
+; [ Dengeki PlayStation D8 (Japan) {SLP-80257} ]
+; [ Dengeki PlayStation D8: Yarudora Series Vol. 1: Double Cast (Japan) (Bundled with Magazine) {PCPX-96116} ]
+; [ Dengeki PlayStation D9 (Japan) {SLP-80266} ]
+; [ Dengeki PlayStation D: Konami Fanbook (Japan) {SLP-80513} ]
+; [ Denkousekka Micro Runner: Maniac Hakase no Hisaku (Japan) {SLPS-02851} ]
+; [ Detective Barbie: The Mystery Cruise (Europe) {SLES-03803} ]
+:SLES-03803
+#Widescreen 16-9
+800EBCDC 0C00
+800FEA94 0C00
+800FEB94 0C00
+80102304 0C00
+8008A428 0C00
+
+; [ Detective Mouse (Europe) {SLES-04130} ]
+; [ Deuce (USA) (Prototype) {Unlicensed} ]
+:UNLICENSED
+#Deuce\Widescreen 16-9
+A70925D0 19991333
+
+; [ Devil's Deception (Europe) {SLES-00848} ]
+:SLES-00848
+#Widescreen 16-9
+8006DD50 0C00
+
+; [ DewPrism (Japan, Asia) {SCPS-45436} ]
+; [ Digimon World 2003 (Europe) {SLES-03936} ]
+:SLES-03936
+#Widescreen 16-9
+80081398 0C00
+
+; [ DigimonTamers: PocketCulumon (Japan) {SLPS-03211} ]
+; [ Disney/Pixar A Bug's Life (Europe) {SCES-01489} ]
+:SCES-01489
+#Widescreen 16-9
+A7027E24 66664CCC
+A7027E2C 6667CCCD
+#Widescreen 16:9 (ASM)
+D0027E24 6666
+80027E24 4CCC
+D0027E2C 6667
+80027E2C CCCD
+
+; [ Disney/Pixar Toy Story Racer aka Disney/Pixar's Toy Story Racer (Europe) {SLES-03396} ]
+:SLES-03396
+#Widescreen 16-9
+A7033E28 66664CCC
+A7033E2C 6667CCCD
+A704D6FC 66664CCC
+A704D799 6667CCCD
+A704D7E0 66664CCC
+A704D7E4 6667CCCD
+A704D894 66664CCC
+A704D89C 6667CCCD
+A704DE8C 66664CCC
+A704DE90 6667CCCD
+A706D404 66664CCC
+A706D40C 6667CCCD
+
+; [ Dragon Ball: Final Bout (France) {SLES-00964} ]
+:SLES-00964
+#Widescreen 16-9
+8002219C 0C00
+
+; [ Dragon Ball: Final Bout (Germany) {SLES-03683} ]
+; [ Dragon Ball: Final Bout (Italy) {SLES-03684} ]
+; [ Dragon Ball: Final Bout (Japan) Demo {SLP-80112} ]
+:SCES-12565
+#Widescreen 16-9
+8002E3EC 0C00
+
+; [ Driver (Europe) {SLES-01816} ]
+:SLES-01816
+#60 Frames Per Second
+80096378 0000
+#Widescreen 16-9
+8008A48C 1333
+
+; [ Driver (France) {SLES-01976} ]
+:SLES-01976
+#Widescreen 16-9
+8008A52C 1333
+
+; [ Driver (Italy) {SLES-01977} ]
+:SLES-01977
+#Widescreen 16-9
+8008A544 1333
+
+:SLES-12993
+#Widescreen 16-9
+8007F0F8 0C00
+
+:SLES-12994
+#Widescreen 16-9
+8007F2F8 0C00
+
+; [ Dune 2000 (France) {SLES-02248} ]
+:SLES-02248
+#Widescreen 16-9
+A6183058 10000C00
+A6183018 10001558
+
+; [ Evo's Space Adventures (Europe) {SLES-01871} ]
+:SLES-01871
+#Widescreen 16-9
+80132760 0C00
+
+; [ Exhumed (Europe) {SLES-00097} ]
+:SLES-00097
+#Widescreen 16-9
+80074C60 1550
+
+; [ Fantastic Night Dreams: Cotton Original (Japan) {SLPS-02034} ]
+:SLPS-02034
+#Widescreen 16-9
+300DB229 000C
+
+; [ Fantasy Tap (Japan) {SLPS-00781} ]
+; [ Fighting Illusion: K-1 GP 2000 (Japan) {SLPS-02985} ]
+:SLPS-02985
+#Widescreen 16-9
+800DF7D0 0C00
+
+; [ Fighting Illusion: K-1 Grand Prix '98 (Japan) (Tentou Demo-ban) {SLP-80341} ]
+; [ Formula Nippon (Europe) {SLES-02527} ]
+:SLES-02527
+#Widescreen 16-9
+A608A3E4 10000C00
+A608A4F4 10000C00
+A608A454 10000C00
+A608A3B4 10000C00
+A608A548 10000C00
+
+; [ Formula One '99 (Europe) Beta {SCED-01979} ]
+; [ Formula One (Europe) Demo {SLED-00491} ]
+; [ Formula One 2000 (Europe) {SCES-02777} ]
+; [ Formula One 2000 (Europe) {SCES-02779} ]
+; [ Formula One 2000 aka Formel Eins 2000 (Europe) {SCES-02778} ]
+; [ Frogger 2: Swampy's Revenge (Europe) {SLES-02853} ]
+:SLES-02853
+#Widescreen 16-9
+800A4920 0C00
+
+; [ From Software 1998 Summer Preview Movies (Japan) (Hibaihin) {SLP-80268} ]
+; [ Ganbare Morikawa-kun 2-gou (Japan) (Genteiban) {SCPS-10033} ]
+:SCPS-10033
+#Widescreen 16-9
+801D050C 0C00
+
+; [ Ganbare Morikawa-kun 2-gou (Japan) {SCPS-10036} ]
+:SCPS-10036
+#Widescreen 16-9
+801D050C 0C00
+
+; [ Ganbare! Nippon! Olympic 2000 (Japan) {SLP-86482} ]
+; [ Gex 3D: Enter the Gecko aka Gex 3D: Return of the Gecko (Europe) {SLES-00596} ]
+:SLES-00596
+#Widescreen 16-9
+800424AC 0C00
+800424BC 0034
+800424BE AFA0
+800424C0 1000
+800424C2 2403
+
+; [ Gex: Deep Cover Gecko (Europe) Demo {SLED-01954} ]
+; [ Gran Turismo (Japan, Asia) {SCPS-10045} ]
+:SCPS-10045
+#60 FPS (+Re-enable tire smoke, Re-enable rear view mirror)
+A60AD648 00020001
+A702DD08 00020001
+A702A548 00020001
+
+:SCPS-91326
+#16:9 Widescreen 2.0 (NTSC-J 1.0)
+;"Help" the game unload segments that normally are left unwritten to,
+;so further cheat detection is more reliable. This is safe as it overwrites dead code.
+;Reset the race overlay for Arcade
+A405054C 801EDEA0
+8005D1EC 0000
+80056C64 0000
+00000000 FFFF
+;Reset the race overlay for Simulation
+A40524D0 00000087
+8005D1EC 0000
+80056C64 0000
+00000000 FFFF
+;Car Selection (Arcade)
+A402085C 3084007F
+A701E374 FF80FF56
+A701E37C 008000AA
+;Car Selection 2P Battle (Arcade)
+A701FF90 FF97FF74
+A701FF98 0069008C
+;Pre-race screen (Arcade)
+A7015340 014001AA
+00000000 FFFF
+;Race
+A401F794 AEB40008
+A70100D0 FF60FF2B
+A70100D4 00A000D5
+00000000 FFFF
+;Race (Rear view mirror)
+A403EC18 02602021
+A702953C FFC4FFB0
+A7029540 003C0050
+00000000 FFFF
+;Post-race screen #1
+A4056C64 260201C0
+;a1 -> t1, *will* change visuals of some screens!
+;Other screens will get slightly resized to compensate for this.
+A704971A A485A489
+A7049E54 00C8010A
+A7049E5C 302100C8
+A7049E5E 00A03406
+A704C0A0 00C8010A
+A704C0A8 302100C8
+A704C0AA 00A03406
+;Bonus screen (Licenses)
+;Use free space to re-fit li $a1, 160h \ sh $a1, C4h($a0)
+A704DCA8 00000160
+A704DCAA 00002405
+A704DCB4 022000C4
+A704DCB6 8FB2A485
+A704DC90 016001D5
+;Results screen
+A7050804 FF50FF16
+A705080C 00B000EA
+00000000 FFFF
+;Post-race screen #2
+A405D1EC 8005A208
+A7057C80 00C8010A
+A7057C88 302100C8
+A7057C8A 00A03406
+A7058534 00C8010A
+A705853C 302100C8
+A705853E 00A03406
+;Bonus screen (Trophy)
+A7059618 016001D5
+00000000 FFFF
+;GT Mode screens (Simulation)
+A4023F14 800225C8
+A701C9D4 00B30086
+A701C9DC FFCEFFDB
+A701C9E4 03200258
+00000000 FFFF
+#16:9 Widescreen 2.0 (NTSC-J 1.1)
+;"Help" the game unload segments that normally are left unwritten to,
+;so further cheat detection is more reliable. This is safe as it overwrites dead code.
+;Reset the race overlay for Arcade
+A40527D4 801EF999
+8005D4AC 0000
+80056F24 0000
+00000000 FFFF
+;Reset the race overlay for Simulation
+A405257C 000000F6
+8005D4AC 0000
+80056F24 0000
+00000000 FFFF
+;Car Selection (Arcade)
+A4020888 3084007F
+A701E3A0 FF80FF56
+A701E3A8 008000AA
+;Car Selection 2P Battle (Arcade)
+A701FFBC FF97FF74
+A701FFC4 0069008C
+;Pre-race screen (Arcade)
+A701536C 014001AA
+00000000 FFFF
+;Race
+A401F880 AEB40008
+A70100D0 FF60FF2B
+A70100D4 00A000D5
+00000000 FFFF
+;Race (Rear view mirror)
+A403EBF0 02602021
+A702960C FFC4FFB0
+A7029610 003C0050
+00000000 FFFF
+;Post-race screen #1
+A4056F24 260201C0
+;a1 -> t1, *will* change visuals of some screens!
+;Other screens will get slightly resized to compensate for this.
+A7049726 A485A489
+A7049EA4 00C8010A
+A7049EAC 302100C8
+A7049EAE 00A03406
+A704C0F0 00C8010A
+A704C0F8 302100C8
+A704C0FA 00A03406
+;Bonus screen (Licenses)
+;Use free space to re-fit li $a1, 160h \ sh $a1, C4h($a0)
+A704DF7C 00000160
+A704DF7E 00002405
+A704DF88 022000C4
+A704DF8A 8FB2A485
+A704DF64 016001D5
+;Results screen
+A7050B14 FF50FF16
+A7050B1C 00B000EA
+00000000 FFFF
+;Post-race screen #2
+A405D4AC 8005A4C8
+A7057F40 00C8010A
+A7057F48 302100C8
+A7057F4A 00A03406
+A70587F4 00C8010A
+A70587FC 302100C8
+A70587FE 00A03406
+;Bonus screen (Trophy)
+A70598D8 016001D5
+00000000 FFFF
+;GT Mode screens (Simulation)
+A4023F98 800225CC
+A701C9D4 00B30086
+A701C9DC FFCEFFDB
+A701C9E4 03200258
+00000000 FFFF
+#21:9 Widescreen 2.0 (NTSC-J 1.0)
+;"Help" the game unload segments that normally are left unwritten to,
+;so further cheat detection is more reliable. This is safe as it overwrites dead code.
+;Reset the race overlay for Arcade
+A405054C 801EDEA0
+8005D1EC 0000
+80056C64 0000
+00000000 FFFF
+;Reset the race overlay for Simulation
+A40524D0 00000087
+8005D1EC 0000
+80056C64 0000
+00000000 FFFF
+;Car Selection (Arcade)
+A402085C 3084007F
+A701E374 FF80FF20
+A701E37C 008000E0
+;Car Selection 2P Battle (Arcade)
+A701FF90 FF97FF49
+A701FF98 006900B7
+;Pre-race screen (Arcade)
+A7015340 01400230
+00000000 FFFF
+;Race
+A401F794 AEB40008
+A70100D0 FF60FEE8
+A70100D4 00A00118
+00000000 FFFF
+;Race (Rear view mirror)
+A403EC18 02602021
+A702953C FFC4FF97
+A7029540 003C0069
+00000000 FFFF
+;Post-race screen #1
+A4056C64 260201C0
+;a1 -> t1, *will* change visuals of some screens!
+;Other screens will get slightly resized to compensate for this.
+A704971A A485A489
+A7049E54 00C8015E
+A7049E5C 302100C8
+A7049E5E 00A03406
+A704C0A0 00C8015E
+A704C0A8 302100C8
+A704C0AA 00A03406
+;Bonus screen (Licenses)
+;Use free space to re-fit li $a1, 160h \ sh $a1, C4h($a0)
+A704DCA8 00000160
+A704DCAA 00002405
+A704DCB4 022000C4
+A704DCB6 8FB2A485
+A704DC90 01600268
+;Results screen
+A7050804 FF50FECC
+A705080C 00B00134
+00000000 FFFF
+;Post-race screen #2
+A405D1EC 8005A208
+A7057C80 00C8015E
+A7057C88 302100C8
+A7057C8A 00A03406
+A7058534 00C8015E
+A705853C 302100C8
+A705853E 00A03406
+;Bonus screen (Trophy)
+A7059618 01600268
+00000000 FFFF
+;GT Mode screens (Simulation)
+A4023F14 800225C8
+A701C9D4 00B30066
+A701C9DC FFCEFFE4
+A701C9E4 032001C9
+00000000 FFFF
+#21:9 Widescreen (NTSC-J 1.1)
+;"Help" the game unload segments that normally are left unwritten to,
+;so further cheat detection is more reliable. This is safe as it overwrites dead code.
+;Reset the race overlay for Arcade
+A40527D4 801EF999
+8005D4AC 0000
+80056F24 0000
+00000000 FFFF
+;Reset the race overlay for Simulation
+A405257C 000000F6
+8005D4AC 0000
+80056F24 0000
+00000000 FFFF
+;Car Selection (Arcade)
+A4020888 3084007F
+A701E3A0 FF80FF20
+A701E3A8 008000E0
+;Car Selection 2P Battle (Arcade)
+A701FFBC FF97FF49
+A701FFC4 006900B7
+;Pre-race screen (Arcade)
+A701536C 01400230
+00000000 FFFF
+;Race
+A401F880 AEB40008
+A70100D0 FF60FEE8
+A70100D4 00A00118
+00000000 FFFF
+;Race (Rear view mirror)
+A403EBF0 02602021
+A702960C FFC4FF97
+A7029610 003C0069
+00000000 FFFF
+;Post-race screen #1
+A4056F24 260201C0
+;a1 -> t1, *will* change visuals of some screens!
+;Other screens will get slightly resized to compensate for this.
+A7049726 A485A489
+A7049EA4 00C8015E
+A7049EAC 302100C8
+A7049EAE 00A03406
+A704C0F0 00C8015E
+A704C0F8 302100C8
+A704C0FA 00A03406
+;Bonus screen (Licenses)
+;Use free space to re-fit li $a1, 160h \ sh $a1, C4h($a0)
+A704DF7C 00000160
+A704DF7E 00002405
+A704DF88 022000C4
+A704DF8A 8FB2A485
+A704DF64 01600268
+;Results screen
+A7050B14 FF50FECC
+A7050B1C 00B00134
+00000000 FFFF
+;Post-race screen #2
+A405D4AC 8005A4C8
+A7057F40 00C8015E
+A7057F48 302100C8
+A7057F4A 00A03406
+A70587F4 00C8015E
+A70587FC 302100C8
+A70587FE 00A03406
+;Bonus screen (Trophy)
+A70598D8 01600268
+00000000 FFFF
+;GT Mode screens (Simulation)
+A4023F98 800225CC
+A701C9D4 00B30066
+A701C9DC FFCEFFE4
+A701C9E4 032001C9
+00000000 FFFF
+#60 FPS (NTSC-J 1.0 Arcade Disc, +Re-enable tire smoke, sky in the read view mirror, rear view mirror)
+E01D5CB4 0002
+301D5CB4 0001
+A401F794 AEB40008
+;Re-enable tire smoke
+A70167EC 00020000
+;Re-enable sky in the read view mirror
+A7019550 00020000
+00000000 FFFF
+;Re-enable rear view mirror
+A003EC18 02602021
+A70294A0 00020000
+#60 FPS (NTSC-J 1.0 Simulation Disc, +Re-enable tire smoke, sky in the read view mirror, rear view mirror)
+E01D5CC4 0002
+301D5CC4 0001
+A401F794 AEB40008
+;Re-enable tire smoke
+A70167EC 00020000
+;Re-enable sky in the read view mirror
+A7019550 00020000
+00000000 FFFF
+;Re-enable rear view mirror
+A003EC18 02602021
+A70294A0 00020000
+#60 FPS (NTSC-J 1.1 Simulation Disc, +Re-enable tire smoke, sky in the read view mirror, rear view mirror)
+E01D56C4 0002
+301D56C4 0001
+A401F880 AEB40008
+;Re-enable tire smoke
+A70168C0 00020000
+;Re-enable sky in the read view mirror
+A701963C 00020000
+00000000 FFFF
+;Re-enable rear view mirror
+A003EBF0 02602021
+A7029570 00020000
+
+; [ Gungage (Europe) {SLES-02069} ]
+:SLES-02069
+#Widescreen 16-9
+80049B1C 0C00
+
+; [ Gungage (Japan) {SLP-86233} ]
+; [ Gungho Brigade (Japan) Demo {SLP-80324} ]
+; [ Gunnm: Kasei no Kioku (Japan) {SLPS-01408} ]
+:SLPS-01408
+#Widescreen 16-9
+800FF620 0C00
+800C7E60 1000
+800C7DD8 1000
+#Widescreen 16-9 (ALT)
+A70FF648 10000C00
+
+; [ Hokuto no Ken: Seikimatsu Kyuuseishu Densetsu (Japan) {SLPS-02993} ]
+:SLPS-02993
+#Widescreen 16-9
+A7166C00 10000C00
+
+; [ Holiday Special (Japan) (PlayStation Demo Disc) {PBPX-95005} ]
+; [ Home Doctor (Japan) {SLPS-01075} ]
+; [ Honkaku 4-nin Uchi: Geinoujin Taikyoku Mahjong: The Wareme de Pon (Japan) {SLPS-00434} ]
+; [ ISS Pro Evolution (Europe) (EDC Platinum) {SLES-02095} ]
+; [ ISS Pro Evolution (Europe) {SLES-02095} ]
+:SLES-02095
+#Widescreen 16-9
+80073590 0C00
+
+; [ ISS Pro Evolution (Europe) {SLES-02424} ]
+:SLES-02424
+#Widescreen 16-9
+800727A0 0C00
+
+; [ ISS Pro Evolution 2 (Europe) {SLES-03321} ]
+:SLES-03321
+#Widescreen 16-9
+80073668 0C00
+
+; [ ISS Pro Evolution 2 (Europe) {SLES-03322} ]
+:SLES-03322
+#Widescreen 16-9
+80072A78 0C00
+
+; [ International Track & Field (Europe) {SLES-00333} ]
+:SLES-00333
+#Widescreen 16-9
+800DB28C 0C00
+
+; [ International Track & Field 2 (Europe) {SLES-02448} ]
+:SLES-02448
+#Widescreen 16-9
+800AC970 0C00
+
+; [ Interplay Sports Baseball 2000 (Europe) {SLES-01935} ]
+; [ J's Racin' (Japan) {SLPS-01007} ]
+:SLPS-01007
+#Widescreen 16-9
+8007A368 0D0B
+8007A3E8 08B2
+
+; [ J. B. Harold: Blue Chicago Blues (Japan) {SLPS-00144 | SLPS-00145} ]
+; [ J.League Jikkyou Winning Eleven '97 (Japan) {SLP-86010} ]
+; [ J.League Jikkyou Winning Eleven '98-'99 (Japan) {SLP-86154} ]
+; [ J.League Jikkyou Winning Eleven (Japan) Rev 1 {SLPS-00068} ]
+; [ J.League Jikkyou Winning Eleven (Japan) {SLPS-00068} ]
+:SLPM-86538
+#Widescreen 16-9
+8006F2B8 0C00
+
+:SLPM-86668
+#Widescreen 16-9
+8006F140 0C00
+
+:SLPM-86835
+#Widescreen 16-9
+8006F248 0C00
+
+:SLPM-86055
+#Widescreen 16-9
+800E6368 0C00
+
+; [ J.League Soccer: Jikkyou Survival League (Japan) {SLPS-02436} ]
+; [ J.League Soccer: Prime Goal EX (Japan) (Lawson Station) {SLPS-00079} ]
+; [ J.League Soccer: Prime Goal EX (Japan) {SLPS-00079} ]
+; [ J.League Virtual Stadium '96 (Japan) {SLPS-00301} ]
+; [ Jersey Devil (Europe) {SLES-00598} ]
+:SLES-00598
+#Widescreen 16-9
+800507F8 0C00
+
+; [ Jersey Devil no Daibouken (Japan) {SLP-86075} ]
+; [ Jet Rider (Europe) {SCES-00566} ]
+:SCES-00566
+#Widescreen 16-9
+8016EEAC 0C00
+8016EC0C 0C00
+8016EC6C 0C00
+8016ED2C 0C00
+8016ED8C 0C00
+
+; [ Jet Rider 2 (Europe) {SCES-01045} ]
+:SCES-01045
+#Widescreen 16-9
+80194CD4 0C00
+80194C14 0C00
+80194C74 0C00
+80194AF4 0C00
+80194B54 0C00
+
+; [ Jet de Go! Let's Go by Airliner (Japan) (JAL Kinai Hanbai Gentei) {SLP-86324} ]
+; [ Jet de Go! Let's Go by Airliner (Japan) Demo {SLP-80515} ]
+:SLPM-86323
+#Widescreen 16-9
+801472D0 0C00
+
+; [ JetMoto (Japan) {PCPX-96080} ]
+; [ Jetracer (Europe) (Pocket Price Midas) {SLES-03328} ]
+; [ Jewel Bem Hunter Lime with Paint Maker (Japan) {SLPS-00589} ]
+; [ Jigoku Sensei Nube (Japan) {SLPS-00802} ]
+; [ Jigsaw Island: Japan Graffiti (Japan) (Major Wave) {SLP-86918} ]
+; [ Jonah Lomu Rugby (France) {SLES-00611} ]
+:SLES-00611
+#Widescreen 16-9
+A701B100 10000C00
+
+; [ Joue avec les Teletubbies (France) {SLES-02772} ]
+; [ K-1 Grand Prix (Europe) {SLES-02753} ]
+:SLES-02753
+#Widescreen 16-9
+800C69F0 0C00
+
+; [ K-1 The Arena Fighters (Europe) {SLES-00767} ]
+:SLES-00767
+#Widescreen 16-9
+800D1CE8 0C00
+
+:SLPM-86763
+#Widescreen 16-9
+800E1200 0C00
+
+; [ Kagero: Deception II aka Kagero: Deception 2 (Europe) {SLES-01967} ]
+:SLES-01967
+#Widescreen 16-9
+800EF340 0C00
+
+; [ Kagerou: Kokumeikan Shinshou (Japan) Demo {SLP-80273} ]
+; [ Kaze no Klonoa: Door to Phantomile (Japan) {SLPS-01010} ]
+:SLPS-01010
+#Widescreen 16-9
+A70BE9F0 10000C00
+A7105568 10000C00
+A7109950 10000C00
+#Remove Dither (Use with widescreen code)
+A70A95DC 02000000
+#Widescreen Heart Sprites (Level 1 only)
+A70C3CFC 10000C00
+A70C3D34 10000C00
+A70C3D18 10000C00
+
+; [ Kaze no Notam: Notam of Wind (Japan, Asia) {SCPS-45111} ]
+; [ Kaze no Oka Kouen Nite (Japan) {SLPS-01565} ]
+; [ Keiba Eight '99 Haru Natsu (Japan) {SLPS-01929} ]
+; [ Keiba Saishou no Housoku '96 Vol. 1 (Japan) {SLPS-00146} ]
+; [ Keiba Saishou no Housoku '96 Vol. 2: GI-Road (Japan) {SLPS-00605} ]
+; [ Keiba Saishou no Housoku '97 Vol. 1: Nerae! Manbaken! (Japan) {SLPS-00808} ]
+; [ Keiba Saishou no Housoku '97 Vol. II: To Hit (Japan) {SLPS-01032} ]
+; [ Keiba Saishou no Housoku '99 Aki Fuyu (Japan) {SLPS-02339} ]
+; [ Keitai Eddy (Japan) {SLPS-02717} ]
+; [ Keitai Henshuu (Japan) {PBPX-95013} ]
+; [ Kensei: Sacred Fist (Europe) {SLES-01081} ]
+:SLES-01081
+#Widescreen 16-9
+800C7F18 0C00
+
+; [ Kiganjou (Japan) {SLPS-02370} ]
+:SLPS-02370
+#Widescreen 16-9
+80184068 0C00
+8017FB18 0FF0
+8017FB98 0FF0
+8017FBD8 0FF0
+8017FC18 0FF0
+
+; [ Kikuni Masahiko Jirushi: Warau Fukei-san Pachi-Slot Hunter (Japan) {SLPS-00021} ]
+; [ Kingsley's Adventure (Europe) {SCES-01659} ]
+:SCES-01659
+#Widescreen 16-9
+800E6FBC 0F00
+
+; [ Kinniku Banzuke Vol. 1: Ore ga Saikyou no Otoko da! (Japan) {SLP-86381} ]
+; [ Kinniku Banzuke Vol. 2: Arata naru Genkai e no Chousen! (Japan) {SLP-86457} ]
+; [ Kinniku Banzuke Vol. 3: Saikyou no Challenger Tanjou! (Japan) {SLP-86950} ]
+; [ Kinniku Banzuke: Road to Sasuke (Japan) {SLP-86490} ]
+; [ Klonoa: Door to Phantomile (France) {SCES-01185} ]
+:SCES-01185
+#Widescreen 16-9
+8010A2E8 0C00
+800BEE12 0C00
+
+; [ Klonoa: Door to Phantomile (Germany) {SCES-01186} ]
+; [ Knockout Kings 2001 (France) {SLES-03122} ]
+:SLES-03122
+#Widescreen 16-9
+8012B3C0 0C00
+
+; [ Knockout Kings 99 (France) {SLES-01450} ]
+:SLES-01450
+#Widescreen 16-9
+800107C8 0C00
+
+; [ Kula World (Europe) {SCES-01000} ]
+:SCES-01000
+#Widescreen 16-9
+800A2E70 0C00
+
+; [ KulaQuest (Japan) Demo {PCPX-96121} ]
+; [ KulaQuest (Japan) {SCPS-10064} ]
+:SCPS-10064
+#Widescreen 16-9
+8009F4D8 0C00
+
+; [ Kurushi (Europe) {SCES-00866} ]
+:SCES-00866
+#Widescreen 16-9
+80098F98 0C00
+
+; [ Kurushi Final aka Kurushi Final: Das Ultimative Puzzle (Germany) {SCES-02011} ]
+; [ Kurushi Final aka Kurushi Final: El Rompecabezas Elevado al Cubo (Spain) {SCES-02013} ]
+; [ Kurushi Final aka Kurushi Final: Il Puzzle Game in 3D (Italy) {SCES-02012} ]
+; [ Kurushi Final aka Kurushi Final: Mental Blocks (Europe) {SCES-02009} ]
+; [ Kurushi Final aka Kurushi Final: Musclez Votre Cerveau (France) {SCES-02010} ]
+; [ Kyaiin no Tanoshi Mail: PS. I Love You (Japan) {SLP-86447} ]
+; [ Kyoto Maiko Monogatari (Japan) {SLPS-03193} ]
+; [ Kyoufu Shinbun (Japan) {SLPS-00503} ]
+; [ Legacy of Kain: Soul Reaver (Europe) {SLES-01301} ]
+:SLES-01301
+#Widescreen 16-9
+8003A604 0C00
+8003A614 0034
+8003A616 AFA0
+8003A618 1000
+8003A61A 2403
+
+; [ Legend (Europe) {SLES-00730} ]
+:SLES-00730
+#Widescreen 16-9
+800BBFDC 0C00
+
+; [ Legend of Foresia: La Contrée Interdite (France) {SLES-01273} ]
+; [ Lifeforce Tenka (Europe) {SLES-00613} ]
+:SLES-00613
+#Widescreen 16-9
+3002B5E1 000C
+
+; [ Lifeforce Tenka (France) {SLES-00614} ]
+:SLES-00614
+#Widescreen 16-9
+3002B5E1 000C
+
+; [ Lifeforce Tenka (Germany) {SLES-00615} ]
+:SLES-00615
+#Widescreen 16-9
+3002B5E1 000C
+
+; [ Lifeforce Tenka (Italy) {SLES-00616} ]
+; [ Lifeforce Tenka (Spain) {SLES-00617} ]
+:SLPM-86015
+#Widescreen 16-9
+800D0E94 0C00
+
+; [ Macross Plus: Game Edition (Japan) {SLPS-02791} ]
+:SLPS-02791
+#Widescreen 16-9
+801FB140 0C00
+
+; [ Macross VF-X2 (Japan) {SLPS-02237} ]
+:SLPS-02237
+#Widescreen 16-9
+8008E538 0C00
+
+; [ Macross VF-X2, Patlabor: The Game (Japan) Demo {SLPS-02007} ]
+; [ Mahjong Station Mazin (Japan) {SLPS-00005} ]
+:SLPS-00005
+#Widescreen 16-9 (Normal Release)
+A70AD02C 10000C00
+#Widescreen 16-9 (Rev 1 Release)
+A70ACF84 10000C00
+
+; [ Mahjong Station Mazin (Japan) {SLPS-00005} ]
+; [ Mahjong Taikai II Special (Japan) Rev 1 {SLP-86993} ]
+; [ Marcel Desailly Pro Football (France) {SLES-03868} ]
+:SLES-03868
+#Widescreen 16-9
+800BB4A8 0C00
+
+; [ Maria 2: Jutai Kokuchi no Nazo (Japan) {SLPS-02240 | SLPS-02241 | SLPS-02242} ]
+; [ Maria: Kimitachi ga Umareta Wake (Japan) Demo {SLP-80185} ]
+; [ Maria: Kimitachi ga Umareta Wake (Japan) {SLPS-01136 | SLPS-01137 | SLPS-01138} ]
+; [ MediEvil (France) {SCES-01492} ]
+:SCES-01492
+#Widescreen 16-9
+A70F8594 19991333
+A70F8C9C 19991333
+
+; [ MediEvil 2 (Europe) {SCES-02545} ]
+:SCES-02545
+#Widescreen 16:9
+A712932C 19991333
+
+; [ MediEvil 2 (Russia) {SCES-02546} ]
+; [ MediEvil Collector's Edition (UK) Demo {SCED-01527} ]
+; [ MediEvil Special (France) Demo {SCED-01571} ]
+; [ MediEvil: Yomigaetta Gallowmere no Yuusha (Japan) {SCPS-10081} ]
+:SCPS-10081
+#Widescreen 16-9
+A70FA268 19991333
+A70F9384 19991333
+A71BE438 19991333
+
+; [ Men in Black: The Game (France) {SLES-01199} ]
+:SLES-01199
+#Widescreen 16-9 (Partial)
+90098248 15551555
+9009824C 15551555
+90098250 15551555
+90098254 15551555
+90098258 15551555
+8009825C 1555
+
+; [ Ms. Pac-Man Maze Madness (Europe) {SCES-03085} ]
+:SCES-03085
+#Widescreen 16-9
+801F32C8 0C00
+
+; [ Ms. Pac-Man Maze Madness (Japan) {SLPS-03000} ]
+; [ Mundial 2002 Challenge (Portugal) {SLES-03870} ]
+; [ Nickelodeon Les Razmoket: 100 100 Angelica (France) {SLES-03545} ]
+:SLES-03545
+#Widescreen 16-9
+D01F9180 1000
+301F9181 000C
+
+; [ Nickelodeon Les Razmoket: A la Recherche de Reptar aka Les Razmoket: A la Recherche de Reptar (France) {SLES-01669} ]
+; [ Nickelodeon Les Razmoket: Font leur Cinéma aka Les Razmoket: Font leur Cinéma (France) {SLES-02524} ]
+; [ Nickelodeon Rocket Power: Sauvetage Extrême (France) {SLES-03732} ]
+; [ OverBlood (Europe) {SLES-00768} ]
+:SLES-00768
+#Widescreen 16-9
+800EBE94 0C00
+
+; [ OverBlood (France) {SLES-00769} ]
+:SLES-11879
+#Widescreen 16-9
+801F0FB8 0C00
+
+:SLPS-01262
+#Widescreen 16-9
+A71F0F80 10000C00
+#Widescreen 16-9 (Optional Extra)
+A71F0FC0 10000C00
+
+; [ PaRappa the Rapper: The Hip Hop Hero (Europe) {SCES-00743} ]
+:SCES-00743
+#Widescreen 16-9
+80097B30 0C00
+
+; [ Pac-Man World (USA) Rev 1 {SLUS-90057} ]
+; [ Pac-Man World 20th Anniversary (France) {SCES-02277} ]
+:SCES-02277
+#Widescreen 16-9
+30151761 000C
+
+; [ Paris-Marseille Racing (France) {SLES-03108} ]
+:SLES-03108
+#Widescreen 16-9
+300D08C1 000C
+
+; [ Pax Corpus (Europe) {SLES-00953} ]
+:SLES-00953
+#Widescreen 16-9
+8010F4C0 0C00
+
+; [ Persona 2: Tsumi: Innocent Sin (Japan) {SLPS-02100} ]
+:SLPS-02100
+#Widescreen 16-9
+80087A68 0C00
+
+; [ Pesni iz Kino aka ÐŸÐµÑÐ½Ð¸ Ð¸Ð· ÐºÐ¸Ð½Ð¾ (Russia) {Unlicensed} ]
+; [ Pet Pet Pet (Japan) (Magical 1500) {SLPS-03082} ]
+; [ Pet in TV (Europe) {SCES-00981} ]
+:SCES-00981
+#Widescreen 16-9
+801C2D50 0C00
+
+; [ Pet in TV (Germany) {SCES-01358} ]
+; [ Pet in TV: Ton Nouveau Meilleur Ami! (France) {SCES-01357} ]
+; [ Porsche Challenge (Japan) {SIPS-60016} ]
+:SIPS-60016
+#Widescreen 16-9
+800CA178 1222
+
+; [ Posit (Japan) {SLPS-00439} ]
+; [ Pour l'Or et la Gloire: La Route d'Eldorado (France) {SLES-03184} ]
+; [ Power Diggerz (Europe) {SLES-03388} ]
+:SLES-03388
+#Widescreen 16-9
+800D43F8 0C00
+
+; [ Power DoLLS 2 (Japan) {SLPS-01033} ]
+; [ Power League (Japan) {SLPS-01517} ]
+; [ Power Move Pro Wrestling (Europe) {SLES-00202} ]
+; [ Poy Poy (Europe) {SLES-00785} ]
+:SLES-00785
+#Widescreen 16-9
+8010DBB0 0C00
+
+; [ Poy Poy 2 (Europe) {SLES-01536} ]
+:SLES-01536
+#Widescreen 16-9
+800EAA68 0C00
+
+; [ PrePre PlayStation Vol. 0 (Japan) (Otameshi Disc) {PCPD-99501} ]
+; [ PrePre Plus 001: 1999 October (Japan) Demo {PCPX-96173 | PCPX-96174} ]
+; [ PrePre Plus 002: 1999 December (Japan) Demo {PCPX-96186 | PCPX-96187} ]
+; [ PrePre Plus 003: 2000 February (Japan) Demo {PCPX-96190} ]
+; [ PrePre Plus 004: 2000 June (Japan) Demo {PCPX-96198} ]
+; [ PrePre Plus 005: 2000 August (Japan) Demo {PCPX-96199} ]
+; [ PrePre Plus 006: 2000 October (Japan) Demo {PCPX-96201} ]
+; [ PrePre Plus 007: 2000 December (Japan) Demo {PCPX-96203} ]
+; [ PrePre Soukan Junbi-gou: DemoDemo PlayStation Special (Japan) (Otameshi Disc) {PCPX-96015} ]
+; [ PrePre Vol. 1 (Japan) (Club Disc) {PCPX-96017} ]
+; [ PrePre Vol. 10 (Japan) (Club Disc) {PCPX-96103 | PCPX-96104} ]
+; [ PrePre Vol. 11 (Japan) (Club Disc) {PCPX-96108} ]
+; [ PrePre Vol. 12 (Japan) (Club Disc) {PCPX-96114} ]
+; [ PrePre Vol. 13 (Japan) (Club Disc) {PCPX-96118 | PCPX-96119} ]
+; [ PrePre Vol. 14 (Japan) (Club Disc) {PCPX-96126 | PCPX-96127} ]
+; [ PrePre Vol. 15 (Japan) (Club Disc) {PCPX-96133 | PCPX-96134} ]
+; [ PrePre Vol. 16 (Japan) (Club Disc) {PCPX-96142 | PCPX-96143} ]
+; [ PrePre Vol. 17 (Japan) (Club Disc) {PCPX-96148 | PCPX-96149} ]
+; [ PrePre Vol. 18 (Japan) (Club Disc) {PCPX-96156 | PCPX-96157} ]
+; [ PrePre Vol. 19 (Japan) (Club Disc) {PCPX-96167 | PCPX-96168} ]
+; [ PrePre Vol. 2 (Japan) (Club Disc) {PCPX-96023} ]
+; [ PrePre Vol. 3 (Japan) (Club Disc) {PCPX-96028} ]
+; [ PrePre Vol. 4 (Japan) {PCPX-96039} ]
+; [ PrePre Vol. 5 (Japan) (Club Disc) {PCPX-96054 | PCPX-96055} ]
+; [ PrePre Vol. 6 (Japan) (Club Disc) {PCPX-96063 | PCPX-96064} ]
+; [ PrePre Vol. 7 (Japan) {PCPX-96075} ]
+; [ PrePre Vol. 8 (Japan) (Club Disc) {PCPX-96084} ]
+; [ PrePre Vol. 9 (Japan) Demo {PCPX-96093 | PCPX-96094} ]
+; [ Pro Evolution Soccer (Europe) {SLES-03795} ]
+:SLES-03795
+#Widescreen 16-9
+80072DD8 0C00
+
+; [ Pro Evolution Soccer (Europe) {SLES-03796} ]
+:SLES-03796
+#Widescreen 16-9
+80072058 0C00
+
+; [ Pro Evolution Soccer 2 (Europe) {SLES-03946} ]
+:SLES-03946
+#Widescreen 16-9
+8007D2E0 0C00
+
+; [ Pro Evolution Soccer 2 (Europe) {SLES-03957} ]
+; [ Pro Foot Contest '98 + Grand Theft Auto + Courier Crisis (France) {SLED-01295} ]
+; [ Pro Logic Mahjong Hai-Shin (Japan) {SLP-86018} ]
+; [ Pro Mahjong Kiwame Plus II (Japan) {SLPS-01605} ]
+:SLPS-01605
+#Widescreen 16-9
+8007C678 0C00
+
+; [ Pro Mahjong Tsuwamono 2 (Japan) (BPV (Best Price Version)) {SLPS-03065} ]
+; [ Pro Mahjong Tsuwamono 2 (Japan) {SLPS-01987} ]
+; [ Pro Mahjong Tsuwamono 3 (Japan) (EPV (Excellent Price Version)) {SLPS-03464} ]
+; [ Pro Mahjong Tsuwamono Series: Joryuu Janshi ni Chousen: Watashi-tachi ni Chousen Shite ne! (Japan) (BPV (Best Price Version)) {SLPS-03218} ]
+; [ Psychic Force (Europe) {SLES-00629} ]
+:SLES-00629
+#Widescreen 16-9
+801CE78C 0C00
+
+; [ Psychic Force (Japan) (Tentou Demo-ban) {SLP-80049} ]
+; [ Psychic Force (Japan) {SLP-86616} ]
+; [ Psychic Force (Japan) {SLPS-00520} ]
+:SLPS-00520
+#Widescreen 16-9
+801D7448 0C00
+
+; [ Psychic Force 2 (Europe) {SLES-02557} ]
+:SLES-02557
+#Widescreen 16-9
+80076CA0 0C00
+
+; [ Psychic Force 2 (Japan) Demo {SLP-80463} ]
+:SLPM-86273
+#Widescreen 16-9
+8007B8C8 0C00
+
+; [ Quake II (Europe) {SLES-01534} ]
+:SLES-01534
+#Widescreen 16-9
+800D5D46 0180
+
+; [ R-Type Delta (Europe) {SCES-01762} ]
+:SCES-01762
+#Widescreen 16-9
+80193740 0C00
+
+; [ R-Type Delta (Japan) {SLPS-01688} ]
+:SLPS-01688
+#Widescreen 16-9
+801F7418 0C00
+
+; [ Racingroovy VS (Japan) {SLPS-00417} ]
+:SLPS-00417
+#Widescreen 16-9
+3008FA31 0014
+3008FA39 0014
+
+; [ Ray Tracers (Europe) {SCES-00741} ]
+:SCES-00741
+#Widescreen 16-9
+8005EAF0 0C00
+
+; [ Ray-Ray CD-ROM (Japan) (Promotion Ban) {SLP-80078} ]
+; [ RayStorm (Europe) {SCES-00742} ]
+:SCES-00742
+#Widescreen 16-9
+800878B8 0C00
+800878D8 1500
+
+; [ RayStorm (Japan) (Tentou Demo-ban) {SLP-80066} ]
+; [ ReBoot (France) {SLES-00923} ]
+:SLES-00923
+#Widescreen 16-9
+800F29A0 1333
+
+; [ Registered Users Demo (Europe) {SCED-01385} ]
+; [ Registered Users Demo 02 (Europe) {SCED-00936} ]
+:SCED-00936
+#MediEvil Widescreen 16-9
+A70E0BA0 19991333
+
+; [ Registered Users Demo 03 (Europe) {SCED-01230} ]
+; [ Registered Users Demo 05 (Europe) {SCED-01636} ]
+; [ Registered Users Demo 06 (Europe) {SCED-01988} ]
+; [ Registered Users Demo 08 (Europe) {SCED-02676} ]
+; [ Registration Demo 01 (Europe) {SCED-00637} ]
+; [ Reikoku: Ikeda Kizoku Shinrei Kenkyuujo (Japan) {SLP-86274} ]
+; [ Remote Control Dandy (Japan) (Premium Taikenban) {SLP-80445} ]
+; [ Ridge Racer Type 4 (Europe) {SCES-01706} ]
+:SCES-01706
+#Widescreen 16-9
+8006E134 0E00
+
+; [ Ridge Racer Type 4 Collectors Demo (Europe, Australia) Demo {SCED-01982} ]
+; [ Ridge Racer: High Spec Ver. & Namco Catalogue '98 (Japan) (R4 + JogCon) {SLPS-01799} ]
+; [ Ridge Racer: High Spec Ver. & Namco Catalogue '98 (Japan, Asia) {SCPS-45357} ]
+; [ Riichi Mahjong: Ohitorisama demo Utemasu! (Japan) {SLPS-03023} ]
+; [ Rikujou Boueitai Mao-chan (Japan) (DX Pack) {SLP-87198} ]
+; [ Rikujou Boueitai Mao-chan (Japan) {SLP-87210} ]
+; [ Ring of Sias (Japan) {SLPS-00207} ]
+; [ Riot (Europe) Demo {SLED-00639} ]
+; [ Rittai Ninja Katsugeki: Tenchu: Shinobi Gaisen (Japan) {SLPS-01901} ]
+:SLPS-01901
+#Widescreen 16-9
+800C6500 0C00
+800D23B0 0C00
+
+; [ Rittai Ninja Katsugeki: Tenchu: Shinobi Hyakusen (Japan) {SLPS-02400} ]
+:SLPS-02400
+#Widescreen 16-9
+800E8B38 0C00
+800908F2 0C00
+80090916 0C00
+
+; [ Rival Schools + Resident Evil 2 + Bloody Roar + Street Fighter EX Plus Alpha + Mr Domino + Victory Boxing 2 (France) {SLED-01756} ]
+:SLES-11436
+#Widescreen 16-9
+801F6120 0C00
+
+; [ Riven: The Sequel to Myst (Europe) {SLES-00963 | SLES-10963 | SLES-20963 | SLES-30963 | SLES-40963} ]
+; [ Riven: The Sequel to Myst (France) {SLES-01099 | SLES-11099 | SLES-21099 | SLES-31099 | SLES-41099} ]
+; [ Riven: The Sequel to Myst (Germany) {SLES-01100 | SLES-11100 | SLES-21100 | SLES-31100 | SLES-41100} ]
+; [ Riven: The Sequel to Myst (Japan) {SLPS-01180 | SLPS-01181 | SLPS-01182 | SLPS-01183 | SLPS-01184} ]
+; [ RoX: 6 = Six (Japan) (Pop Collection 1280 Yen) {SLPS-02388} ]
+; [ Rogue Trip: Vacation 2012 (Europe) {SLES-01417} ]
+:SLES-01417
+#Widescreen 16-9
+801C2C8C 0C00
+801C2D4C 0C00
+801C2DAC 0C00
+
+; [ Rogue Trip: Vacation 2012 (USA) (Trade Demo) {SLUS-80643} ]
+; [ Rogue Trip: Vacation 2012 (USA) Demo {SLUS-90044} ]
+; [ Rollcage Stage II (Europe) {SCES-01922} ]
+:SCES-01922
+#60Fps-Mode L2 to activate
+D00C2A4C FEFF
+80019CAC 0100
+D00C2A4C FDFF
+80019CAC 0000
+
+; [ Segare Ijiri (Japan) {SLP-86230} ]
+:SLPM-86230
+#Widescreen 16-9
+801BFE20 0C00
+
+; [ Seiken Densetsu: Legend of Mana (Japan, Asia) {SCPS-45416} ]
+; [ Shin Nihon Pro Wrestling: Toukon Retsuden (Japan) {SLPS-00084} ]
+:SLPS-00084
+#Widescreen 16-9
+8002C634 0C00
+8002C6C8 0C00
+
+; [ Shin Nihon Pro Wrestling: Toukon Retsuden 2 (Japan) {SLPS-00637} ]
+:SLPM-86192
+#Widescreen 16-9
+A70C9510 10000C00
+A70C9520 10000C00
+#60 FPS
+A70A8FF0 00020001
+A70AB38C 00020001
+
+; [ Silent Hill (USA) Demo {SLUS-90050} ]
+; [ Silent Iron (Europe) {SLES-04157} ]
+:SLES-04157
+#Widescreen 16-9
+80082E28 0C00
+
+; [ Simple 1500 Jitsuyou Series Vol. 02: Katei no Fuusui (Japan) {SLPS-02843} ]
+; [ Simple 1500 Jitsuyou Series Vol. 05: Kusuri no Jiten: Pill Book 2001 Nen Ban (Japan) {SLP-86706} ]
+; [ Simple 1500 Jitsuyou Series Vol. 06: Cocktail no Recipe (Japan) {SLP-86707} ]
+; [ Simple 1500 Jitsuyou Series Vol. 07: Tanoshiku Manabu Unten Menkyo (Japan) {SLP-86797} ]
+; [ Simple 1500 Jitsuyou Series Vol. 08: 1-jikan de Wakaru Kabushiki Toushi (Japan) {SLP-86708} ]
+; [ Simple 1500 Jitsuyou Series Vol. 09: Watashi Style no Aromatherapy (Japan) {SLP-86843} ]
+; [ Simple 1500 Jitsuyou Series Vol. 10: Tarot Uranai (Japan) {SLP-86913} ]
+; [ Simple 1500 Jitsuyou Series Vol. 11: Katei de Dekiru Tsubo Shiatsu (Japan) {SLP-86968} ]
+; [ Simple 1500 Jitsuyou Series Vol. 12: Katei no Igaku: Shindan Jiten (Japan) {SLP-86969} ]
+; [ Simple 1500 Jitsuyou Series Vol. 13: Shinri Game: Soreike x Kokology: Kokoro no Uso no Makafushigi (Japan) {SLP-87016} ]
+; [ Simple 1500 Jitsuyou Series Vol. 14: Kurashi no Manner: Kankon Sousai-hen (Japan) {SLP-87022} ]
+:SLPM-87022
+#Widescreen 16-9
+80030C04 0C00
+
+; [ Simple 1500 Jitsuyou Series Vol. 15: Inu no Kai-kata: Sekai no Inu Catalog (Japan) {SLP-87051} ]
+; [ Simple 1500 Jitsuyou Series Vol. 16: Neko no Kai-kata: Sekai no Neko Catalog (Japan) {SLP-87052} ]
+; [ Simple 1500 Jitsuyou Series Vol. 17: Planetarium (Japan) {SLP-87049} ]
+; [ Simple 1500 Jitsuyou Series Vol. 18: Kanji Quiz: Kanji Kentei ni Challenge (Japan) {SLP-87072} ]
+; [ Simple 1500 Series Vol. 100: The Uchuu Hikoushi (Japan) {SLP-87141} ]
+; [ Simple 1500 Series Vol. 101: The Sentou (Japan) {SLP-87142} ]
+; [ Simple 1500 Series Vol. 102: The Densha Untenshu: Densha de Go! Nagoya Tetsudou-hen (Japan) {SLP-87144} ]
+; [ Simple 1500 Series Vol. 103: The Ganso Densha Untenshi: Densha de Go! (Japan) {SLP-87212} ]
+; [ Simple 1500 Series Vol. 104: The Pink Panther: Pinkadelic Pursuit (Japan) {SLP-87215} ]
+; [ Simple 1500 Series Vol. 48: The Puzzle 2 (Japan) {SLP-86698} ]
+; [ Simple 1500 Series Vol. 49: The Casino (Japan) {SLP-86699} ]
+; [ Simple 1500 Series Vol. 4: The Reversi (Japan) (Culture Publishers) {SLPS-01634} ]
+; [ Simple 1500 Series Vol. 4: The Reversi (Japan) {SLPS-02440} ]
+; [ Simple 1500 Series Vol. 50: The Billiard 2 (Japan) {SLP-86697} ]
+; [ Simple 1500 Series Vol. 51: The Jigsaw Puzzle (Japan) {SLP-86700} ]
+; [ Simple 1500 Series Vol. 52: The Pro Wrestling 2 (Japan) {SLP-86702} ]
+:SLPM-86702
+#Widescreen 16-9 (In-Game)
+80022CD4 0C00
+
+; [ Simple 1500 Series Vol. 53: The Helicopter (Japan) {SLP-86701} ]
+; [ Simple 1500 Series Vol. 54: The Volleyball: Break Volley Plus (Japan) {SLP-86713} ]
+; [ Simple 1500 Series Vol. 55: The Darts (Japan) {SLP-86714} ]
+; [ Simple 1500 Series Vol. 56: The Sniper (Japan) {SLP-86762} ]
+; [ Simple 1500 Series Vol. 57: The Meiro (Japan) {SLP-86715} ]
+; [ Simple 1500 Series Vol. 58: The Sumou (Japan) {SLP-86760} ]
+; [ Simple 1500 Series Vol. 59: The Suiri: IT Tantei 18 no Jikenbo (Japan) {SLP-86709} ]
+; [ Simple 1500 Series Vol. 5: The Igo (Japan) (Culture Publishers) {SLPS-01683} ]
+; [ Simple 1500 Series Vol. 5: The Igo (Japan) {SLPS-02441} ]
+; [ Simple 1500 Series Vol. 60: The Table Hockey (Japan) {SLP-86761} ]
+; [ Simple 1500 Series Vol. 61: The Quiz 2 (Japan) {SLP-86803} ]
+; [ Simple 1500 Series Vol. 62: The Ski (Japan) {SLP-86801} ]
+; [ Simple 1500 Series Vol. 63: The Gun Shooting 2 (Japan) {SLP-86816} ]
+; [ Simple 1500 Series Vol. 64: The Kick Boxing (Japan) {SLP-86841} ]
+; [ Simple 1500 Series Vol. 65: The Golf (Japan) {SLP-86842} ]
+; [ Simple 1500 Series Vol. 66: The Kaiten: Mawasundaa!! (Japan) {SLP-86840} ]
+; [ Simple 1500 Series Vol. 67: The Soccer: Dynamite Soccer 1500 (Japan) {SLP-86864} ]
+; [ Simple 1500 Series Vol. 68: The RC Car: RC de Go! (Japan) {SLP-86865} ]
+; [ Simple 1500 Series Vol. 69: The Putter Golf (Japan) {SLP-86868} ]
+; [ Simple 1500 Series Vol. 6: The Hanafuda (Japan) (Culture Publishers) {SLPS-01684} ]
+; [ Simple 1500 Series Vol. 6: The Hanafuda (Japan) {SLPS-02442} ]
+; [ Simple 1500 Series Vol. 70: The War Simulation: Hito no Tsukurishi Mono-tachi (Japan) {SLP-86869} ]
+; [ Simple 1500 Series Vol. 71: The Ren'ai Simulation 2: Fureai (Japan) {SLP-86870} ]
+; [ Simple 1500 Series Vol. 72: The Beach Volley (Japan) {SLP-86871} ]
+; [ Simple 1500 Series Vol. 73: The Invaders: Space Invaders 1500 (Japan) {SLP-86900} ]
+; [ Simple 1500 Series Vol. 74: The Horror Mystery: Sangeki-kan: Kevin Hakushaku no Fukkatsu (Japan) {SLP-86901} ]
+; [ Simple 1500 Series Vol. 75: The Double Shooting: RayStorm x RayCrisis (Japan) {SLP-86912} ]
+; [ Simple 1500 Series Vol. 76: The Dodgeball (Japan) {SLP-86914} ]
+; [ Simple 1500 Series Vol. 77: The Suiei (Japan) {SLP-86915} ]
+; [ Simple 1500 Series Vol. 78: The Zeroyon (Japan) {SLP-86712} ]
+; [ Simple 1500 Series Vol. 79: The Shisenshou (Japan) {SLP-86970} ]
+; [ Simple 1500 Series Vol. 7: The Card (Japan) (Culture Publishers) {SLPS-01685} ]
+; [ Simple 1500 Series Vol. 7: The Card (Japan) {SLPS-02443} ]
+; [ Simple 1500 Series Vol. 80: The Jintori (Japan) {SLP-86971} ]
+; [ Simple 1500 Series Vol. 81: The Ren'ai Adventure: Okaeri! (Japan) {SLP-86972} ]
+; [ Simple 1500 Series Vol. 82: The Sensuikan (Japan) {SLP-86973} ]
+; [ Simple 1500 Series Vol. 83: The Wakeboard: BursTrick Wakeboarding!! (Japan) {SLP-86998} ]
+; [ Simple 1500 Series Vol. 84: The Intro Quiz (Japan) {SLP-86974} ]
+; [ Simple 1500 Series Vol. 85: The Sengoku Bushou: Tenka Touitsu no Yabou (Japan) {SLP-87008} ]
+; [ Simple 1500 Series Vol. 86: The Onigokko (Japan) {SLP-87017} ]
+; [ Simple 1500 Series Vol. 87: The Kyoutei (Japan) {SLP-87026} ]
+; [ Simple 1500 Series Vol. 88: The Gal Mahjong: Love Songs: Idol wa High Rate (Japan) {SLP-87023} ]
+; [ Simple 1500 Series Vol. 89: The Power Shovel ni Norou!! (Japan) {SLP-87035} ]
+; [ Simple 1500 Series Vol. 8: The Solitaire (Japan) (Culture Publishers) {SLPS-01686} ]
+; [ Simple 1500 Series Vol. 8: The Solitaire (Japan) {SLPS-02444} ]
+; [ Simple 1500 Series Vol. 90: The Sensha (Japan) {SLP-87044} ]
+; [ Simple 1500 Series Vol. 91: The Gambler: Honoo no Tobaku Densetsu (Japan) {SLP-86975} ]
+; [ Simple 1500 Series Vol. 92: The Tozan RPG: Ginrei no Hasha (Japan) {SLP-87036} ]
+; [ Simple 1500 Series Vol. 93: The Puzzle Bobble: Puzzle Bobble 4 (Japan) {SLP-87057} ]
+; [ Simple 1500 Series Vol. 94: The Cameraman: Gekisha Boy Omake Tsuki (Japan) {SLP-87076} ]
+; [ Simple 1500 Series Vol. 95: The Hikouki (Japan) {SLP-87070} ]
+; [ Simple 1500 Series Vol. 96: The Yakyuu 2: 2002 Pro Yakyuu (Japan) {SLP-87071} ]
+; [ Simple 1500 Series Vol. 97: The Squash (Japan) {SLP-87088} ]
+; [ Simple 1500 Series Vol. 98: The Futsal (Japan) {SLP-87087} ]
+; [ Simple 1500 Series Vol. 99: The Kendou: Ken no Hanamichi (Japan) {SLP-87140} ]
+; [ Simple 1500 Series Vol. 9: The Chess (Japan) (Culture Publishers) {SLPS-01687} ]
+; [ Simple 1500 Series Vol. 9: The Chess (Japan) {SLPS-02445} ]
+; [ Simple 1500 Series: Hello Kitty Vol. 01: Bowling (Japan) {SLP-86866} ]
+; [ Simple 1500 Series: Hello Kitty Vol. 02: Illust Puzzle (Japan) {SLP-86867} ]
+; [ Simple 1500 Series: Hello Kitty Vol. 03: Block Kuzushi (Japan) {SLP-86911} ]
+; [ Simple 1500 Series: Hello Kitty Vol. 04: Trump (Japan) {SLP-86910} ]
+; [ Simple 1500 Series: The Demo (Japan) Demo {SLP-80472} ]
+; [ Simple Character 2000 Series Vol. 01: Kidou Senshi Gundam: The Gunjin Shougi (Japan) {SLPS-03309} ]
+; [ Slam Dragon (Japan) {SLPS-00246} ]
+:SLPS-00246
+#Widescreen 16-9
+8005BA30 0C00
+
+; [ Sled Storm (Europe) {SLES-02194} ]
+:SLES-02194
+#Widescreen 16-9
+800E27F0 1333
+800E2900 0E66
+
+; [ Slim Jim (USA) {SCUS-94472} ]
+; [ Small Soldiers (France) {SLES-01581} ]
+:SLES-01581
+#Widescreen 16-9
+300A7191 000C
+
+; [ Small Soldiers (Germany) {SLES-01582} ]
+:SLES-01582
+#Widescreen 16-9
+300A7191 000C
+
+; [ Small Soldiers (USA) (Preview) {Unlicensed} ]
+; [ SnoCross Championship Racing aka Sno-Cross Championship Racing (Europe) {SLES-02763} ]
+:SLES-02763
+#Widescreen 16-9
+8012DE74 1333
+
+; [ Snow Break (Japan, Asia) {SCPS-45157} ]
+; [ Spec Ops: Ranger Elite (Europe) {SLES-03157} ]
+:SLES-03157
+#Widescreen 16-9
+80091974 0C00
+800919E4 0C00
+
+; [ Spec Ops: Stealth Patrol (Europe) {SLES-00844} ]
+:SLES-00844
+#Widescreen 16-9
+800FC9D8 0C00
+800FCA58 0C00
+
+; [ Sports Car GT (France) {SLES-01915} ]
+:SLES-01915
+#Widescreen 16-9
+800B1370 1333
+300B1381 000C
+
+; [ Star Gladiator: Episode I: Final Crusade (Europe) {SLES-00495} ]
+:SLES-00495
+#Widescreen 16-9
+801D8B98 0C00
+
+; [ Star Gladiator: Episode I: Final Crusade (Japan) (Demo Movie CD-ROM) {SLP-80056} ]
+; [ Star Gladiator: Episode I: Final Crusade (Japan) {SLPS-00539} ]
+:SLPS-00539
+#Widescreen 16-9
+801D8794 0C00
+
+; [ Streak Hoverboard Racing (Europe) {SLES-01437} ]
+:SLES-01437
+#Widescreen 16-9
+801E9A3C 0C00
+801E997C 0C00
+801E99DC 0C00
+801E985C 0C00
+801E98BC 0C00
+
+; [ Street Fighter EX Plus Alpha (Europe) {SLES-00939} ]
+:SLES-00939
+#Widescreen 16-9
+801DDD38 0C00
+
+:SLPM-86041
+#Widescreen 16-9
+801DDAD8 0C00
+
+:SLPM-80149
+#Widescreen 16-9
+801D8148 0C00
+
+; [ Street Fighter EX2 Plus (Europe) {SLES-02598} ]
+:SLES-02598
+#Widescreen 16-9
+801F7C90 0C00
+
+; [ Street Fighter EX2 Plus (Japan) Demo {SLP-80517} ]
+; [ Street Fighter EX2 Plus (Japan) {SLPS-02508} ]
+:SLPS-02508
+#Widescreen 16-9
+801F6C80 0C00
+
+; [ Street Fighter II Movie (Japan) {SLPS-00080 | SLPS-00081} ]
+; [ Street Scooters (Europe) {SLES-02528} ]
+:SLES-02528
+#Widescreen 16-9
+80091AFC 0D0B
+80091B7C 08B2
+
+; [ Syphon Filter (France) {SCES-01911} ]
+:SCES-01911
+#Widescreen 16-9
+3012DE01 000C
+
+:SCES-12286
+#Widescreen 16-9
+30120795 000C
+
+; [ Syphon Filter 3 (France) (Platinum, Press Kit) {SCES-03698} ]
+:SCES-03698
+#Widescreen 16-9
+30123551 000C
+
+; [ Syphon Filter 3 (Italy) {SCES-03700} ]
+:SCES-03700
+#Widescreen
+80123550 0C00
+
+; [ Syphon Filter 3 (USA) Demo {SCUS-94661} ]
+; [ TechnoMage: En Quête de L'Eternité (France) {SLES-03242} ]
+:SLES-03242
+#Widescreen 16-9
+8009F21C 1333
+3009F22D 000C
+
+; [ Tenchu 2: Birth of the Stealth Assassins (Italy) {SLES-02464} ]
+; [ Tenchu 2: Birth of the Stealth Assassins (Spain) {SLES-02465} ]
+; [ Tenchu: Stealth Assassins (Europe) {SLES-01374} ]
+:SLES-01374
+#Widescreen 16-9
+800C5350 0C00
+8008DA9A OCOO
+8008DABE OC00
+
+; [ Test Drive 4 (Europe) {SLES-00948} ]
+:SLES-00948
+#Widescreen 16-9
+8006F2D8 0C00
+
+; [ Test Drive 4 (Japan) {SLPS-01288} ]
+; [ Test Drive 4x4 (Europe) {SLES-01179} ]
+:SLES-01179
+#Widescreen 16-9
+80074E78 0C00
+
+; [ Test Drive 5 (Europe) {SLES-01165} ]
+:SLES-01165
+#Widescreen 16-9
+8009108C 1334
+
+; [ Test Drive 5 (Japan) {SLPS-01964} ]
+; [ Test Drive Off-Road (Europe) {SLES-00194} ]
+; [ Tetsuya Komuro: Gaball Screen (Japan) {SLPS-00675} ]
+:SLPS-00675
+#Widescreen 16-9
+801DE638 0C00
+
+; [ Tettei Kaiseki: Hisshou Pachi-Slot Doujou: Yamasa & Pioneer (Japan) {SLPS-01718} ]
+; [ That's QT (Japan) {SLP-86340} ]
+; [ The Amazing Virtual Sea-Monkeys (Europe) {SLES-03858} ]
+; [ The Best PlayStation Games Ever: No. 1 of 4 (Europe, Australia) {SCED-02327} ]
+; [ The Best of PlayStation Underground Year One (USA) {SCUS-94261} ]
+; [ The Grinch (Europe) {SLES-02974} ]
+:SLES-02974
+#Widescreen 16-9
+80099A8C 0C00
+
+; [ The Italian Job (Europe) {SLES-03626} ]
+:SLES-03626
+#Widescreen 16-9
+80040F90 0C00
+800410F0 0C00
+
+; [ The Italian Job (Italy) {SLES-03648} ]
+; [ The Italian Job (UK) Demo {SLED-03679} ]
+; [ The Lost World: Jurassic Park (Europe) (EDC Original, EA Classics) {SLES-00903} ]
+:SLES-00903
+#Widescreen 16-9
+80065460 0C00
+
+; [ The Lost World: Jurassic Park (Japan) {SLPS-01099} ]
+; [ The Maestromusic (Japan) (Baton Controller Doukonban) {SLP-86585} ]
+; [ The Maestromusic (Japan) {SLP-86586} ]
+; [ The Maestromusic: Encore Disc (Japan) {SLP-86679} ]
+; [ The Maestromusic: Merry Christmas (Japan) {SLP-86684} ]
+; [ The Magical World of Disney on PlayStation aka Disney Sun Demo (Europe) {SCED-03993} ]
+; [ The Making of Nightruth (Japan) {SLPS-00562} ]
+; [ Tony Hawk's Skateboarding (Europe) {SLES-02055} ]
+:SLES-02055
+#Widescreen
+300D185C 0000
+
+; [ Toshinden 4 (Europe) {SLES-02493} ]
+:SLES-02493
+#Widescreen 16-9
+801DBCBC 0C00
+
+; [ Total Activision Demo (France) {SLED-02023} ]
+:SLPS-91041
+#Widescreen 16-9
+300A2B41 000C
+
+; [ Touhaiden Akagi (Japan) {SLPS-00187} ]
+; [ Trap Runner (Europe) {SLES-01628} ]
+:SLES-01628
+#Widescreen 16-9
+8013A920 0C00
+
+; [ Treasures of the Deep (France) {SCES-01070} ]
+:SCES-01070
+#Widescreen 16-9
+30040D85 000C
+
+; [ Treasures of the Deep (Germany) {SCES-01071} ]
+; [ Treasures of the Deep (Italy) {SCES-01072} ]
+; [ Twisted Metal (Europe) {SCES-00061} ]
+:SCES-00061
+#Widescreen 16-9
+801747C0 0C00
+
+; [ Twisted Metal: World Tour (Europe) {SCES-00567} ]
+:SCES-00567
+#Widescreen 16-9
+8017EC1C 0C00
+
+; [ Two Product Psygnosis Demo (Europe) Demo {SCED-02540} ]
+; [ Téléfoot Manager (France) {SLES-02131} ]
+; [ U-SA (Japan) {SLPS-02693} ]
+; [ Um Jammer Lammy (Europe) {SCES-01753} ]
+:SCES-01753
+#Widescreen 16-9
+801C4290 0C00
+
+; [ Vib-Ribbon (Japan) {SCPS-18012} ]
+:SCPS-18012
+#Widescreen 16-9
+A707F624 10000C00
+
+; [ Victory Boxing (Japan) {SLPS-02740} ]
+; [ Victory Boxing 2 (Europe) Demo {SLED-01529} ]
+; [ WarGames: Defcon 1 (Europe) {SLES-00978} ]
+:SLES-00978
+#Widescreen 16-9
+800D1A88 0C00
+
+; [ WarGames: Defcon 1 (Europe, Australia) Demo {SLED-01366} ]
+; [ Warhawk: The Red Mercury Missions (Europe) {SCES-00062} ]
+:SCES-00062
+#Widescreen 16-9
+80173CE4 0C00
+
+; [ Warzone 2100 (Europe) {SLES-00937} ]
+:SLES-00937
+#Widescreen 16-9
+800CB808 0C00
+
+; [ Warzone 2100 (France) {SLES-01742} ]
+:SLPM-86600
+#Widescreen 16-9
+80072A48 0C00
+
+:SLPM-86162
+#Widescreen 16-9
+800FF6A8 0C00
+
+; [ World Soccer Jikkyou Winning Eleven 3: World Cup France '98 (Japan) Demo {SLP-80240} ]
+:SLPM-86086
+#Widescreen 16-9
+800F1D18 0C00
+
+:SLPM-86291
+#Widescreen 16-9
+80072F90 0C00
+
+; [ World Soccer Winning Eleven '97 (Japan) Rev 1 {SLP-86035} ]
+; [ World Soccer Winning Eleven '97 (Japan) {SLP-86035} ]
+; [ World Soccer Winning Eleven (Japan) {SLPS-00272} ]
+:SLPM-87056
+#Widescreen 16-9
+80072AE8 0C00
+8007B43C FF80
+8007B446 0F00
+8007B444 0C00
+8007B468 0C00
+8007B420 0C00
+8007B5AC 0C00
+8007B5D0 0C00
+8007B48C 0C00
+8007B484 FFF5
+8007B4B0 0C00
+8007B4A8 0006
+8007B4D4 0C00
+8007B4CC 0006
+8007B3D8 0C2F
+8007B3FC 0BAF
+8007B540 0C00
+8007B538 0006
+
+; [ Wu-Tang: Taste the Pain (Europe) {SLES-02170} ]
+:SLES-02170
+#Widescreen 16-9
+8009BEF8 1333
+
+; [ Wu-Tang: Taste the Pain (Italy) {SLES-02173} ]
+; [ X Games Pro Boarder (Europe) {SCES-01556} ]
+; [ X Games Pro Boarder (Japan) Demo {SLP-80393} ]
+; [ X Games Pro Boarder (Japan) {SLPS-01944} ]
+; [ X-Men: Mutant Academy (Europe) {SLES-02865} ]
+:SLES-02865
+#Widescreen 16-9
+80095918 1333
+
+; [ X-Men: Mutant Academy 2 (Europe) {SLES-03630} ]
+:SLES-03630
+#Widescreen 16-9
+800A20AC 1333
+
+; [ X-Men: Mutant Academy 2 (Japan) {SLP-87077} ]
+; [ Yusha: Heaven's Gate (Europe) {SLES-00713} ]
+:SLES-00713
+#Widescreen 16-9
+8011B148 0C00
+
+; [ Zen Nihon GT Senshuken Kai (Japan) {SLPS-00219} ]
+:SLPS-00219
+#Widescreen 16-9
+3006452D 0014
+30106149 0014
+
+; [ Magic Castle {NYMC-02020} ]
+:NYMC-02020
+#Widescreen 16-9
+A7063F0C 10000C00
+
+:SLES-02407
+#50fps
+800A1584 0001
+800A18E4 0001
+
+:SLUS-01418
+#60 FPS
+800A60F8 0001
+
+:SLUS-00348
+#30 FPS Hack
+300C8854 0002
+#30 FPS Hack (Alternate) (ASM)
+8008AA08 0000
+8008AA0A 0000
+E00C8854 0003
+300C8854 0002
+#60 FPS Hack (Incomplete, Frame Pacing Code Needed)
+300C8854 0001
+
+:SLUS-01140
+#Force game to 30 FPS (ASM)
+80010F4C 0002
+80010F4E 2403
+
+:SLUS-01021
+#Ntsc To Pal/50 Fps Mode
+3009DFC0 0001
+
+:SLPM-86498
+#Enable 60 FPS
+300AB38C 0001
+
+:SLUS-01429
+#60 FPS Patch
+800C0BA8 0001
+
+:SCES-02380
+#Aspect ratio Widescreen
+D0010000 FFE8
+8007B3E0 0155
+D0010000 FFD0
+8007B3E0 0370
+D0010000 FFE0
+8007B3E0 01AC
+8007B3E2 3402

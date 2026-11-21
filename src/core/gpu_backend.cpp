@@ -1,8 +1,9 @@
 // SPDX-FileCopyrightText: 2019-2022 Connor McLaughlin <stenzek@gmail.com>
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #include "gpu_backend.h"
 #include "common/align.h"
+#include "common/assert.h"
 #include "common/log.h"
 #include "common/timer.h"
 #include "settings.h"
@@ -10,6 +11,15 @@
 Log_SetChannel(GPUBackend);
 
 std::unique_ptr<GPUBackend> g_gpu_backend;
+
+namespace {
+struct GPUBackendRunCallbackCommand : public GPUBackendCommand
+{
+  std::function<void()>* func;
+};
+} // namespace
+
+static thread_local const GPUBackend* s_running_backend = nullptr;
 
 GPUBackend::GPUBackend() = default;
 
@@ -88,6 +98,46 @@ GPUBackendDrawPolygonCommand* GPUBackend::NewDrawPolygonCommand(u32 num_vertices
   return cmd;
 }
 
+GPUBackendDrawPrecisePolygonCommand* GPUBackend::NewDrawPrecisePolygonCommand(u32 num_vertices)
+{
+  const u32 size =
+    sizeof(GPUBackendDrawPrecisePolygonCommand) + (num_vertices * sizeof(GPUBackendDrawPrecisePolygonCommand::Vertex));
+  GPUBackendDrawPrecisePolygonCommand* cmd =
+    static_cast<GPUBackendDrawPrecisePolygonCommand*>(AllocateCommand(GPUBackendCommandType::DrawPrecisePolygon, size));
+  cmd->num_vertices = Truncate16(num_vertices);
+  return cmd;
+}
+
+GPUBackendDrawPreciseLineCommand* GPUBackend::NewDrawPreciseLineCommand(u32 num_vertices)
+{
+  const u32 size =
+    sizeof(GPUBackendDrawPreciseLineCommand) + (num_vertices * sizeof(GPUBackendDrawPreciseLineCommand::Vertex));
+  GPUBackendDrawPreciseLineCommand* cmd =
+    static_cast<GPUBackendDrawPreciseLineCommand*>(AllocateCommand(GPUBackendCommandType::DrawPreciseLine, size));
+  cmd->num_vertices = Truncate16(num_vertices);
+  return cmd;
+}
+
+bool GPUBackend::UsesPreciseVertices() const
+{
+  return false;
+}
+
+bool GPUBackend::OwnsDevice() const
+{
+  return false;
+}
+
+void GPUBackend::DrawPrecisePolygon(const GPUBackendDrawPrecisePolygonCommand* cmd)
+{
+  Panic("Backend does not take precise polygons");
+}
+
+void GPUBackend::DrawPreciseLine(const GPUBackendDrawPreciseLineCommand* cmd)
+{
+  Panic("Backend does not take precise lines");
+}
+
 GPUBackendDrawRectangleCommand* GPUBackend::NewDrawRectangleCommand()
 {
   return static_cast<GPUBackendDrawRectangleCommand*>(
@@ -103,10 +153,26 @@ GPUBackendDrawLineCommand* GPUBackend::NewDrawLineCommand(u32 num_vertices)
   return cmd;
 }
 
+bool GPUBackend::IsOnBackendThread() const
+{
+  return (s_running_backend == this);
+}
+
 void* GPUBackend::AllocateCommand(GPUBackendCommandType command, u32 size)
 {
   // Ensure size is a multiple of 4 so we don't end up with an unaligned command.
   size = Common::AlignUpPow2(size, 4);
+
+  if (IsOnBackendThread())
+  {
+    if (m_backend_thread_command.size() < size)
+      m_backend_thread_command.resize(size);
+
+    GPUBackendCommand* cmd = reinterpret_cast<GPUBackendCommand*>(m_backend_thread_command.data());
+    cmd->type = command;
+    cmd->size = size;
+    return cmd;
+  }
 
   for (;;)
   {
@@ -153,7 +219,7 @@ u32 GPUBackend::GetPendingCommandSize() const
 
 void GPUBackend::PushCommand(GPUBackendCommand* cmd)
 {
-  if (!m_use_gpu_thread)
+  if (!m_use_gpu_thread || IsOnBackendThread())
   {
     // single-thread mode
     if (cmd->type != GPUBackendCommandType::Sync)
@@ -182,7 +248,11 @@ void GPUBackend::StartGPUThread()
 {
   m_gpu_loop_done.store(false);
   m_use_gpu_thread = true;
-  m_gpu_thread.Start([this]() { RunGPULoop(); });
+  m_gpu_thread.Start([this]() {
+    s_running_backend = this;
+    RunGPULoop();
+    s_running_backend = nullptr;
+  });
   INFO_LOG("GPU thread started.");
 }
 
@@ -200,8 +270,11 @@ void GPUBackend::StopGPUThread()
 
 void GPUBackend::Sync(bool allow_sleep)
 {
-  if (!m_use_gpu_thread)
+  if (!m_use_gpu_thread || IsOnBackendThread())
+  {
+    FlushRender();
     return;
+  }
 
   GPUBackendSyncCommand* cmd =
     static_cast<GPUBackendSyncCommand*>(AllocateCommand(GPUBackendCommandType::Sync, sizeof(GPUBackendSyncCommand)));
@@ -210,6 +283,39 @@ void GPUBackend::Sync(bool allow_sleep)
   WakeGPUThread();
 
   m_sync_semaphore.Wait();
+}
+
+void GPUBackend::PushFlushRender()
+{
+  PushCommand(
+    static_cast<GPUBackendCommand*>(AllocateCommand(GPUBackendCommandType::FlushRender, sizeof(GPUBackendCommand))));
+}
+
+void GPUBackend::RunOnBackendThread(std::function<void()> func)
+{
+  if (!m_use_gpu_thread || IsOnBackendThread())
+  {
+    func();
+    return;
+  }
+
+  GPUBackendRunCallbackCommand* cmd = static_cast<GPUBackendRunCallbackCommand*>(
+    AllocateCommand(GPUBackendCommandType::RunCallback, sizeof(GPUBackendRunCallbackCommand)));
+  cmd->func = new std::function<void()>(std::move(func));
+  PushCommand(cmd);
+  WakeGPUThread();
+}
+
+void GPUBackend::RunOnBackendThreadAndWait(std::function<void()> func)
+{
+  if (!m_use_gpu_thread || IsOnBackendThread())
+  {
+    func();
+    return;
+  }
+
+  RunOnBackendThread(std::move(func));
+  Sync(false);
 }
 
 void GPUBackend::RunGPULoop()
@@ -260,6 +366,7 @@ void GPUBackend::RunGPULoop()
         case GPUBackendCommandType::Sync:
         {
           DebugAssert(read_ptr == write_ptr);
+          FlushRender();
           m_sync_semaphore.Post();
           allow_sleep = static_cast<const GPUBackendSyncCommand*>(cmd)->allow_sleep;
         }
@@ -307,6 +414,20 @@ void GPUBackend::HandleCommand(const GPUBackendCommand* cmd)
     }
     break;
 
+    case GPUBackendCommandType::FlushRender:
+    {
+      FlushRender();
+    }
+    break;
+
+    case GPUBackendCommandType::RunCallback:
+    {
+      std::function<void()>* func = static_cast<const GPUBackendRunCallbackCommand*>(cmd)->func;
+      (*func)();
+      delete func;
+    }
+    break;
+
     case GPUBackendCommandType::SetDrawingArea:
     {
       FlushRender();
@@ -328,9 +449,21 @@ void GPUBackend::HandleCommand(const GPUBackendCommand* cmd)
     }
     break;
 
+    case GPUBackendCommandType::DrawPrecisePolygon:
+    {
+      DrawPrecisePolygon(static_cast<const GPUBackendDrawPrecisePolygonCommand*>(cmd));
+    }
+    break;
+
     case GPUBackendCommandType::DrawRectangle:
     {
       DrawRectangle(static_cast<const GPUBackendDrawRectangleCommand*>(cmd));
+    }
+    break;
+
+    case GPUBackendCommandType::DrawPreciseLine:
+    {
+      DrawPreciseLine(static_cast<const GPUBackendDrawPreciseLineCommand*>(cmd));
     }
     break;
 

@@ -1,25 +1,17 @@
 name: GameDB Lint
 
 on:
-  pull_request:
-    paths:
-      - 'data/resources/gamedb.yaml'
-      - 'data/resources/discdb.yaml'
   push:
-    branches:
-      - master
-      - dev
-    paths:
-      - 'data/resources/gamedb.yaml'
-      - 'data/resources/discdb.yaml'
-  workflow_dispatch:
+    tags:
+      - '*'
+      - '!latest'
 
 jobs:
   gamedb-lint:
     runs-on: ubuntu-22.04
     timeout-minutes: 120
     steps:
-    - uses: actions/checkout@v4.1.1
+    - uses: actions/checkout@v4
       with:
         fetch-depth: 0
 

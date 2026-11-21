@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2019-2024 Connor McLaughlin <stenzek@gmail.com> and contributors.
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #include "multitap.h"
 #include "controller.h"
@@ -48,6 +48,13 @@ bool Multitap::DoState(StateWrapper& sw)
   sw.Do(&m_transfer_all_controllers);
   sw.Do(&m_current_controller_done);
   sw.Do(&m_transfer_buffer);
+
+  if (sw.IsReading() && (m_transfer_state > TransferState::AllControllers || m_selected_slot >= 4 ||
+                         m_controller_transfer_step >= m_transfer_buffer.size()))
+  {
+    ResetTransferState();
+    return false;
+  }
 
   return !sw.HasError();
 }
@@ -233,7 +240,12 @@ bool Multitap::Transfer(const u8 data_in, u8* data_out)
           !TransferController(m_selected_slot, data_in, &m_transfer_buffer[m_controller_transfer_step]);
 
       m_controller_transfer_step++;
-      if (m_controller_transfer_step % 8 == 0)
+      if (m_controller_transfer_step >= m_transfer_buffer.size())
+      {
+        ResetTransferState();
+        ack = false;
+      }
+      else if (m_controller_transfer_step % 8 == 0)
       {
         m_current_controller_done = false;
         m_selected_slot = (m_selected_slot + 1) % 4;

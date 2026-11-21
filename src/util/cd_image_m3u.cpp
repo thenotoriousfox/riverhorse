@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2019-2023 Connor McLaughlin <stenzek@gmail.com>
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #include "cd_image.h"
 #include "cd_subchannel_replacement.h"
@@ -29,6 +29,7 @@ public:
 
   bool ReadSubChannelQ(SubChannelQ* subq, const Index& index, LBA lba_in_index) override;
   bool HasNonStandardSubchannel() const override;
+  bool LoadSubchannelReplacementFile(std::string_view path) override;
 
   bool HasSubImages() const override;
   u32 GetSubImageCount() const override;
@@ -113,6 +114,11 @@ bool CDImageM3u::Open(const char* path, bool apply_patches, Error* error)
 
   INFO_LOG("Loaded {} paths from m3u '{}'", m_entries.size(), path);
   return !m_entries.empty() && SwitchSubImage(0, error);
+}
+
+bool CDImageM3u::LoadSubchannelReplacementFile(std::string_view path)
+{
+  return m_current_image->LoadSubchannelReplacementFile(path);
 }
 
 bool CDImageM3u::HasNonStandardSubchannel() const

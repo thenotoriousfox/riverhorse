@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2019-2024 Connor McLaughlin <stenzek@gmail.com>
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #pragma once
 
@@ -10,11 +10,27 @@
 class Error;
 
 struct ImFont;
+struct ImDrawData;
 
 union InputBindingKey;
 enum class GenericInputBinding : u8;
 
 namespace ImGuiManager {
+
+class CopiedDrawData
+{
+public:
+  explicit CopiedDrawData(const ImDrawData* source);
+  ~CopiedDrawData();
+
+  CopiedDrawData(const CopiedDrawData&) = delete;
+  CopiedDrawData& operator=(const CopiedDrawData&) = delete;
+
+  const ImDrawData* Get() const;
+
+private:
+  ImDrawData* m_data;
+};
 /// Sets the path to the font to use. Empty string means to use the default.
 void SetFontPathAndRange(std::string path, std::vector<u16> range);
 

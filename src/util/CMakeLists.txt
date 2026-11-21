@@ -4,6 +4,7 @@ add_library(util
   cd_image.cpp
   cd_image.h
   cd_image_bin.cpp
+  cd_image_ccd.cpp
   cd_image_cue.cpp
   cd_image_chd.cpp
   cd_image_device.cpp
@@ -167,7 +168,11 @@ if(ENABLE_VULKAN)
   target_link_libraries(util PUBLIC vulkan-headers)
 endif()
 
-if(ENABLE_VULKAN OR APPLE)
+if(ENABLE_VULKAN AND LINK_SHADER_COMPILERS)
+  target_link_libraries(util PRIVATE Shaderc::shaderc_combined spirv-cross-c)
+  target_compile_definitions(util PRIVATE "SHADER_COMPILERS_LINKED=1")
+  target_include_directories(util PUBLIC ${SHADERC_INCLUDE_DIR})
+elseif(ENABLE_VULKAN OR APPLE)
   # shaderc is loaded dynamically to reduce module loads on startup.
   target_include_directories(util PUBLIC ${SHADERC_INCLUDE_DIR})
 endif()

@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2019-2023 Connor McLaughlin <stenzek@gmail.com> and contributors.
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #include "negcon.h"
 #include "host.h"
@@ -96,6 +96,15 @@ static u8 get_scaled_value(float value, const NeGcon::AxisModifier& axis_modifie
   return static_cast<u8>(std::clamp(std::round(value), 0.0f, 255.0f));
 }
 
+void NeGcon::SetAxisState(Axis axis, u8 value)
+{
+  if (m_axis_state[static_cast<u32>(axis)] == value)
+    return;
+
+  System::SetRunaheadReplayFlag();
+  m_axis_state[static_cast<u32>(axis)] = value;
+}
+
 void NeGcon::SetBindState(u32 index, float value)
 {
   // Steering Axis: -1..1 -> 0..255
@@ -107,7 +116,7 @@ void NeGcon::SetBindState(u32 index, float value)
     m_half_axis_state[index - static_cast<u32>(Button::Count)] = std::clamp(value, 0.0f, 1.0f);
 
     float merged = m_half_axis_state[1] - m_half_axis_state[0];
-    m_axis_state[static_cast<u32>(Axis::Steering)] = get_scaled_value(merged, m_steering_modifier);
+    SetAxisState(Axis::Steering, get_scaled_value(merged, m_steering_modifier));
   }
   else if (index >= static_cast<u32>(Button::Count))
   {
@@ -122,11 +131,11 @@ void NeGcon::SetBindState(u32 index, float value)
       const AxisModifier& axis_modifier =
         m_half_axis_modifiers[index - (static_cast<u32>(Button::Count) + static_cast<u32>(HalfAxis::I))];
       value = apply_axis_modifier(value, axis_modifier);
-      m_axis_state[sub_index] = get_scaled_value(value, axis_modifier);
+      SetAxisState(static_cast<Axis>(sub_index), get_scaled_value(value, axis_modifier));
     }
     else
     {
-      m_axis_state[sub_index] = static_cast<u8>(std::clamp(value * 255.0f, 0.0f, 255.0f));
+      SetAxisState(static_cast<Axis>(sub_index), static_cast<u8>(std::clamp(value * 255.0f, 0.0f, 255.0f)));
     }
   }
   else if (index < static_cast<u32>(Button::Count))

@@ -668,7 +668,7 @@ bool D3D11Device::BeginPresent(bool skip_present, u32 clear_color)
   // This blows our our GPU usage number considerably, so read the timestamp before the final blit
   // in this configuration. It does reduce accuracy a little, but better than seeing 100% all of
   // the time, when it's more like a couple of percent.
-  if (m_vsync_mode == GPUVSyncMode::FIFO && m_gpu_timing_enabled)
+  if (IsVSyncModeBlocking() && m_gpu_timing_enabled)
     PopTimestampQuery();
 
   m_context->ClearRenderTargetView(m_swap_chain_rtv.Get(), GSVector4::rgba32(clear_color).F32);
@@ -686,10 +686,10 @@ void D3D11Device::EndPresent(bool explicit_present)
   DebugAssert(!explicit_present);
   DebugAssert(m_num_current_render_targets == 0 && !m_current_depth_target);
 
-  if (m_vsync_mode != GPUVSyncMode::FIFO && m_gpu_timing_enabled)
+  if (!IsVSyncModeBlocking() && m_gpu_timing_enabled)
     PopTimestampQuery();
 
-  const UINT sync_interval = static_cast<UINT>(m_vsync_mode == GPUVSyncMode::FIFO);
+  const UINT sync_interval = static_cast<UINT>(IsVSyncModeBlocking());
   const UINT flags = (m_vsync_mode == GPUVSyncMode::Disabled && m_using_allow_tearing) ? DXGI_PRESENT_ALLOW_TEARING : 0;
   m_swap_chain->Present(sync_interval, flags);
 

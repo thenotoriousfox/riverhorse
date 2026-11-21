@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2019-2023 Connor McLaughlin <stenzek@gmail.com> and contributors.
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #include "analog_controller.h"
 #include "host.h"
@@ -106,8 +106,22 @@ bool AnalogController::DoState(StateWrapper& sw, bool apply_input_state)
   MotorState motor_state = m_motor_state;
   sw.Do(&motor_state);
 
+  if (sw.GetVersion() >= 92)
+  {
+    sw.Do(&m_command_step);
+    sw.Do(&m_response_length);
+    sw.Do(&m_rx_buffer);
+    sw.Do(&m_tx_buffer);
+  }
+
   if (sw.IsReading())
   {
+    if (sw.GetVersion() < 92)
+    {
+      m_command = Command::Idle;
+      m_command_step = 0;
+    }
+
     for (u8 i = 0; i < NUM_MOTORS; i++)
       SetMotorState(i, motor_state[i]);
 
@@ -357,23 +371,34 @@ void AnalogController::UpdateHostVibration()
   InputManager::SetPadVibrationIntensity(m_index, hvalues[0], hvalues[1]);
 }
 
-u8 AnalogController::GetExtraButtonMaskLSB() const
+bool AnalogController::IsRightStickMappingActive(u8 mode) const
 {
-  if (!m_analog_dpad_in_digital_mode || m_analog_mode || m_configuration_mode)
-    return 0xFF;
+  return (mode == 2 || (mode == 1 && !m_analog_mode && !m_configuration_mode));
+}
 
+u16 AnalogController::GetExtraButtonMask() const
+{
   static constexpr u8 NEG_THRESHOLD = static_cast<u8>(128.0f - (127.0 * 0.5f));
   static constexpr u8 POS_THRESHOLD = static_cast<u8>(128.0f + (127.0 * 0.5f));
 
-  const bool left = (m_axis_state[static_cast<u8>(Axis::LeftX)] <= NEG_THRESHOLD);
-  const bool right = (m_axis_state[static_cast<u8>(Axis::LeftX)] >= POS_THRESHOLD);
-  const bool up = (m_axis_state[static_cast<u8>(Axis::LeftY)] <= NEG_THRESHOLD);
-  const bool down = (m_axis_state[static_cast<u8>(Axis::LeftY)] >= POS_THRESHOLD);
+  const auto pressed_bit = [this](Axis axis, bool positive, Button button) -> u16 {
+    const u8 value = m_axis_state[static_cast<u8>(axis)];
+    const bool pressed = positive ? (value >= POS_THRESHOLD) : (value <= NEG_THRESHOLD);
+    return static_cast<u16>(BoolToUInt32(pressed) << static_cast<u8>(button));
+  };
 
-  return ~((static_cast<u8>(left) << static_cast<u8>(Button::Left)) |
-           (static_cast<u8>(right) << static_cast<u8>(Button::Right)) |
-           (static_cast<u8>(up) << static_cast<u8>(Button::Up)) |
-           (static_cast<u8>(down) << static_cast<u8>(Button::Down)));
+  u16 pressed = 0;
+  if (m_analog_dpad_in_digital_mode && !m_analog_mode && !m_configuration_mode)
+  {
+    pressed |= pressed_bit(Axis::LeftX, false, Button::Left) | pressed_bit(Axis::LeftX, true, Button::Right) |
+               pressed_bit(Axis::LeftY, false, Button::Up) | pressed_bit(Axis::LeftY, true, Button::Down);
+  }
+  if (IsRightStickMappingActive(m_right_stick_shoulder_buttons))
+    pressed |= pressed_bit(Axis::RightX, false, Button::L1) | pressed_bit(Axis::RightX, true, Button::R1);
+  if (IsRightStickMappingActive(m_right_stick_trigger_buttons))
+    pressed |= pressed_bit(Axis::RightY, false, Button::L2) | pressed_bit(Axis::RightY, true, Button::R2);
+
+  return static_cast<u16>(~pressed);
 }
 
 void AnalogController::ResetRumbleConfig()
@@ -524,7 +549,7 @@ bool AnalogController::Transfer(const u8 data_in, u8* data_out)
       {
         case 2:
         {
-          m_tx_buffer[m_command_step] = Truncate8(m_button_state) & GetExtraButtonMaskLSB();
+          m_tx_buffer[m_command_step] = Truncate8(m_button_state & GetExtraButtonMask());
 
           if (m_dualshock_enabled)
             SetMotorStateForConfigIndex(rumble_index, data_in);
@@ -533,7 +558,7 @@ bool AnalogController::Transfer(const u8 data_in, u8* data_out)
 
         case 3:
         {
-          m_tx_buffer[m_command_step] = Truncate8(m_button_state >> 8);
+          m_tx_buffer[m_command_step] = Truncate8((m_button_state & GetExtraButtonMask()) >> 8);
 
           if (m_dualshock_enabled)
           {
@@ -603,13 +628,13 @@ bool AnalogController::Transfer(const u8 data_in, u8* data_out)
         {
           case 2:
           {
-            m_tx_buffer[m_command_step] = Truncate8(m_button_state) & GetExtraButtonMaskLSB();
+            m_tx_buffer[m_command_step] = Truncate8(m_button_state & GetExtraButtonMask());
           }
           break;
 
           case 3:
           {
-            m_tx_buffer[m_command_step] = Truncate8(m_button_state >> 8);
+            m_tx_buffer[m_command_step] = Truncate8((m_button_state & GetExtraButtonMask()) >> 8);
           }
           break;
 
@@ -837,6 +862,10 @@ static const char* s_invert_settings[] = {TRANSLATE_NOOP("AnalogController", "No
                                           TRANSLATE_NOOP("AnalogController", "Invert Up/Down"),
                                           TRANSLATE_NOOP("AnalogController", "Invert Left/Right + Up/Down"), nullptr};
 
+static const char* s_right_stick_button_settings[] = {
+  TRANSLATE_NOOP("AnalogController", "Never"), TRANSLATE_NOOP("AnalogController", "Digital Mode Only"),
+  TRANSLATE_NOOP("AnalogController", "Analog and Digital Modes"), nullptr};
+
 static const SettingInfo s_settings[] = {
   {SettingInfo::Type::Boolean, "ForceAnalogOnReset", TRANSLATE_NOOP("AnalogController", "Force Analog Mode on Reset"),
    TRANSLATE_NOOP("AnalogController", "Forces the controller to analog mode when the console is reset/powered on."),
@@ -846,6 +875,16 @@ static const SettingInfo s_settings[] = {
    TRANSLATE_NOOP("AnalogController",
                   "Allows you to use the analog sticks to control the d-pad in digital mode, as well as the buttons."),
    "true", nullptr, nullptr, nullptr, nullptr, nullptr, 0.0f},
+  {SettingInfo::Type::IntegerList, "AnalogShoulderButtons",
+   TRANSLATE_NOOP("AnalogController", "Use Right Stick Left/Right for L1/R1"),
+   TRANSLATE_NOOP("AnalogController",
+                  "Pushing the right stick left or right also presses L1 or R1, for pads without shoulder buttons."),
+   "0", "0", "2", nullptr, nullptr, s_right_stick_button_settings, 0.0f},
+  {SettingInfo::Type::IntegerList, "RightStickTriggerButtons",
+   TRANSLATE_NOOP("AnalogController", "Use Right Stick Up/Down for L2/R2"),
+   TRANSLATE_NOOP("AnalogController",
+                  "Pushing the right stick up or down also presses L2 or R2, for pads without triggers."),
+   "0", "0", "2", nullptr, nullptr, s_right_stick_button_settings, 0.0f},
   {SettingInfo::Type::Float, "AnalogDeadzone", TRANSLATE_NOOP("AnalogController", "Analog Deadzone"),
    TRANSLATE_NOOP("AnalogController",
                   "Sets the analog stick deadzone, i.e. the fraction of the stick movement which will be ignored."),
@@ -885,6 +924,10 @@ void AnalogController::LoadSettings(SettingsInterface& si, const char* section)
   Controller::LoadSettings(si, section);
   m_force_analog_on_reset = si.GetBoolValue(section, "ForceAnalogOnReset", true);
   m_analog_dpad_in_digital_mode = si.GetBoolValue(section, "AnalogDPadInDigitalMode", true);
+  m_right_stick_shoulder_buttons =
+    static_cast<u8>(std::min<u32>(static_cast<u32>(si.GetIntValue(section, "AnalogShoulderButtons", 0)), 2u));
+  m_right_stick_trigger_buttons =
+    static_cast<u8>(std::min<u32>(static_cast<u32>(si.GetIntValue(section, "RightStickTriggerButtons", 0)), 2u));
   m_analog_deadzone = std::clamp(si.GetFloatValue(section, "AnalogDeadzone", DEFAULT_STICK_DEADZONE), 0.0f, 1.0f);
   m_analog_sensitivity =
     std::clamp(si.GetFloatValue(section, "AnalogSensitivity", DEFAULT_STICK_SENSITIVITY), 0.01f, 3.0f);

@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2019-2023 Connor McLaughlin <stenzek@gmail.com>
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #include "cpu_recompiler_code_generator.h"
 #include "common/log.h"
@@ -106,12 +106,14 @@ bool CodeGenerator::CompileInstruction(Instruction instruction, const CodeCache:
 
     case InstructionOp::lwl:
     case InstructionOp::lwr:
-      result = Compile_LoadLeftRight(instruction, info);
+      result = g_settings.gpu_pgxp_enable ? Compile_Fallback(instruction, info) :
+                                            Compile_LoadLeftRight(instruction, info);
       break;
 
     case InstructionOp::swl:
     case InstructionOp::swr:
-      result = Compile_StoreLeftRight(instruction, info);
+      result = g_settings.gpu_pgxp_enable ? Compile_Fallback(instruction, info) :
+                                            Compile_StoreLeftRight(instruction, info);
       break;
 
     case InstructionOp::sb:
@@ -929,7 +931,7 @@ Value CodeGenerator::NotValue(const Value& val)
 const TickCount* CodeGenerator::GetFetchMemoryAccessTimePtr() const
 {
   const TickCount* ptr =
-    Bus::GetMemoryAccessTimePtr(m_block->pc & PHYSICAL_MEMORY_ADDRESS_MASK, MemoryAccessSize::Word);
+    Bus::GetMemoryAccessTimePtr(m_block->pc & KSEG_MASK, MemoryAccessSize::Word);
   AssertMsg(ptr, "Address has dynamic fetch ticks");
   return ptr;
 }
@@ -1431,7 +1433,7 @@ bool CodeGenerator::Compile_Shift(Instruction instruction, const CodeCache::Inst
         if (instruction.r.funct == InstructionFunct::sll)
           EmitFunctionCall(nullptr, &PGXP::CPU_SLL, Value::FromConstantU32(instruction.bits), rt);
         else // if (instruction.r.funct == InstructionFunct::sllv)
-          EmitFunctionCall(nullptr, &PGXP::CPU_SLLV, Value::FromConstantU32(instruction.bits), rt, shamt);
+          EmitFunctionCall(nullptr, &PGXP::CPU_SLLV, Value::FromConstantU32(instruction.bits), shamt, rt);
       }
 
       result = ShlValues(rt, shamt, false);
@@ -1448,7 +1450,7 @@ bool CodeGenerator::Compile_Shift(Instruction instruction, const CodeCache::Inst
         if (instruction.r.funct == InstructionFunct::srl)
           EmitFunctionCall(nullptr, &PGXP::CPU_SRL, Value::FromConstantU32(instruction.bits), rt);
         else // if (instruction.r.funct == InstructionFunct::srlv)
-          EmitFunctionCall(nullptr, &PGXP::CPU_SRLV, Value::FromConstantU32(instruction.bits), rt, shamt);
+          EmitFunctionCall(nullptr, &PGXP::CPU_SRLV, Value::FromConstantU32(instruction.bits), shamt, rt);
       }
 
       result = ShrValues(rt, shamt, false);
@@ -1465,12 +1467,12 @@ bool CodeGenerator::Compile_Shift(Instruction instruction, const CodeCache::Inst
         if (instruction.r.funct == InstructionFunct::sra)
           EmitFunctionCall(nullptr, &PGXP::CPU_SRA, Value::FromConstantU32(instruction.bits), rt);
         else // if (instruction.r.funct == InstructionFunct::srav)
-          EmitFunctionCall(nullptr, &PGXP::CPU_SRAV, Value::FromConstantU32(instruction.bits), rt, shamt);
+          EmitFunctionCall(nullptr, &PGXP::CPU_SRAV, Value::FromConstantU32(instruction.bits), shamt, rt);
       }
 
       result = SarValues(rt, shamt, false);
       if (rt_spec && shamt_spec)
-        result_spec = static_cast<u32>(static_cast<s32>(*rt_spec) << *shamt_spec);
+        result_spec = static_cast<u32>(static_cast<s32>(*rt_spec) >> *shamt_spec);
     }
     break;
 
@@ -1743,9 +1745,6 @@ bool CodeGenerator::Compile_LoadLeftRight(Instruction instruction, const CodeCac
 
   shift.ReleaseAndClear();
 
-  if (g_settings.gpu_pgxp_enable)
-    EmitFunctionCall(nullptr, PGXP::CPU_LW, Value::FromConstantU32(instruction.bits), address, mem);
-
   m_register_cache.WriteGuestRegisterDelayed(instruction.i.rt, std::move(mem));
 
   // TODO: Speculative values
@@ -1806,8 +1805,6 @@ bool CodeGenerator::Compile_StoreLeftRight(Instruction instruction, const CodeCa
   shift.ReleaseAndClear();
 
   EmitStoreGuestMemory(instruction, info, address, address_spec, RegSize_32, mem);
-  if (g_settings.gpu_pgxp_enable)
-    EmitFunctionCall(nullptr, PGXP::CPU_SW, Value::FromConstantU32(instruction.bits), address, mem);
 
   InstructionEpilogue(instruction, info);
   return true;
@@ -2755,15 +2752,14 @@ bool CodeGenerator::Compile_cop0(Instruction instruction, const CodeCache::Instr
 
               if (g_settings.UsingPGXPCPUMode())
               {
-                EmitFunctionCall(nullptr, &PGXP::CPU_MTC0, Value::FromConstantU32(instruction.bits), masked_value,
-                                 value);
+                EmitFunctionCall(nullptr, &PGXP::CPU_MTC0, Value::FromConstantU32(instruction.bits), value);
               }
               value = std::move(masked_value);
             }
             else
             {
               if (g_settings.UsingPGXPCPUMode())
-                EmitFunctionCall(nullptr, &PGXP::CPU_MTC0, Value::FromConstantU32(instruction.bits), value, value);
+                EmitFunctionCall(nullptr, &PGXP::CPU_MTC0, Value::FromConstantU32(instruction.bits), value);
             }
 
             if (reg == Cop0Reg::SR)
@@ -3160,7 +3156,7 @@ void CodeGenerator::SpeculativeWriteReg(Reg reg, SpeculativeValue value)
 
 CodeGenerator::SpeculativeValue CodeGenerator::SpeculativeReadMemory(VirtualMemoryAddress address)
 {
-  PhysicalMemoryAddress phys_addr = address & PHYSICAL_MEMORY_ADDRESS_MASK;
+  PhysicalMemoryAddress phys_addr = address & KSEG_MASK;
 
   auto it = m_speculative_constants.memory.find(address);
   if (it != m_speculative_constants.memory.end())
@@ -3186,7 +3182,7 @@ CodeGenerator::SpeculativeValue CodeGenerator::SpeculativeReadMemory(VirtualMemo
 
 void CodeGenerator::SpeculativeWriteMemory(u32 address, SpeculativeValue value)
 {
-  PhysicalMemoryAddress phys_addr = address & PHYSICAL_MEMORY_ADDRESS_MASK;
+  PhysicalMemoryAddress phys_addr = address & KSEG_MASK;
 
   auto it = m_speculative_constants.memory.find(address);
   if (it != m_speculative_constants.memory.end())

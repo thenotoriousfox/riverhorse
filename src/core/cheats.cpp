@@ -1,10 +1,12 @@
 // SPDX-FileCopyrightText: 2019-2024 Connor McLaughlin <stenzek@gmail.com> and contributors.
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #include "cheats.h"
 #include "bus.h"
 #include "controller.h"
+#include "cpu_code_cache.h"
 #include "cpu_core.h"
+#include "cpu_core_private.h"
 #include "host.h"
 #include "system.h"
 
@@ -22,6 +24,102 @@ Log_SetChannel(Cheats);
 
 static std::array<u32, 256> cht_register; // Used for D7 ,51 & 52 cheat types
 
+namespace CheatInstructionPatches {
+namespace {
+struct Slot
+{
+  PhysicalMemoryAddress address = 0;
+  u32 expected = 0;
+  u32 replacement = 0;
+  bool has_address = false;
+  bool has_expected = false;
+  bool has_replacement = false;
+
+  bool IsComplete() const { return has_address && has_expected && has_replacement; }
+};
+} // namespace
+
+static void UpdateSlot(u8 index, const Slot& slot);
+
+static std::array<Slot, 256> s_slots;
+static std::vector<u8> s_active_slots;
+} // namespace CheatInstructionPatches
+
+u32 CheatInstructionPatches::Apply(VirtualMemoryAddress pc, u32 bits)
+{
+  const PhysicalMemoryAddress physical = CPU::VirtualAddressToPhysical(pc);
+  if (!Bus::IsRAMAddress(physical))
+    return bits;
+
+  const PhysicalMemoryAddress address = physical & Bus::g_ram_mask;
+  for (const u8 index : s_active_slots)
+  {
+    const Slot& slot = s_slots[index];
+    if (slot.address == address && slot.expected == bits)
+      return slot.replacement;
+  }
+
+  return bits;
+}
+
+void CheatInstructionPatches::UpdateSlot(u8 index, const Slot& slot)
+{
+  Slot& current = s_slots[index];
+  const bool was_complete = current.IsComplete();
+  const bool changed_while_complete = was_complete && slot.IsComplete() &&
+                                      (current.address != slot.address || current.expected != slot.expected ||
+                                       current.replacement != slot.replacement);
+  current = slot;
+  if (was_complete == slot.IsComplete() && !changed_while_complete)
+    return;
+
+  s_active_slots.clear();
+  for (u32 i = 0; i < s_slots.size(); i++)
+  {
+    if (s_slots[i].IsComplete())
+      s_active_slots.push_back(static_cast<u8>(i));
+  }
+  g_any_active = !s_active_slots.empty();
+
+  CPU::CodeCache::InvalidateAllRAMBlocks();
+}
+
+void CheatInstructionPatches::SetAddress(u8 slot, VirtualMemoryAddress address)
+{
+  const PhysicalMemoryAddress physical = CPU::VirtualAddressToPhysical(address);
+  Slot updated = s_slots[slot];
+  updated.address = physical & Bus::g_ram_mask;
+  updated.has_address = Bus::IsRAMAddress(physical);
+  UpdateSlot(slot, updated);
+}
+
+void CheatInstructionPatches::SetExpected(u8 slot, u32 bits)
+{
+  Slot updated = s_slots[slot];
+  updated.expected = bits;
+  updated.has_expected = true;
+  UpdateSlot(slot, updated);
+}
+
+void CheatInstructionPatches::SetReplacement(u8 slot, u32 bits)
+{
+  Slot updated = s_slots[slot];
+  updated.replacement = bits;
+  updated.has_replacement = true;
+  UpdateSlot(slot, updated);
+}
+
+void CheatInstructionPatches::Clear(u8 slot)
+{
+  UpdateSlot(slot, Slot());
+}
+
+void CheatInstructionPatches::ClearAll()
+{
+  for (u32 i = 0; i < s_slots.size(); i++)
+    Clear(static_cast<u8>(i));
+}
+
 using KeyValuePairVector = std::vector<std::pair<std::string, std::string>>;
 
 static bool IsValidScanAddress(PhysicalMemoryAddress address)
@@ -32,7 +130,7 @@ static bool IsValidScanAddress(PhysicalMemoryAddress address)
     return true;
   }
 
-  address &= CPU::PHYSICAL_MEMORY_ADDRESS_MASK;
+  address &= CPU::KSEG_MASK;
 
   if (address < Bus::RAM_MIRROR_END)
     return true;
@@ -167,7 +265,10 @@ static u32 GetControllerAnalogBits()
   return bits;
 }
 
-CheatList::CheatList() = default;
+CheatList::CheatList()
+{
+  cht_register.fill(0);
+}
 
 CheatList::~CheatList() = default;
 
@@ -228,7 +329,7 @@ bool CheatList::LoadFromPCSXRString(const std::string& str)
       end--;
     }
 
-    // DuckStation metadata
+    // Riverhorse metadata
     if (StringUtil::Strncasecmp(start, "#group=", 7) == 0)
     {
       group = start + 7;
@@ -690,9 +791,9 @@ bool CheatList::SaveToPCSXRFile(const char* filename)
   return (std::ferror(fp.get()) == 0);
 }
 
-bool CheatList::LoadFromPackage(const std::string& serial)
+bool CheatList::LoadFromPackage(const std::string& serial, const char* resource_name)
 {
-  const std::optional<std::string> db_string(Host::ReadResourceFileToString("chtdb.txt", false));
+  const std::optional<std::string> db_string(Host::ReadResourceFileToString(resource_name, false));
   if (!db_string.has_value())
     return false;
 
@@ -1587,6 +1688,15 @@ void CheatCode::Apply() const
             break;
           case 0xCA: // Reg3 = Reg1 >> X
             cht_register[cht_reg_no3] = cht_register[cht_reg_no1] >> cht_reg_no2;
+            break;
+          case 0xE1: // Instruction patch NN: address
+            CheatInstructionPatches::SetAddress(cht_reg_no1, poke_value);
+            break;
+          case 0xE2: // Instruction patch NN: instruction expected at the address
+            CheatInstructionPatches::SetExpected(cht_reg_no1, poke_value);
+            break;
+          case 0xE3: // Instruction patch NN: instruction to execute instead
+            CheatInstructionPatches::SetReplacement(cht_reg_no1, poke_value);
             break;
           // Lots of options exist for expanding into this space
           default:
@@ -2701,9 +2811,17 @@ void CheatCode::ApplyOnDisable() const
       case InstructionCode::ExtConstantSwap16:
       case InstructionCode::DelayActivation: // C1
       case InstructionCode::ExtConstantWriteIfMatch16:
-      case InstructionCode::ExtCheatRegisters:
         index++;
         break;
+
+      case InstructionCode::ExtCheatRegisters:
+      {
+        const u8 sub_type = Truncate8((inst.address & 0xFF0000u) >> 16);
+        if (sub_type >= 0xE1 && sub_type <= 0xE3)
+          CheatInstructionPatches::Clear(Truncate8(inst.address & 0xFFu));
+        index++;
+      }
+      break;
 
       case InstructionCode::ExtConstantForceRange16:
       case InstructionCode::Slide:

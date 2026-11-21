@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2019-2024 Connor McLaughlin <stenzek@gmail.com>
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #include "cd_image.h"
 #include "cd_subchannel_replacement.h"
@@ -7,6 +7,9 @@
 #include "common/error.h"
 #include "common/file_system.h"
 #include "common/path.h"
+
+#include <array>
+#include <cstring>
 
 namespace {
 
@@ -20,6 +23,7 @@ public:
 
   bool ReadSubChannelQ(SubChannelQ* subq, const Index& index, LBA lba_in_index) override;
   bool HasNonStandardSubchannel() const override;
+  bool LoadSubchannelReplacementFile(std::string_view path) override;
 
   s64 GetSizeOnDisk() const override;
 
@@ -27,6 +31,9 @@ protected:
   bool ReadSectorFromIndex(void* buffer, const Index& index, LBA lba_in_index) override;
 
 private:
+  static TrackMode DetectTrackMode(const std::array<u8, SECTOR_SYNC_SIZE + SECTOR_HEADER_SIZE>& first_sector_header,
+                                   u64 file_size);
+
   std::FILE* m_fp = nullptr;
   u64 m_file_position = 0;
 
@@ -43,6 +50,22 @@ CDImageBin::~CDImageBin()
     std::fclose(m_fp);
 }
 
+CDImage::TrackMode
+CDImageBin::DetectTrackMode(const std::array<u8, SECTOR_SYNC_SIZE + SECTOR_HEADER_SIZE>& first_sector_header,
+                            u64 file_size)
+{
+  const bool raw_size = (file_size % RAW_SECTOR_SIZE) == 0;
+  const u8 sector_mode = first_sector_header[SECTOR_SYNC_SIZE + 3];
+  if (raw_size &&
+      std::memcmp(first_sector_header.data(), SECTOR_SYNC_PATTERN.data(), SECTOR_SYNC_PATTERN.size()) == 0 &&
+      (sector_mode == 1 || sector_mode == 2))
+  {
+    return (sector_mode == 1) ? TrackMode::Mode1Raw : TrackMode::Mode2Raw;
+  }
+
+  return raw_size ? TrackMode::Audio : TrackMode::Mode1;
+}
+
 bool CDImageBin::Open(const char* filename, Error* error)
 {
   m_filename = filename;
@@ -53,17 +76,21 @@ bool CDImageBin::Open(const char* filename, Error* error)
     return false;
   }
 
-  const u32 track_sector_size = RAW_SECTOR_SIZE;
-
-  // determine the length from the file
-  std::fseek(m_fp, 0, SEEK_END);
-  const u32 file_size = static_cast<u32>(std::ftell(m_fp));
+  const s64 file_size = FileSystem::FSize64(m_fp);
+  std::array<u8, SECTOR_SYNC_SIZE + SECTOR_HEADER_SIZE> first_sector_header;
+  if (file_size < static_cast<s64>(first_sector_header.size()) ||
+      std::fread(first_sector_header.data(), first_sector_header.size(), 1, m_fp) != 1)
+  {
+    Error::SetStringFmt(error, "Unable to determine the sector format of '{}'", Path::GetFileName(filename));
+    return false;
+  }
   std::fseek(m_fp, 0, SEEK_SET);
 
-  m_lba_count = file_size / track_sector_size;
+  const TrackMode mode = DetectTrackMode(first_sector_header, static_cast<u64>(file_size));
+  const u32 track_sector_size = GetBytesPerSector(mode);
+  m_lba_count = static_cast<u32>(static_cast<u64>(file_size) / track_sector_size);
 
   SubChannelQ::Control control = {};
-  TrackMode mode = TrackMode::Mode2Raw;
   control.data = mode != TrackMode::Audio;
 
   // Two seconds default pregap.
@@ -113,6 +140,11 @@ bool CDImageBin::ReadSubChannelQ(SubChannelQ* subq, const Index& index, LBA lba_
     return true;
 
   return CDImage::ReadSubChannelQ(subq, index, lba_in_index);
+}
+
+bool CDImageBin::LoadSubchannelReplacementFile(std::string_view path)
+{
+  return m_sbi.LoadFromFile(path);
 }
 
 bool CDImageBin::HasNonStandardSubchannel() const

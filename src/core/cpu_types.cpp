@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2019-2024 Connor McLaughlin <stenzek@gmail.com>
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #include "cpu_types.h"
 #include "common/assert.h"
@@ -47,9 +47,21 @@ bool CPU::IsBranchInstruction(const Instruction instruction)
       }
     }
 
+    case InstructionOp::cop0:
+    case InstructionOp::cop1:
+    case InstructionOp::cop2:
+    case InstructionOp::cop3:
+      return IsCoprocessorBranchInstruction(instruction);
+
     default:
       return false;
   }
+}
+
+bool CPU::IsCoprocessorBranchInstruction(const Instruction instruction)
+{
+  return ((instruction.bits >> 28) == 0b0100 && instruction.cop.IsCommonInstruction() &&
+          instruction.cop.CommonOp() == CopCommonInstruction::bcnc);
 }
 
 bool CPU::IsUnconditionalBranchInstruction(const Instruction instruction)

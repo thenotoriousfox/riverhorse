@@ -143,6 +143,12 @@ if (WebP_LIBRARY AND NOT TARGET WebP::libwebp)
         INTERFACE_COMPILE_OPTIONS "${WebP_COMPILE_OPTIONS}"
         INTERFACE_INCLUDE_DIRECTORIES "${WebP_INCLUDE_DIR}"
     )
+    if (WebP_LIBRARY MATCHES "\\.a$")
+        find_library(WebP_SHARPYUV_LIBRARY NAMES sharpyuv HINTS ${PC_WEBP_LIBDIR} ${PC_WEBP_LIBRARY_DIRS})
+        if (WebP_SHARPYUV_LIBRARY)
+            set_property(TARGET WebP::libwebp APPEND PROPERTY INTERFACE_LINK_LIBRARIES "${WebP_SHARPYUV_LIBRARY}")
+        endif ()
+    endif ()
 endif ()
 
 if (WebP_DEMUX_LIBRARY AND NOT TARGET WebP::demux)

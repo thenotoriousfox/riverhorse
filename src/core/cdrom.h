@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2019-2022 Connor McLaughlin <stenzek@gmail.com>
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #pragma once
 #include "types.h"
@@ -22,6 +22,9 @@ const std::string& GetMediaFileName();
 const CDImage* GetMedia();
 DiscRegion GetDiscRegion();
 bool IsMediaPS1Disc();
+
+/// Drops the current read back to normal double speed, e.g. when the MDEC starts decoding a video.
+void DisableReadSpeedup();
 bool IsMediaAudioCD();
 bool DoesMediaRegionMatchConsole();
 

@@ -2,8 +2,15 @@
 
 set -e
 
+# Use --libretro to build static, position-independent libraries for the libretro core, without Qt.
+LIBRETRO=0
+if [ "$1" == "--libretro" ]; then
+    LIBRETRO=1
+    shift
+fi
+
 if [ "$#" -ne 1 ]; then
-    echo "Syntax: $0 <output directory>"
+    echo "Syntax: $0 [--libretro] <output directory>"
     exit 1
 fi
 
@@ -27,6 +34,22 @@ DISCORD_RPC=144f3a3f1209994d8d9e8a87964a989cb9911c1e
 SHADERC=feb2460bf3a504d67011246edeb810c45ea58826
 SOUNDTOUCH=463ade388f3a51da078dc9ed062bf28e4ba29da7
 SPIRV_CROSS=vulkan-sdk-1.3.290.0
+
+if [ "$LIBRETRO" == 1 ]; then
+	SHARED=OFF
+	STATIC=ON
+	export CFLAGS="${CFLAGS} -fPIC"
+	export CXXFLAGS="${CXXFLAGS} -fPIC"
+	CMAKE_COMMON=(-DCMAKE_POSITION_INDEPENDENT_CODE=ON -DBUILD_SHARED_LIBS=OFF)
+	CMAKE_SHADERC=("${CMAKE_COMMON[@]}")
+	AUTOTOOLS_LIBRARY_TYPE=(--enable-static --disable-shared --with-pic)
+else
+	SHARED=ON
+	STATIC=OFF
+	CMAKE_COMMON=(-DBUILD_SHARED_LIBS=ON)
+	CMAKE_SHADERC=()
+	AUTOTOOLS_LIBRARY_TYPE=(--disable-static --enable-shared)
+fi
 
 mkdir -p deps-build
 cd deps-build
@@ -57,12 +80,12 @@ curl -C - -L \
 	-O "https://storage.googleapis.com/downloads.webmproject.org/releases/webp/libwebp-$LIBWEBP.tar.gz" \
 	-O "https://github.com/libsdl-org/SDL/releases/download/release-$SDL2/SDL2-$SDL2.tar.gz" \
 	-O "https://github.com/facebook/zstd/releases/download/v$ZSTD/zstd-$ZSTD.tar.gz" \
-	-O "https://download.qt.io/official_releases/qt/${QT%.*}/$QT/submodules/qtbase-everywhere-src-$QT.tar.xz" \
-	-O "https://download.qt.io/official_releases/qt/${QT%.*}/$QT/submodules/qtimageformats-everywhere-src-$QT.tar.xz" \
-	-O "https://download.qt.io/official_releases/qt/${QT%.*}/$QT/submodules/qtsvg-everywhere-src-$QT.tar.xz" \
-	-O "https://download.qt.io/official_releases/qt/${QT%.*}/$QT/submodules/qttools-everywhere-src-$QT.tar.xz" \
-	-O "https://download.qt.io/official_releases/qt/${QT%.*}/$QT/submodules/qttranslations-everywhere-src-$QT.tar.xz" \
-	-O "https://download.qt.io/official_releases/qt/${QT%.*}/$QT/submodules/qtwayland-everywhere-src-$QT.tar.xz" \
+	-O "https://download.qt.io/archive/qt/${QT%.*}/$QT/submodules/qtbase-everywhere-src-$QT.tar.xz" \
+	-O "https://download.qt.io/archive/qt/${QT%.*}/$QT/submodules/qtimageformats-everywhere-src-$QT.tar.xz" \
+	-O "https://download.qt.io/archive/qt/${QT%.*}/$QT/submodules/qtsvg-everywhere-src-$QT.tar.xz" \
+	-O "https://download.qt.io/archive/qt/${QT%.*}/$QT/submodules/qttools-everywhere-src-$QT.tar.xz" \
+	-O "https://download.qt.io/archive/qt/${QT%.*}/$QT/submodules/qttranslations-everywhere-src-$QT.tar.xz" \
+	-O "https://download.qt.io/archive/qt/${QT%.*}/$QT/submodules/qtwayland-everywhere-src-$QT.tar.xz" \
 	-o "cpuinfo-$CPUINFO.tar.gz" "https://github.com/stenzek/cpuinfo/archive/$CPUINFO.tar.gz" \
 	-o "discord-rpc-$DISCORD_RPC.tar.gz" "https://github.com/stenzek/discord-rpc/archive/$DISCORD_RPC.tar.gz" \
 	-o "shaderc-$SHADERC.tar.gz" "https://github.com/stenzek/shaderc/archive/$SHADERC.tar.gz" \
@@ -79,7 +102,7 @@ echo "Building libbacktrace..."
 rm -fr "libbacktrace-$LIBBACKTRACE"
 unzip "$LIBBACKTRACE.zip"
 cd "libbacktrace-$LIBBACKTRACE"
-./configure --prefix="$INSTALLDIR"
+./configure --prefix="$INSTALLDIR" "${AUTOTOOLS_LIBRARY_TYPE[@]}"
 make
 make install
 cd ..
@@ -88,7 +111,7 @@ echo "Building libpng..."
 rm -fr "libpng-$LIBPNG"
 tar xf "libpng-$LIBPNG.tar.xz"
 cd "libpng-$LIBPNG"
-cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$INSTALLDIR" -DCMAKE_INSTALL_PREFIX="$INSTALLDIR" -DBUILD_SHARED_LIBS=ON -DBUILD_SHARED_LIBS=ON -DPNG_TESTS=OFF -DPNG_STATIC=OFF -DPNG_SHARED=ON -DPNG_TOOLS=OFF -B build -G Ninja
+cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$INSTALLDIR" -DCMAKE_INSTALL_PREFIX="$INSTALLDIR" "${CMAKE_COMMON[@]}" -DPNG_TESTS=OFF -DPNG_STATIC=$STATIC -DPNG_SHARED=$SHARED -DPNG_TOOLS=OFF -B build -G Ninja
 cmake --build build --parallel
 ninja -C build install
 cd ..
@@ -99,7 +122,7 @@ tar xf "jpegsrc.v$LIBJPEG.tar.gz"
 cd "jpeg-$LIBJPEG"
 mkdir build
 cd build
-../configure --prefix="$INSTALLDIR" --disable-static --enable-shared
+../configure --prefix="$INSTALLDIR" "${AUTOTOOLS_LIBRARY_TYPE[@]}"
 make "-j$NPROCS"
 make install
 cd ../..
@@ -108,7 +131,7 @@ echo "Building Zstandard..."
 rm -fr "zstd-$ZSTD"
 tar xf "zstd-$ZSTD.tar.gz"
 cd "zstd-$ZSTD"
-cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$INSTALLDIR" -DCMAKE_INSTALL_PREFIX="$INSTALLDIR" -DBUILD_SHARED_LIBS=ON -DZSTD_BUILD_SHARED=ON -DZSTD_BUILD_STATIC=OFF -DZSTD_BUILD_PROGRAMS=OFF -B build -G Ninja build/cmake
+cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$INSTALLDIR" -DCMAKE_INSTALL_PREFIX="$INSTALLDIR" "${CMAKE_COMMON[@]}" -DZSTD_BUILD_SHARED=$SHARED -DZSTD_BUILD_STATIC=$STATIC -DZSTD_BUILD_PROGRAMS=OFF -B build -G Ninja build/cmake
 cmake --build build --parallel
 ninja -C build install
 cd ..
@@ -119,7 +142,7 @@ tar xf "libwebp-$LIBWEBP.tar.gz"
 cd "libwebp-$LIBWEBP"
 cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$INSTALLDIR" -DCMAKE_INSTALL_PREFIX="$INSTALLDIR" -B build -G Ninja \
   -DWEBP_BUILD_ANIM_UTILS=OFF -DWEBP_BUILD_CWEBP=OFF -DWEBP_BUILD_DWEBP=OFF -DWEBP_BUILD_GIF2WEBP=OFF -DWEBP_BUILD_IMG2WEBP=OFF \
-  -DWEBP_BUILD_VWEBP=OFF -DWEBP_BUILD_WEBPINFO=OFF -DWEBP_BUILD_WEBPMUX=OFF -DWEBP_BUILD_EXTRAS=OFF -DBUILD_SHARED_LIBS=ON
+  -DWEBP_BUILD_VWEBP=OFF -DWEBP_BUILD_WEBPINFO=OFF -DWEBP_BUILD_WEBPMUX=OFF -DWEBP_BUILD_EXTRAS=OFF "${CMAKE_COMMON[@]}"
 cmake --build build --parallel
 ninja -C build install
 cd ..
@@ -128,11 +151,12 @@ echo "Building SDL2..."
 rm -fr "SDL2-$SDL2"
 tar xf "SDL2-$SDL2.tar.gz"
 cd "SDL2-$SDL2"
-cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$INSTALLDIR" -DCMAKE_INSTALL_PREFIX="$INSTALLDIR" -DBUILD_SHARED_LIBS=ON -DSDL_SHARED=ON -DSDL_STATIC=OFF -G Ninja
+cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$INSTALLDIR" -DCMAKE_INSTALL_PREFIX="$INSTALLDIR" "${CMAKE_COMMON[@]}" -DSDL_SHARED=$SHARED -DSDL_STATIC=$STATIC -DSDL_STATIC_PIC=ON -G Ninja
 cmake --build build --parallel
 ninja -C build install
 cd ..
 
+if [ "$LIBRETRO" == 0 ]; then
 # Couple notes:
 # -fontconfig is needed otherwise Qt Widgets render only boxes.
 # -qt-doubleconversion avoids a dependency on libdouble-conversion.
@@ -229,19 +253,33 @@ cmake --build . --parallel
 ninja install
 cd ../../
 
+fi
+
 echo "Building shaderc..."
 rm -fr "shaderc-$SHADERC"
 tar xf "shaderc-$SHADERC.tar.gz"
 cd "shaderc-$SHADERC"
-cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$INSTALLDIR" -DCMAKE_INSTALL_PREFIX="$INSTALLDIR" -DSHADERC_SKIP_TESTS=ON -DSHADERC_SKIP_EXAMPLES=ON -DSHADERC_SKIP_COPYRIGHT_CHECK=ON -B build -G Ninja
+if [ "$LIBRETRO" == 1 ]; then
+	sed -i 's/add_library(shaderc_shared SHARED/add_library(shaderc_shared STATIC/' libshaderc/CMakeLists.txt
+fi
+cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$INSTALLDIR" -DCMAKE_INSTALL_PREFIX="$INSTALLDIR" "${CMAKE_SHADERC[@]}" -DSHADERC_SKIP_TESTS=ON -DSHADERC_SKIP_EXAMPLES=ON -DSHADERC_SKIP_COPYRIGHT_CHECK=ON -B build -G Ninja
 cmake --build build --parallel
 ninja -C build install
+if [ "$LIBRETRO" == 1 ]; then
+	rm -f "$INSTALLDIR/lib/libshaderc_shared.a"
+	{
+		echo "CREATE $INSTALLDIR/lib/libshaderc_combined.a"
+		find build -name '*.a' -printf 'ADDLIB %p\n'
+		echo "SAVE"
+		echo "END"
+	} | ar -M
+fi
 cd ..
 
 echo "Building SPIRV-Cross..."
 cd SPIRV-Cross
 rm -fr build
-cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$INSTALLDIR" -DCMAKE_INSTALL_PREFIX="$INSTALLDIR" -DSPIRV_CROSS_SHARED=ON -DSPIRV_CROSS_STATIC=OFF -DSPIRV_CROSS_CLI=OFF -DSPIRV_CROSS_ENABLE_TESTS=OFF -DSPIRV_CROSS_ENABLE_GLSL=ON -DSPIRV_CROSS_ENABLE_HLSL=OFF -DSPIRV_CROSS_ENABLE_MSL=OFF -DSPIRV_CROSS_ENABLE_CPP=OFF -DSPIRV_CROSS_ENABLE_REFLECT=OFF -DSPIRV_CROSS_ENABLE_C_API=ON -DSPIRV_CROSS_ENABLE_UTIL=ON -B build -G Ninja
+cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$INSTALLDIR" -DCMAKE_INSTALL_PREFIX="$INSTALLDIR" "${CMAKE_COMMON[@]}" -DSPIRV_CROSS_SHARED=$SHARED -DSPIRV_CROSS_STATIC=$STATIC -DSPIRV_CROSS_CLI=OFF -DSPIRV_CROSS_ENABLE_TESTS=OFF -DSPIRV_CROSS_ENABLE_GLSL=ON -DSPIRV_CROSS_ENABLE_HLSL=OFF -DSPIRV_CROSS_ENABLE_MSL=OFF -DSPIRV_CROSS_ENABLE_CPP=OFF -DSPIRV_CROSS_ENABLE_REFLECT=OFF -DSPIRV_CROSS_ENABLE_C_API=ON -DSPIRV_CROSS_ENABLE_UTIL=ON -B build -G Ninja
 cmake --build build --parallel
 ninja -C build install
 cd ..
@@ -250,7 +288,7 @@ echo "Building cpuinfo..."
 rm -fr "cpuinfo-$CPUINFO"
 tar xf "cpuinfo-$CPUINFO.tar.gz"
 cd "cpuinfo-$CPUINFO"
-cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$INSTALLDIR" -DCMAKE_INSTALL_PREFIX="$INSTALLDIR" -DCPUINFO_LIBRARY_TYPE=shared -DCPUINFO_RUNTIME_TYPE=shared -DCPUINFO_LOG_LEVEL=error -DCPUINFO_LOG_TO_STDIO=ON -DCPUINFO_BUILD_TOOLS=OFF -DCPUINFO_BUILD_UNIT_TESTS=OFF -DCPUINFO_BUILD_MOCK_TESTS=OFF -DCPUINFO_BUILD_BENCHMARKS=OFF -DUSE_SYSTEM_LIBS=ON -B build -G Ninja
+cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$INSTALLDIR" -DCMAKE_INSTALL_PREFIX="$INSTALLDIR" "${CMAKE_COMMON[@]}" -DCPUINFO_LIBRARY_TYPE=$( [ "$LIBRETRO" == 1 ] && echo static || echo shared ) -DCPUINFO_RUNTIME_TYPE=$( [ "$LIBRETRO" == 1 ] && echo static || echo shared ) -DCPUINFO_LOG_LEVEL=error -DCPUINFO_LOG_TO_STDIO=ON -DCPUINFO_BUILD_TOOLS=OFF -DCPUINFO_BUILD_UNIT_TESTS=OFF -DCPUINFO_BUILD_MOCK_TESTS=OFF -DCPUINFO_BUILD_BENCHMARKS=OFF -DUSE_SYSTEM_LIBS=ON -B build -G Ninja
 cmake --build build --parallel
 ninja -C build install
 cd ..
@@ -259,7 +297,7 @@ echo "Building discord-rpc..."
 rm -fr "discord-rpc-$DISCORD_RPC"
 tar xf "discord-rpc-$DISCORD_RPC.tar.gz"
 cd "discord-rpc-$DISCORD_RPC"
-cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$INSTALLDIR" -DCMAKE_INSTALL_PREFIX="$INSTALLDIR" -DBUILD_SHARED_LIBS=ON -B build -G Ninja
+cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$INSTALLDIR" -DCMAKE_INSTALL_PREFIX="$INSTALLDIR" "${CMAKE_COMMON[@]}" -B build -G Ninja
 cmake --build build --parallel
 ninja -C build install
 cd ..
@@ -268,7 +306,13 @@ echo "Building soundtouch..."
 rm -fr "soundtouch-$SOUNDTOUCH"
 tar xf "soundtouch-$SOUNDTOUCH.tar.gz"
 cd "soundtouch-$SOUNDTOUCH"
-cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$INSTALLDIR" -DCMAKE_INSTALL_PREFIX="$INSTALLDIR" -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON -B build -G Ninja
+SOUNDTOUCH_IPO=ON
+if [ "$LIBRETRO" == 1 ]; then
+	sed -i -e 's/add_library(SoundTouchDLL SHARED/add_library(SoundTouchDLL STATIC/' \
+		-e 's/install(TARGETS SoundTouchDLL EXPORT SoundTouchTargets)/install(TARGETS SoundTouch SoundTouchDLL EXPORT SoundTouchTargets)/' CMakeLists.txt
+	SOUNDTOUCH_IPO=OFF
+fi
+cmake "${CMAKE_COMMON[@]}" -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$INSTALLDIR" -DCMAKE_INSTALL_PREFIX="$INSTALLDIR" -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=$SOUNDTOUCH_IPO -B build -G Ninja
 cmake --build build --parallel
 ninja -C build install
 cd ..

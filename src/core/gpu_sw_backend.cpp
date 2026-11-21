@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2019-2024 Connor McLaughlin <stenzek@gmail.com>
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #include "gpu_sw_backend.h"
 #include "gpu.h"
@@ -222,8 +222,11 @@ void GPU_SW_Backend::DrawRectangle(const GPUBackendDrawRectangleCommand* cmd)
   const s32 origin_y = cmd->y;
   const auto [r, g, b] = UnpackColorRGB24(cmd->color);
   const auto [origin_texcoord_x, origin_texcoord_y] = UnpackTexcoord(cmd->texcoord);
+  const u32 texcoord_step_x = cmd->draw_mode.texture_x_flip ? 0xFFu : 1u;
+  const u32 texcoord_step_y = cmd->draw_mode.texture_y_flip ? 0xFFu : 1u;
 
-  for (u32 offset_y = 0; offset_y < cmd->height; offset_y++)
+  u32 texcoord_y = origin_texcoord_y;
+  for (u32 offset_y = 0; offset_y < cmd->height; offset_y++, texcoord_y += texcoord_step_y)
   {
     const s32 y = origin_y + static_cast<s32>(offset_y);
     if (y < static_cast<s32>(m_drawing_area.top) || y > static_cast<s32>(m_drawing_area.bottom) ||
@@ -233,18 +236,16 @@ void GPU_SW_Backend::DrawRectangle(const GPUBackendDrawRectangleCommand* cmd)
     }
 
     const u32 draw_y = static_cast<u32>(y) & VRAM_HEIGHT_MASK;
-    const u8 texcoord_y = Truncate8(ZeroExtend32(origin_texcoord_y) + offset_y);
 
-    for (u32 offset_x = 0; offset_x < cmd->width; offset_x++)
+    u32 texcoord_x = origin_texcoord_x;
+    for (u32 offset_x = 0; offset_x < cmd->width; offset_x++, texcoord_x += texcoord_step_x)
     {
       const s32 x = origin_x + static_cast<s32>(offset_x);
       if (x < static_cast<s32>(m_drawing_area.left) || x > static_cast<s32>(m_drawing_area.right))
         continue;
 
-      const u8 texcoord_x = Truncate8(ZeroExtend32(origin_texcoord_x) + offset_x);
-
-      ShadePixel<texture_enable, raw_texture_enable, transparency_enable, false>(cmd, static_cast<u32>(x), draw_y, r, g,
-                                                                                 b, texcoord_x, texcoord_y);
+      ShadePixel<texture_enable, raw_texture_enable, transparency_enable, false>(
+        cmd, static_cast<u32>(x), draw_y, r, g, b, Truncate8(texcoord_x), Truncate8(texcoord_y));
     }
   }
 }
@@ -815,8 +816,9 @@ void GPU_SW_Backend::UpdateVRAM(u32 x, u32 y, u32 width, u32 height, const void*
       {
         // TODO: Handle unaligned reads...
         u16* pixel_ptr = &dst_row_ptr[(x + col++) % VRAM_WIDTH];
+        const u16 src_pixel = *(src_ptr++);
         if (((*pixel_ptr) & mask_and) == 0)
-          *pixel_ptr = *(src_ptr++) | mask_or;
+          *pixel_ptr = src_pixel | mask_or;
       }
     }
   }

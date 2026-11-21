@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2019-2024 Connor McLaughlin <stenzek@gmail.com>
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #include "game_list.h"
 #include "bios.h"
@@ -149,9 +149,13 @@ bool GameList::IsGameListLoaded()
 
 bool GameList::IsScannableFilename(std::string_view path)
 {
-  // we don't scan bin files because they'll duplicate
   if (StringUtil::EndsWithNoCase(path, ".bin"))
     return false;
+  if (StringUtil::EndsWithNoCase(path, ".img") &&
+      FileSystem::FileExists(Path::ReplaceExtension(path, "ccd").c_str()))
+  {
+    return false;
+  }
 
   return System::IsLoadableFilename(path);
 }

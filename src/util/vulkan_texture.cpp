@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2019-2024 Connor McLaughlin <stenzek@gmail.com>
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #include "vulkan_texture.h"
 #include "vulkan_builders.h"
@@ -51,7 +51,7 @@ VulkanTexture::VulkanTexture(u32 width, u32 height, u32 layers, u32 levels, u32 
 
 VulkanTexture::~VulkanTexture()
 {
-  Destroy(true);
+  GPUDevice::RunOnDeviceThread([&]() { Destroy(true); });
 }
 
 std::unique_ptr<VulkanTexture> VulkanTexture::Create(u32 width, u32 height, u32 layers, u32 levels, u32 samples,
@@ -865,7 +865,7 @@ VulkanTextureBuffer::VulkanTextureBuffer(Format format, u32 size_in_elements)
 
 VulkanTextureBuffer::~VulkanTextureBuffer()
 {
-  Destroy(true);
+  GPUDevice::RunOnDeviceThread([&]() { Destroy(true); });
 }
 
 bool VulkanTextureBuffer::CreateBuffer(bool ssbo)
@@ -981,17 +981,19 @@ VulkanDownloadTexture::VulkanDownloadTexture(u32 width, u32 height, GPUTexture::
 
 VulkanDownloadTexture::~VulkanDownloadTexture()
 {
-  if (m_allocation != VK_NULL_HANDLE)
-  {
-    // Buffer was created mapped, no need to manually unmap.
-    VulkanDevice::GetInstance().DeferBufferDestruction(m_buffer, m_allocation);
-  }
-  else
-  {
-    // imported
-    DebugAssert(m_is_imported && m_memory != VK_NULL_HANDLE);
-    VulkanDevice::GetInstance().DeferBufferDestruction(m_buffer, m_memory);
-  }
+  GPUDevice::RunOnDeviceThread([&]() {
+    if (m_allocation != VK_NULL_HANDLE)
+    {
+      // Buffer was created mapped, no need to manually unmap.
+      VulkanDevice::GetInstance().DeferBufferDestruction(m_buffer, m_allocation);
+    }
+    else
+    {
+      // imported
+      DebugAssert(m_is_imported && m_memory != VK_NULL_HANDLE);
+      VulkanDevice::GetInstance().DeferBufferDestruction(m_buffer, m_memory);
+    }
+  });
 }
 
 std::unique_ptr<VulkanDownloadTexture> VulkanDownloadTexture::Create(u32 width, u32 height, GPUTexture::Format format,

@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2019-2022 Connor McLaughlin <stenzek@gmail.com>
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #pragma once
 #include "cd_image.h"
@@ -39,6 +39,7 @@ struct Track
   u32 number;
   u32 flags;
   std::string file;
+  bool file_is_wave;
   std::vector<std::pair<u32, MSF>> indices;
   TrackMode mode;
   MSF start;
@@ -83,6 +84,7 @@ private:
 
   std::vector<Track> m_tracks;
   std::optional<std::string> m_current_file;
+  bool m_current_file_is_wave = false;
   std::optional<Track> m_current_track;
 };
 

@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Riverhorse
+GenericName=PlayStation 1 Emulator
+Comment=Fast PlayStation 1 emulator
+Icon=io.github.thenotoriousfox.Riverhorse
+TryExec=riverhorse
+Exec=riverhorse %f
+Categories=Game;Emulator;Qt;

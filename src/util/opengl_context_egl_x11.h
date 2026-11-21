@@ -19,4 +19,5 @@ public:
 protected:
   EGLDisplay GetPlatformDisplay(Error* error) override;
   EGLSurface CreatePlatformSurface(EGLConfig config, void* win, Error* error) override;
+  bool IsConfigCompatibleWithWindow(EGLConfig config) override;
 };

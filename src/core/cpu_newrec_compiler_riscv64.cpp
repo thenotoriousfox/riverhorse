@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2024 Connor McLaughlin <stenzek@gmail.com>
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #include "cpu_newrec_compiler_riscv64.h"
 #include "cpu_code_cache_private.h"
@@ -1038,7 +1038,8 @@ void CPU::NewRec::RISCV64Compiler::CheckBranchTarget(const biscuit::GPR& pcreg)
   SwitchToFarCode(true, &Assembler::BEQ, RSCRATCH, zero);
 
   BackupHostState();
-  EndBlockWithException(Exception::AdEL);
+  StoreHostRegToCPUPointer(pcreg.Index(), &g_state.cop0_regs.BadVaddr);
+  EndBlockWithBranchTargetException();
 
   RestoreHostState();
   SwitchToNearCode(false);
@@ -1985,9 +1986,9 @@ void CPU::NewRec::RISCV64Compiler::Compile_lwx(CompileFlags cf, MemoryAccessSize
   {
     Flush(FLUSH_FOR_C_CALL);
     rvAsm->MV(RARG3, value);
-    rvAsm->ANDI(RARG2, addr, ~0x3u);
+    rvAsm->MV(RARG2, addr);
     EmitMov(RARG1, inst->bits);
-    EmitCall(reinterpret_cast<const void*>(&PGXP::CPU_LW));
+    EmitCall(reinterpret_cast<const void*>(&PGXP::CPU_LWx));
   }
 }
 
@@ -2111,9 +2112,7 @@ void CPU::NewRec::RISCV64Compiler::Compile_swx(CompileFlags cf, MemoryAccessSize
   // TODO: this can take over rt's value if it's no longer needed
   // NOTE: can't trust T in cf because of the alloc
   const GPR addr = GPR(AllocateTempHostReg(HR_CALLEE_SAVED));
-  const GPR value = g_settings.gpu_pgxp_enable ? GPR(AllocateTempHostReg(HR_CALLEE_SAVED)) : RARG2;
-  if (g_settings.gpu_pgxp_enable)
-    MoveMIPSRegToReg(value, inst->r.rt);
+  const GPR value = RARG2;
 
   FlushForLoadStore(address, true, use_fastmem);
 
@@ -2127,9 +2126,7 @@ void CPU::NewRec::RISCV64Compiler::Compile_swx(CompileFlags cf, MemoryAccessSize
   rvAsm->SLLIW(RSCRATCH, RSCRATCH, 3); // *8
   rvAsm->ANDI(addr, addr, ~0x3u);
 
-  // Need to load down here for PGXP-off, because it's in a volatile reg that can get overwritten by flush.
-  if (!g_settings.gpu_pgxp_enable)
-    MoveMIPSRegToReg(value, inst->r.rt);
+  MoveMIPSRegToReg(value, inst->r.rt);
 
   if (inst->op == InstructionOp::swl)
   {
@@ -2158,23 +2155,8 @@ void CPU::NewRec::RISCV64Compiler::Compile_swx(CompileFlags cf, MemoryAccessSize
     rvAsm->OR(value, value, RRET);
   }
 
-  if (!g_settings.gpu_pgxp_enable)
-  {
-    GenerateStore(addr, value, MemoryAccessSize::Word, use_fastmem);
-    FreeHostReg(addr.Index());
-  }
-  else
-  {
-    GenerateStore(addr, value, MemoryAccessSize::Word, use_fastmem);
-
-    Flush(FLUSH_FOR_C_CALL);
-    rvAsm->MV(RARG3, value);
-    FreeHostReg(value.Index());
-    rvAsm->MV(RARG2, addr);
-    FreeHostReg(addr.Index());
-    EmitMov(RARG1, inst->bits);
-    EmitCall(reinterpret_cast<const void*>(&PGXP::CPU_SW));
-  }
+  GenerateStore(addr, value, MemoryAccessSize::Word, use_fastmem);
+  FreeHostReg(addr.Index());
 }
 
 void CPU::NewRec::RISCV64Compiler::Compile_swc2(CompileFlags cf, MemoryAccessSize size, bool sign, bool use_fastmem,

@@ -116,5 +116,8 @@ void SetGameSettingsLayer(SettingsInterface* sif, std::unique_lock<std::mutex>& 
 
 /// Sets the input profile settings layer. Called by VMManager when the game changes.
 void SetInputSettingsLayer(SettingsInterface* sif, std::unique_lock<std::mutex>& lock);
+
+/// Sets the netplay settings layer, which overrides every other layer while a session is active.
+void SetNetplaySettingsLayer(SettingsInterface* sif);
 } // namespace Internal
 } // namespace Host

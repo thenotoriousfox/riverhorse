@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2019-2024 Connor McLaughlin <stenzek@gmail.com>
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #include "bus.h"
 #include "bios.h"
@@ -202,7 +202,7 @@ bool Bus::AllocateMemoryMap(bool export_shared_memory, Error* error)
   INFO_LOG("Allocating{} shared memory map.", export_shared_memory ? " EXPORTED" : "");
   if (export_shared_memory)
   {
-    s_shmem_name = MemMap::GetFileMappingName("duckstation");
+    s_shmem_name = MemMap::GetFileMappingName("riverhorse");
     INFO_LOG("Shared memory object name is \"{}\".", s_shmem_name);
   }
   s_shmem_handle = MemMap::CreateSharedMemory(s_shmem_name.c_str(), MemoryMap::TOTAL_SIZE, error);
@@ -648,7 +648,7 @@ void Bus::UpdateFastmemViews(CPUFastmemMode mode)
 
 bool Bus::CanUseFastmemForAddress(VirtualMemoryAddress address)
 {
-  const PhysicalMemoryAddress paddr = address & CPU::PHYSICAL_MEMORY_ADDRESS_MASK;
+  const PhysicalMemoryAddress paddr = CPU::VirtualAddressToPhysical(address);
 
   switch (s_fastmem_mode)
   {
@@ -832,7 +832,7 @@ u8* Bus::GetMemoryRegionPointer(MemoryRegion region)
       return (g_unprotected_ram + ((RAM_2MB_SIZE * 2) & g_ram_mask));
 
     case MemoryRegion::RAMMirror3:
-      return (g_unprotected_ram + ((RAM_8MB_SIZE * 3) & g_ram_mask));
+      return (g_unprotected_ram + ((RAM_2MB_SIZE * 3) & g_ram_mask));
 
     case MemoryRegion::EXP1:
       return nullptr;
@@ -993,6 +993,11 @@ bool Bus::InjectExecutable(std::span<const u8> buffer, bool set_pc, Error* error
   }
 
   return true;
+}
+
+bool Bus::HasKernelInitialized()
+{
+  return s_kernel_initialize_hook_run;
 }
 
 void Bus::KernelInitializedHook()
@@ -1518,7 +1523,15 @@ void Bus::HWHandlers::MemCtrlWrite(PhysicalMemoryAddress address, u32 value)
 
   value = FIXUP_WORD_WRITE_VALUE(size, offset, value);
 
-  const u32 write_mask = (index == 8) ? COMDELAY::WRITE_MASK : MEMDELAY::WRITE_MASK;
+  static constexpr u32 BASE_ADDRESS_WRITE_MASK = 0x00FFFFFFu;
+  static constexpr u32 DELAY_WAIT_BIT = 0x80000000u;
+  u32 write_mask;
+  if (index < 2)
+    write_mask = BASE_ADDRESS_WRITE_MASK;
+  else if (index == 8)
+    write_mask = COMDELAY::WRITE_MASK;
+  else
+    write_mask = (index == 2) ? MEMDELAY::WRITE_MASK : (MEMDELAY::WRITE_MASK & ~DELAY_WAIT_BIT);
   const u32 new_value = (s_MEMCTRL.regs[index] & ~write_mask) | (value & write_mask);
   if (s_MEMCTRL.regs[index] != new_value)
   {
@@ -1577,6 +1590,11 @@ u32 Bus::HWHandlers::PADRead(PhysicalMemoryAddress address)
 
   u32 value = Pad::ReadRegister(FIXUP_HALFWORD_OFFSET(size, offset));
   value = FIXUP_HALFWORD_READ_VALUE(size, offset, value);
+  if constexpr (size == MemoryAccessSize::Word)
+  {
+    if (offset & 8u)
+      value = (value & 0xFFFFu) | (Pad::ReadRegister(offset + 2) << 16);
+  }
   BUS_CYCLES(2);
   return value;
 }
@@ -1594,6 +1612,11 @@ u32 Bus::HWHandlers::SIORead(PhysicalMemoryAddress address)
   const u32 offset = address & SIO_MASK;
   u32 value = SIO::ReadRegister(FIXUP_HALFWORD_OFFSET(size, offset));
   value = FIXUP_HALFWORD_READ_VALUE(size, offset, value);
+  if constexpr (size == MemoryAccessSize::Word)
+  {
+    if (offset & 8u)
+      value = (value & 0xFFFFu) | (SIO::ReadRegister(offset + 2) << 16);
+  }
   BUS_CYCLES(2);
   return value;
 }
@@ -1823,7 +1846,18 @@ template<MemoryAccessSize size>
 void Bus::HWHandlers::DMAWrite(PhysicalMemoryAddress address, u32 value)
 {
   const u32 offset = address & DMA_MASK;
-  DMA::WriteRegister(FIXUP_WORD_OFFSET(size, offset), FIXUP_WORD_WRITE_VALUE(size, offset, value));
+  value = FIXUP_WORD_WRITE_VALUE(size, offset, value);
+
+  if constexpr (size != MemoryAccessSize::Word)
+  {
+    if ((offset & 0x0Cu) == 0x04u && offset < 0x70u)
+    {
+      const u32 written_bytes = ((size == MemoryAccessSize::Byte) ? 0xFFu : 0xFFFFu) << ((offset & 3u) * 8u);
+      value = (DMA::ReadRegister(FIXUP_WORD_OFFSET(size, offset)) & ~written_bytes) | (value & written_bytes);
+    }
+  }
+
+  DMA::WriteRegister(FIXUP_WORD_OFFSET(size, offset), value);
 }
 
 #undef BUS_CYCLES

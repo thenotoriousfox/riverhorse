@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2019-2024 Connor McLaughlin <stenzek@gmail.com>
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #pragma once
 #include "core/types.h"
@@ -49,9 +49,12 @@ enum class Trait : u32
   DisablePGXPOn2DPolygons,
   ForcePGXPVertexCache,
   ForcePGXPCPUMode,
+  NormalizePGXPDepth,
   ForceRecompilerMemoryExceptions,
   ForceRecompilerICache,
   ForceRecompilerLUTFastmem,
+  ForceCDROMSubQSkew,
+  DisableCDROMSpeedupOnMDEC,
   IsLibCryptProtected,
 
   Count
@@ -85,7 +88,6 @@ struct Entry
   std::optional<GPULineDetectMode> gpu_line_detect_mode;
   std::optional<u32> dma_max_slice_ticks;
   std::optional<u32> dma_halt_ticks;
-  std::optional<u32> gpu_fifo_size;
   std::optional<u32> gpu_max_run_ahead;
   std::optional<float> gpu_pgxp_tolerance;
   std::optional<float> gpu_pgxp_depth_threshold;

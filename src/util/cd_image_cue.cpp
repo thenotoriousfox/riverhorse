@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2019-2023 Connor McLaughlin <stenzek@gmail.com>
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #include "cd_image.h"
 #include "cd_subchannel_replacement.h"
@@ -15,6 +15,7 @@
 
 #include <algorithm>
 #include <cinttypes>
+#include <cstring>
 #include <map>
 
 Log_SetChannel(CDImageCueSheet);
@@ -31,6 +32,7 @@ public:
 
   bool ReadSubChannelQ(SubChannelQ* subq, const Index& index, LBA lba_in_index) override;
   bool HasNonStandardSubchannel() const override;
+  bool LoadSubchannelReplacementFile(std::string_view path) override;
   s64 GetSizeOnDisk() const override;
 
 protected:
@@ -42,7 +44,11 @@ private:
     std::string filename;
     std::FILE* file;
     u64 file_position;
+    u64 data_offset;
+    u64 data_size;
   };
+
+  static bool FindWaveAudioData(std::FILE* fp, u64* data_offset, u64* data_size, Error* error);
 
   std::vector<TrackFile> m_files;
   CDSubChannelReplacement m_sbi;
@@ -124,7 +130,16 @@ bool CDImageCueSheet::OpenAndParse(const char* filename, Error* error)
         return false;
       }
 
-      m_files.push_back(TrackFile{track_filename, track_fp, 0});
+      u64 data_offset = 0;
+      u64 data_size = static_cast<u64>(std::max<s64>(FileSystem::FSize64(track_fp), 0));
+      if (track->file_is_wave && !FindWaveAudioData(track_fp, &data_offset, &data_size, error))
+      {
+        Error::AddPrefixFmt(error, "Track file '{}': ", Path::GetFileName(track_filename));
+        std::fclose(track_fp);
+        return false;
+      }
+
+      m_files.push_back(TrackFile{track_filename, track_fp, UINT64_MAX, data_offset, data_size});
     }
 
     // data type determines the sector size
@@ -142,11 +157,7 @@ bool CDImageCueSheet::OpenAndParse(const char* filename, Error* error)
     LBA track_length;
     if (!track->length.has_value())
     {
-      FileSystem::FSeek64(m_files[track_file_index].file, 0, SEEK_END);
-      u64 file_size = static_cast<u64>(FileSystem::FTell64(m_files[track_file_index].file));
-      FileSystem::FSeek64(m_files[track_file_index].file, 0, SEEK_SET);
-
-      file_size /= track_sector_size;
+      const u64 file_size = m_files[track_file_index].data_size / track_sector_size;
       if (track_start >= file_size)
       {
         ERROR_LOG("Failed to open track {} in '{}': track start is out of range ({} vs {})", track_num, filename,
@@ -306,9 +317,80 @@ bool CDImageCueSheet::ReadSubChannelQ(SubChannelQ* subq, const Index& index, LBA
   return CDImage::ReadSubChannelQ(subq, index, lba_in_index);
 }
 
+bool CDImageCueSheet::LoadSubchannelReplacementFile(std::string_view path)
+{
+  return m_sbi.LoadFromFile(path);
+}
+
 bool CDImageCueSheet::HasNonStandardSubchannel() const
 {
   return (m_sbi.GetReplacementSectorCount() > 0);
+}
+
+bool CDImageCueSheet::FindWaveAudioData(std::FILE* fp, u64* data_offset, u64* data_size, Error* error)
+{
+  u8 riff_header[12];
+  if (FileSystem::FSeek64(fp, 0, SEEK_SET) != 0 || std::fread(riff_header, sizeof(riff_header), 1, fp) != 1 ||
+      std::memcmp(riff_header, "RIFF", 4) != 0 || std::memcmp(riff_header + 8, "WAVE", 4) != 0)
+  {
+    Error::SetStringView(error, "Not a RIFF WAVE file.");
+    return false;
+  }
+
+  bool format_ok = false;
+  u64 position = sizeof(riff_header);
+  for (;;)
+  {
+    u8 chunk_header[8];
+    if (FileSystem::FSeek64(fp, static_cast<s64>(position), SEEK_SET) != 0 ||
+        std::fread(chunk_header, sizeof(chunk_header), 1, fp) != 1)
+    {
+      Error::SetStringView(error, "WAVE file has no data chunk.");
+      return false;
+    }
+
+    u32 chunk_size;
+    std::memcpy(&chunk_size, chunk_header + 4, sizeof(chunk_size));
+    position += sizeof(chunk_header);
+
+    if (std::memcmp(chunk_header, "fmt ", 4) == 0)
+    {
+      u8 fmt[16];
+      u16 format_tag, channels, bits_per_sample;
+      u32 sample_rate;
+      if (chunk_size < sizeof(fmt) || std::fread(fmt, sizeof(fmt), 1, fp) != 1)
+      {
+        Error::SetStringView(error, "WAVE format chunk is truncated.");
+        return false;
+      }
+      std::memcpy(&format_tag, fmt + 0, sizeof(format_tag));
+      std::memcpy(&channels, fmt + 2, sizeof(channels));
+      std::memcpy(&sample_rate, fmt + 4, sizeof(sample_rate));
+      std::memcpy(&bits_per_sample, fmt + 14, sizeof(bits_per_sample));
+      if (format_tag != 1 || channels != 2 || sample_rate != 44100 || bits_per_sample != 16)
+      {
+        Error::SetStringFmt(error, "WAVE audio must be 16-bit stereo PCM at 44100 Hz (got format {}, {} channels, "
+                                   "{} Hz, {} bits).",
+                            format_tag, channels, sample_rate, bits_per_sample);
+        return false;
+      }
+      format_ok = true;
+    }
+    else if (std::memcmp(chunk_header, "data", 4) == 0)
+    {
+      if (!format_ok)
+      {
+        Error::SetStringView(error, "WAVE data chunk comes before its format chunk.");
+        return false;
+      }
+
+      *data_offset = position;
+      *data_size = chunk_size;
+      return true;
+    }
+
+    position += chunk_size + (chunk_size & 1u);
+  }
 }
 
 bool CDImageCueSheet::ReadSectorFromIndex(void* buffer, const Index& index, LBA lba_in_index)
@@ -316,10 +398,11 @@ bool CDImageCueSheet::ReadSectorFromIndex(void* buffer, const Index& index, LBA 
   DebugAssert(index.file_index < m_files.size());
 
   TrackFile& tf = m_files[index.file_index];
-  const u64 file_position = index.file_offset + (static_cast<u64>(lba_in_index) * index.file_sector_size);
+  const u64 file_position =
+    tf.data_offset + index.file_offset + (static_cast<u64>(lba_in_index) * index.file_sector_size);
   if (tf.file_position != file_position)
   {
-    if (std::fseek(tf.file, static_cast<long>(file_position), SEEK_SET) != 0)
+    if (FileSystem::FSeek64(tf.file, static_cast<s64>(file_position), SEEK_SET) != 0)
       return false;
 
     tf.file_position = file_position;
@@ -327,7 +410,7 @@ bool CDImageCueSheet::ReadSectorFromIndex(void* buffer, const Index& index, LBA 
 
   if (std::fread(buffer, index.file_sector_size, 1, tf.file) != 1)
   {
-    std::fseek(tf.file, static_cast<long>(tf.file_position), SEEK_SET);
+    tf.file_position = UINT64_MAX;
     return false;
   }
 

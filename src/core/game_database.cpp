@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2019-2024 Connor McLaughlin <stenzek@gmail.com>
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #include "game_database.h"
 #include "controller.h"
@@ -36,7 +36,7 @@ namespace GameDatabase {
 enum : u32
 {
   GAME_DATABASE_CACHE_SIGNATURE = 0x45434C48,
-  GAME_DATABASE_CACHE_VERSION = 13,
+  GAME_DATABASE_CACHE_VERSION = 14,
 };
 
 static Entry* GetMutableEntry(std::string_view serial);
@@ -83,9 +83,12 @@ static constexpr const std::array<const char*, static_cast<u32>(GameDatabase::Tr
   "DisablePGXPOn2DPolygons",
   "ForcePGXPVertexCache",
   "ForcePGXPCPUMode",
+  "NormalizePGXPDepth",
   "ForceRecompilerMemoryExceptions",
   "ForceRecompilerICache",
   "ForceRecompilerLUTFastmem",
+  "ForceCDROMSubQSkew",
+  "DisableCDROMSpeedupOnMDEC",
   "IsLibCryptProtected",
 }};
 
@@ -111,9 +114,12 @@ static constexpr const std::array<const char*, static_cast<u32>(GameDatabase::Tr
   TRANSLATE_NOOP("GameDatabase", "Disable PGXP on 2D Polygons"),
   TRANSLATE_NOOP("GameDatabase", "Force PGXP Vertex Cache"),
   TRANSLATE_NOOP("GameDatabase", "Force PGXP CPU Mode"),
+  TRANSLATE_NOOP("GameDatabase", "Normalize PGXP Depth"),
   TRANSLATE_NOOP("GameDatabase", "Force Recompiler Memory Exceptions"),
   TRANSLATE_NOOP("GameDatabase", "Force Recompiler ICache"),
   TRANSLATE_NOOP("GameDatabase", "Force Recompiler LUT Fastmem"),
+  TRANSLATE_NOOP("GameDatabase", "Force CD-ROM SubQ Skew"),
+  TRANSLATE_NOOP("GameDatabase", "Disable CD-ROM Speedup on MDEC"),
   TRANSLATE_NOOP("GameDatabase", "Is LibCrypt Protected"),
 }};
 
@@ -416,12 +422,6 @@ void GameDatabase::Entry::ApplySettings(Settings& settings, bool display_osd_mes
     if (display_osd_messages)
       INFO_LOG("GameDB: DMA halt ticks set to {}.", settings.dma_halt_ticks);
   }
-  if (gpu_fifo_size.has_value())
-  {
-    settings.gpu_fifo_size = gpu_fifo_size.value();
-    if (display_osd_messages)
-      INFO_LOG("GameDB: GPU FIFO size set to {}.", settings.gpu_fifo_size);
-  }
   if (gpu_max_run_ahead.has_value())
   {
     settings.gpu_max_run_ahead = gpu_max_run_ahead.value();
@@ -677,6 +677,9 @@ void GameDatabase::Entry::ApplySettings(Settings& settings, bool display_osd_mes
     settings.gpu_pgxp_depth_buffer = false;
   }
 
+  if (HasTrait(Trait::NormalizePGXPDepth))
+    settings.gpu_pgxp_normalize_depth = true;
+
   if (HasTrait(Trait::DisablePGXPOn2DPolygons))
   {
     if (display_osd_messages && settings.gpu_pgxp_enable && !settings.gpu_pgxp_disable_2d)
@@ -695,6 +698,18 @@ void GameDatabase::Entry::ApplySettings(Settings& settings, bool display_osd_mes
   {
     WARNING_LOG("ICache for recompiler forced by compatibility settings.");
     settings.cpu_recompiler_icache = true;
+  }
+
+  if (HasTrait(Trait::DisableCDROMSpeedupOnMDEC))
+  {
+    WARNING_LOG("CD-ROM speedup during MDEC decoding disabled by compatibility settings.");
+    settings.cdrom_disable_speedup_on_mdec = true;
+  }
+
+  if (HasTrait(Trait::ForceCDROMSubQSkew))
+  {
+    WARNING_LOG("CD-ROM SubQ skew forced by compatibility settings.");
+    settings.cdrom_subq_skew = true;
   }
 
   if (settings.cpu_fastmem_mode == CPUFastmemMode::MMap && HasTrait(Trait::ForceRecompilerLUTFastmem))
@@ -868,7 +883,6 @@ std::string GameDatabase::Entry::GenerateCompatibilityReport() const
                     &Settings::GetDisplayDeinterlacingModeDisplayName, display_deinterlacing_mode);
   AppendIntegerSetting(ret, settings_heading, TRANSLATE_SV("GameDatabase", "DMA Max Slice Ticks"), dma_max_slice_ticks);
   AppendIntegerSetting(ret, settings_heading, TRANSLATE_SV("GameDatabase", "DMA Halt Ticks"), dma_halt_ticks);
-  AppendIntegerSetting(ret, settings_heading, TRANSLATE_SV("GameDatabase", "GPU FIFO Size"), gpu_fifo_size);
   AppendIntegerSetting(ret, settings_heading, TRANSLATE_SV("GameDatabase", "GPU Max Runahead"), gpu_max_run_ahead);
   AppendFloatSetting(ret, settings_heading, TRANSLATE_SV("GameDatabase", "GPU PGXP Tolerance"), gpu_pgxp_tolerance);
   AppendFloatSetting(ret, settings_heading, TRANSLATE_SV("GameDatabase", "GPU PGXP Depth Threshold"),
@@ -943,8 +957,7 @@ bool GameDatabase::LoadFromCache()
         !reader.ReadOptionalT(&entry.display_line_start_offset) ||
         !reader.ReadOptionalT(&entry.display_line_end_offset) || !reader.ReadOptionalT(&entry.display_crop_mode) ||
         !reader.ReadOptionalT(&entry.display_deinterlacing_mode) || !reader.ReadOptionalT(&entry.dma_max_slice_ticks) ||
-        !reader.ReadOptionalT(&entry.dma_halt_ticks) || !reader.ReadOptionalT(&entry.gpu_fifo_size) ||
-        !reader.ReadOptionalT(&entry.gpu_max_run_ahead) || !reader.ReadOptionalT(&entry.gpu_pgxp_tolerance) ||
+        !reader.ReadOptionalT(&entry.dma_halt_ticks) || !reader.ReadOptionalT(&entry.gpu_max_run_ahead) || !reader.ReadOptionalT(&entry.gpu_pgxp_tolerance) ||
         !reader.ReadOptionalT(&entry.gpu_pgxp_depth_threshold) || !reader.ReadOptionalT(&entry.gpu_line_detect_mode) ||
         !reader.ReadSizePrefixedString(&entry.disc_set_name) || !reader.ReadU32(&num_disc_set_serials))
     {
@@ -1046,7 +1059,6 @@ bool GameDatabase::SaveToCache()
     writer.WriteOptionalT(entry.display_deinterlacing_mode);
     writer.WriteOptionalT(entry.dma_max_slice_ticks);
     writer.WriteOptionalT(entry.dma_halt_ticks);
-    writer.WriteOptionalT(entry.gpu_fifo_size);
     writer.WriteOptionalT(entry.gpu_max_run_ahead);
     writer.WriteOptionalT(entry.gpu_pgxp_tolerance);
     writer.WriteOptionalT(entry.gpu_pgxp_depth_threshold);
@@ -1261,7 +1273,6 @@ bool GameDatabase::ParseYamlEntry(Entry* entry, const ryml::ConstNodeRef& value)
       settings, "displayDeinterlacingMode", &Settings::ParseDisplayDeinterlacingMode);
     entry->dma_max_slice_ticks = GetOptionalTFromObject<u32>(settings, "dmaMaxSliceTicks");
     entry->dma_halt_ticks = GetOptionalTFromObject<u32>(settings, "dmaHaltTicks");
-    entry->gpu_fifo_size = GetOptionalTFromObject<u32>(settings, "gpuFIFOSize");
     entry->gpu_max_run_ahead = GetOptionalTFromObject<u32>(settings, "gpuMaxRunAhead");
     entry->gpu_pgxp_tolerance = GetOptionalTFromObject<float>(settings, "gpuPGXPTolerance");
     entry->gpu_pgxp_depth_threshold = GetOptionalTFromObject<float>(settings, "gpuPGXPDepthThreshold");

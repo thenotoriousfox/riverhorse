@@ -42,7 +42,7 @@ function retry_command {
 }
 
 if [ "$#" -ne 4 ]; then
-    echo "Syntax: $0 <path to duckstation directory> <path to build directory> <deps prefix> <output name>"
+    echo "Syntax: $0 <path to riverhorse directory> <path to build directory> <deps prefix> <output name>"
     exit 1
 fi
 
@@ -51,8 +51,8 @@ BUILDDIR=$2
 DEPSDIR=$3
 NAME=$4
 
-BINARY=duckstation-qt
-APPDIRNAME=DuckStation.AppDir
+BINARY=riverhorse
+APPDIRNAME=Riverhorse.AppDir
 STRIP=strip
 
 declare -a MANUAL_LIBS=(
@@ -79,29 +79,30 @@ declare -a REMOVE_LIBS=(
 
 set -e
 
-LINUXDEPLOY=./linuxdeploy-x86_64
-LINUXDEPLOY_PLUGIN_QT=./linuxdeploy-plugin-qt-x86_64
-APPIMAGETOOL=./appimagetool-x86_64
-APPIMAGERUNTIME=./runtime-x86_64
+ARCH=$(uname -m)
+LINUXDEPLOY=./linuxdeploy-$ARCH
+LINUXDEPLOY_PLUGIN_QT=./linuxdeploy-plugin-qt-$ARCH
+APPIMAGETOOL=./appimagetool-$ARCH
+APPIMAGERUNTIME=./runtime-$ARCH
 PATCHELF=patchelf
 
 if [ ! -f "$LINUXDEPLOY" ]; then
-	retry_command wget -O "$LINUXDEPLOY" https://github.com/stenzek/duckstation-ext-qt-minimal/releases/download/linux/linuxdeploy-x86_64.AppImage
+	retry_command wget -O "$LINUXDEPLOY" https://github.com/stenzek/duckstation-ext-qt-minimal/releases/download/linux/linuxdeploy-$ARCH.AppImage
 	chmod +x "$LINUXDEPLOY"
 fi
 
 if [ ! -f "$LINUXDEPLOY_PLUGIN_QT" ]; then
-	retry_command wget -O "$LINUXDEPLOY_PLUGIN_QT" https://github.com/stenzek/duckstation-ext-qt-minimal/releases/download/linux/linuxdeploy-plugin-qt-x86_64.AppImage
+	retry_command wget -O "$LINUXDEPLOY_PLUGIN_QT" https://github.com/stenzek/duckstation-ext-qt-minimal/releases/download/linux/linuxdeploy-plugin-qt-$ARCH.AppImage
 	chmod +x "$LINUXDEPLOY_PLUGIN_QT"
 fi
 
 if [ ! -f "$APPIMAGETOOL" ]; then
-	retry_command wget -O "$APPIMAGETOOL" https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
+	retry_command wget -O "$APPIMAGETOOL" https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-$ARCH.AppImage
 	chmod +x "$APPIMAGETOOL"
 fi
 
 if [ ! -f "$APPIMAGERUNTIME" ]; then
-	retry_command wget -O "$APPIMAGERUNTIME" https://github.com/stenzek/type2-runtime/releases/download/continuous/runtime-x86_64
+	retry_command wget -O "$APPIMAGERUNTIME" https://github.com/stenzek/type2-runtime/releases/download/continuous/runtime-$ARCH
 fi
 
 OUTDIR=$(realpath "./$APPDIRNAME")
@@ -142,9 +143,9 @@ EXTRA_PLATFORM_PLUGINS="libqwayland-egl.so;libqwayland-generic.so" \
 DEPLOY_PLATFORM_THEMES="1" \
 QMAKE="$DEPSDIR/bin/qmake" \
 NO_STRIP="1" \
-$LINUXDEPLOY --plugin qt --appdir="$OUTDIR" --executable="$BUILDDIR/bin/duckstation-qt" ${EXTRA_LIBS_ARGS[@]} \
---desktop-file="$ROOTDIR/scripts/org.duckstation.DuckStation.desktop" \
---icon-file="$ROOTDIR/scripts/org.duckstation.DuckStation.png" \
+$LINUXDEPLOY --plugin qt --appdir="$OUTDIR" --executable="$BUILDDIR/bin/riverhorse" ${EXTRA_LIBS_ARGS[@]} \
+--desktop-file="$ROOTDIR/scripts/io.github.thenotoriousfox.Riverhorse.desktop" \
+--icon-file="$ROOTDIR/scripts/io.github.thenotoriousfox.Riverhorse.png" \
 
 echo "Copying resources into AppDir..."
 cp -a "$BUILDDIR/bin/resources" "$OUTDIR/usr/bin"

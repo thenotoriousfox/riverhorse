@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2019-2024 Connor McLaughlin <stenzek@gmail.com>
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #pragma once
 #include "gpu_types.h"
@@ -15,6 +15,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cstring>
 #include <deque>
 #include <memory>
 #include <string>
@@ -26,6 +27,7 @@ class SmallStringBase;
 class StateWrapper;
 
 class GPUDevice;
+class GPUBackend;
 class GPUTexture;
 class GPUPipeline;
 class MediaCapture;
@@ -58,6 +60,9 @@ public:
   enum : u32
   {
     MAX_FIFO_SIZE = 4096,
+    FIFO_SIZE = 16,
+    FIFO_MODE_FULL_WORDS = 11,
+    MAX_POLYLINE_VERTICES = 1024,
     DOT_TIMER_INDEX = 0,
     HBLANK_TIMER_INDEX = 1,
     MAX_RESOLUTION_SCALE = 32,
@@ -67,11 +72,14 @@ public:
 
   enum : u16
   {
-    NTSC_TICKS_PER_LINE = 3413,
+    NTSC_HALF_TICKS_PER_LINE = 6825,
     NTSC_TOTAL_LINES = 263,
-    PAL_TICKS_PER_LINE = 3406,
+    PAL_HALF_TICKS_PER_LINE = 6810,
     PAL_TOTAL_LINES = 314,
   };
+
+  static constexpr u64 CRTC_SUBTICKS_PER_TICK = 451584;
+  static constexpr u32 LINE_COUNTER_WRAP = 1024;
 
   enum : u16
   {
@@ -122,7 +130,8 @@ public:
   }
   ALWAYS_INLINE void DMAWrite(u32 address, u32 value)
   {
-    m_fifo.Push((ZeroExtend64(address) << 32) | ZeroExtend64(value));
+    if (!m_fifo.IsFull())
+      m_fifo.Push((ZeroExtend64(address) << 32) | ZeroExtend64(value));
   }
   void EndDMAWrite();
 
@@ -147,8 +156,7 @@ public:
   /// Returns true if we're in PAL mode, otherwise false if NTSC.
   ALWAYS_INLINE bool IsInPALMode() const { return m_GPUSTAT.pal_mode; }
 
-  /// Returns the number of pending GPU ticks.
-  TickCount GetPendingCRTCTicks() const;
+  u64 GetPendingCRTCSubTicks() const;
   TickCount GetPendingCommandTicks() const;
 
   /// Returns true if enough ticks have passed for the raster to be on the next line.
@@ -159,6 +167,9 @@ public:
 
   /// Synchronizes the CRTC, updating the hblank timer.
   void SynchronizeCRTC();
+
+  /// Reschedules the CRTC event after a timer it clocks was changed. Synchronize the CRTC before the change.
+  void RescheduleCRTC();
 
   /// Recompile shaders/recreate framebuffers when needed.
   virtual void UpdateSettings(const Settings& old_settings);
@@ -218,6 +229,12 @@ public:
   /// Helper function to save current display texture to PNG.
   bool WriteDisplayTextureToFile(std::string filename, bool compress_on_thread = false);
 
+  bool ReadDisplayTexture(std::vector<u32>* pixels, u32* stride, u32* width, u32* height, GPUTexture::Format* format);
+
+  ALWAYS_INLINE u32 GetDisplayTextureViewWidth() const { return static_cast<u32>(m_display_texture_view_width); }
+  ALWAYS_INLINE u32 GetDisplayTextureViewHeight() const { return static_cast<u32>(m_display_texture_view_height); }
+  bool RenderDisplayAtInternalResolution(GPUTexture* target, bool postfx);
+
   /// Renders the display, optionally with postprocessing to the specified image.
   bool RenderScreenshotToBuffer(u32 width, u32 height, const GSVector4i display_rect, const GSVector4i draw_rect,
                                 bool postfx, std::vector<u32>* out_pixels, u32* out_stride,
@@ -236,16 +253,17 @@ public:
   /// Reads the CLUT from the specified coordinates, accounting for wrap-around.
   static void ReadCLUT(u16* dest, GPUTexturePaletteReg reg, bool clut_is_8bit);
 
-protected:
-  TickCount CRTCTicksToSystemTicks(TickCount crtc_ticks, TickCount fractional_ticks) const;
-  TickCount SystemTicksToCRTCTicks(TickCount sysclk_ticks, TickCount* fractional_ticks) const;
+  bool IsDeviceOnBackendThread() const;
 
-  // The GPU internally appears to run at 2x the system clock.
-  ALWAYS_INLINE static constexpr TickCount GPUTicksToSystemTicks(TickCount gpu_ticks)
-  {
-    return std::max<TickCount>((gpu_ticks + 1) >> 1, 1);
-  }
-  ALWAYS_INLINE static constexpr TickCount SystemTicksToGPUTicks(TickCount sysclk_ticks) { return sysclk_ticks << 1; }
+protected:
+  u64 GetCRTCSubTicksPerSystemTick() const;
+  TickCount CRTCSubTicksToSystemTicks(u64 subticks) const;
+  TickCount SystemTicksToCRTCTicks(TickCount sysclk_ticks, TickCount* fractional_ticks) const;
+  u64 GetCRTCLineSubTicks() const;
+  u64 GetCRTCPositionInLineSubTicks() const;
+  u64 GetDotsPerLine() const;
+  u32 GetCRTCWrapLine() const;
+  u64 GetCRTCBeamSubTicks() const;
 
   static constexpr std::tuple<u8, u8> UnpackTexcoord(u16 texcoord)
   {
@@ -277,6 +295,8 @@ protected:
 
   // Ticks for hblank/vblank.
   void CRTCTickEvent(TickCount ticks);
+  void SetCRTCVBlank(bool vblank);
+  void ResetCRTCTiming(bool was_in_hblank);
   void CommandTickEvent(TickCount ticks);
 
   /// Returns 0 if the currently-displayed field is on odd lines (1,3,5,...) or 1 if even (2,4,6,...).
@@ -298,16 +318,19 @@ protected:
   void SetTextureWindow(u32 value);
 
   u32 ReadGPUREAD();
-  void FinishVRAMWrite();
+  void FinishVRAMWrite(bool write_partial_row = true);
+  void DrawBufferedPolyLineSegment();
+  bool IsLoadedStateValid() const;
 
   /// Returns the number of vertices in the buffered poly-line.
   ALWAYS_INLINE u32 GetPolyLineVertexCount() const
   {
-    return (static_cast<u32>(m_blit_buffer.size()) + BoolToUInt32(m_render_command.shading_enable)) >>
+    return (static_cast<u32>(m_polyline_buffer.size()) + BoolToUInt32(m_render_command.shading_enable)) >>
            BoolToUInt8(m_render_command.shading_enable);
   }
 
   void AddCommandTicks(TickCount ticks);
+  void HoldDMARequestThroughCurrentTicks();
 
   void WriteGP1(u32 value);
   void EndCommand();
@@ -320,11 +343,24 @@ protected:
 
   // Rendering in the backend
   virtual void ReadVRAM(u32 x, u32 y, u32 width, u32 height);
-  virtual void FillVRAM(u32 x, u32 y, u32 width, u32 height, u32 color);
-  virtual void UpdateVRAM(u32 x, u32 y, u32 width, u32 height, const void* data, bool set_mask, bool check_mask);
-  virtual void CopyVRAM(u32 src_x, u32 src_y, u32 dst_x, u32 dst_y, u32 width, u32 height);
-  virtual void DispatchRenderCommand() = 0;
-  virtual void UpdateCLUT(GPUTexturePaletteReg reg, bool clut_is_8bit) = 0;
+  void FillVRAM(u32 x, u32 y, u32 width, u32 height, u32 color);
+  void UpdateVRAM(u32 x, u32 y, u32 width, u32 height, const void* data, bool set_mask, bool check_mask);
+  void CopyVRAM(u32 src_x, u32 src_y, u32 dst_x, u32 dst_y, u32 width, u32 height);
+  void DispatchRenderCommand();
+  void UpdateCLUT(GPUTexturePaletteReg reg, bool clut_is_8bit);
+
+  void FillBackendCommandParameters(GPUBackendCommand* cmd) const;
+  void FillDrawCommand(GPUBackendDrawCommand* cmd, GPURenderCommand rc);
+  void DispatchPolygon(GPURenderCommand rc);
+  void DispatchRectangle(GPURenderCommand rc);
+  void DispatchLine(GPURenderCommand rc);
+  void DispatchPolyLine(GPURenderCommand rc);
+  bool AddPolygonTicks(const GSVector2i* positions, GPURenderCommand rc);
+  bool AddLineSegmentTicks(GSVector2i start, GSVector2i end, GPURenderCommand rc, bool* out_visible);
+  void GetPreciseVertexPosition(u64 maddr_and_pos, s32 native_x, s32 native_y, float* x, float* y, float* w,
+                                bool* valid_w) const;
+  void SetPreciseLineVertex(GPUBackendDrawPreciseLineCommand::Vertex* vert, u64 maddr_and_pos, GSVector2i pos,
+                            u32 color) const;
   virtual void UpdateDisplay() = 0;
   virtual void DrawRendererStats();
   virtual void OnBufferSwapped();
@@ -344,48 +380,55 @@ protected:
 
     TickCount pixels =
       std::abs((v1.x * v2.y + v2.x * v3.y + v3.x * v1.y - v1.x * v3.y - v2.x * v1.y - v3.x * v2.y) / 2);
-    if (textured)
-      pixels += pixels;
-    if (semitransparent || m_GPUSTAT.check_mask_before_draw)
-      pixels += (pixels + 1) / 2;
+    TickCount rows = std::max({v1.y, v2.y, v3.y}) - std::min({v1.y, v2.y, v3.y});
     if (m_GPUSTAT.SkipDrawingToActiveField())
+    {
       pixels /= 2;
+      rows /= 2;
+    }
 
-    AddCommandTicks(pixels);
+    const bool semi = (semitransparent || m_GPUSTAT.check_mask_before_draw);
+    const bool flat = !shaded && !textured;
+    const TickCount pixel_quarter_ticks = flat ? (semi ? 3 : 2) : 4;
+    const TickCount row_ticks = 2 + (semi ? (flat ? 3 : 1) : 0);
+    AddCommandTicks((pixels * pixel_quarter_ticks + 3) / 4 + rows * row_ticks);
   }
   ALWAYS_INLINE_RELEASE void AddDrawRectangleTicks(const GSVector4i clamped_rect, bool textured, bool semitransparent)
   {
     u32 drawn_width = clamped_rect.width();
     u32 drawn_height = clamped_rect.height();
 
-    u32 ticks_per_row = drawn_width;
+    const bool semi = (semitransparent || m_GPUSTAT.check_mask_before_draw);
+    const u32 pixels_per_row = semi ? drawn_width : (drawn_width & ~1u);
+    u32 eighth_ticks_per_row = (semi ? 64 : 16) + pixels_per_row * (semi ? 6 : 4);
     if (textured)
     {
       switch (m_draw_mode.mode_reg.texture_mode)
       {
         case GPUTextureMode::Palette4Bit:
-          ticks_per_row += drawn_width;
+          eighth_ticks_per_row += drawn_width * 6;
           break;
 
         case GPUTextureMode::Palette8Bit:
         {
-          // Texture cache reload every 2 pixels, reads in 8 bytes (assuming 4x2). Cache only reloads if the
-          // draw width is greater than 32, otherwise the cache hits between rows.
-          if (drawn_width >= 32)
-            ticks_per_row += (drawn_width / 4) * 8;
+          if (drawn_width > 128)
+            eighth_ticks_per_row += drawn_width * 11;
+          else if ((drawn_width * drawn_height) > 2048)
+            eighth_ticks_per_row += ((drawn_width / 4) * (4 * (128 / drawn_width))) * 11 / 2;
           else
-            ticks_per_row += drawn_width;
+            eighth_ticks_per_row += drawn_width * 11 / 2;
         }
         break;
 
         case GPUTextureMode::Direct16Bit:
         case GPUTextureMode::Reserved_Direct16Bit:
         {
-          // Same as above, except with 2x2 blocks instead of 4x2.
-          if (drawn_width >= 32)
-            ticks_per_row += (drawn_width / 2) * 8;
+          if (drawn_width > 128)
+            eighth_ticks_per_row += drawn_width * 20;
+          else if ((drawn_width * drawn_height) > 1024)
+            eighth_ticks_per_row += ((drawn_width / 4) * (8 * (128 / drawn_width))) * 5;
           else
-            ticks_per_row += drawn_width;
+            eighth_ticks_per_row += drawn_width * 5;
         }
         break;
 
@@ -393,22 +436,30 @@ protected:
       }
     }
 
-    if (semitransparent || m_GPUSTAT.check_mask_before_draw)
-      ticks_per_row += (drawn_width + 1u) / 2u;
+    if (drawn_width > 0 && drawn_width < 8)
+      eighth_ticks_per_row = std::max(eighth_ticks_per_row, 36u);
     if (m_GPUSTAT.SkipDrawingToActiveField())
       drawn_height = std::max<u32>(drawn_height / 2, 1u);
 
-    AddCommandTicks(ticks_per_row * drawn_height);
+    AddCommandTicks((eighth_ticks_per_row * drawn_height + 7) / 8);
   }
-  ALWAYS_INLINE_RELEASE void AddDrawLineTicks(const GSVector4i clamped_rect, bool shaded)
+  ALWAYS_INLINE_RELEASE void AddDrawLineTicks(const GSVector4i clamped_rect, bool shaded, bool semitransparent)
   {
-    u32 drawn_width = clamped_rect.width();
+    AddCommandTicks(shaded ? 124 : 60);
+    if (clamped_rect.rempty())
+      return;
+
     u32 drawn_height = clamped_rect.height();
-
+    u32 major = std::max<u32>(clamped_rect.width(), drawn_height);
     if (m_GPUSTAT.SkipDrawingToActiveField())
-      drawn_height = std::max<u32>(drawn_height / 2, 1u);
+    {
+      const u32 field_height = std::max<u32>(drawn_height / 2, 1u);
+      major = major * field_height / drawn_height;
+      drawn_height = field_height;
+    }
 
-    AddCommandTicks(std::max(drawn_width, drawn_height));
+    const bool semi = (semitransparent || m_GPUSTAT.check_mask_before_draw);
+    AddCommandTicks((major * 4 + drawn_height * (semi ? 26 : 16) + 3) / 4);
   }
 
   TimingEvent m_crtc_tick_event;
@@ -427,7 +478,7 @@ protected:
     BitField<u32, bool, 12, 1> check_mask_before_draw;
     BitField<u32, u8, 13, 1> interlaced_field;
     BitField<u32, bool, 14, 1> reverse_flag;
-    BitField<u32, bool, 15, 1> texture_disable;
+    BitField<u32, bool, 15, 1> texture_page_y_base_2;
     BitField<u32, u8, 16, 1> horizontal_resolution_2;
     BitField<u32, u8, 17, 2> horizontal_resolution_1;
     BitField<u32, bool, 19, 1> vertical_resolution;
@@ -485,8 +536,6 @@ protected:
 
     // decoded values
     GPUTextureWindow texture_window;
-    bool texture_x_flip;
-    bool texture_y_flip;
     bool texture_page_changed;
     bool texture_window_changed;
 
@@ -499,12 +548,14 @@ protected:
     ALWAYS_INLINE void ClearTextureWindowChangedFlag() { texture_window_changed = false; }
   } m_draw_mode = {};
 
+  std::unique_ptr<GPUBackend> m_backend;
+
   GPUDrawingArea m_drawing_area = {};
   GPUDrawingOffset m_drawing_offset = {};
   GSVector4i m_clamped_drawing_area = {};
 
   bool m_console_is_pal = false;
-  bool m_set_texture_disable_mask = false;
+  bool m_enable_upper_vram = false;
   bool m_drawing_area_changed = false;
   bool m_force_progressive_scan = false;
   bool m_force_ntsc_timings = false;
@@ -570,18 +621,19 @@ protected:
 
     u16 horizontal_total;
     u16 vertical_total;
+    TickCount horizontal_total_fraction;
 
     TickCount fractional_ticks;
     TickCount current_tick_in_scanline;
     u32 current_scanline;
 
-    TickCount fractional_dot_ticks; // only used when timer0 is enabled
 
     bool in_hblank;
     bool in_vblank;
 
     u8 interlaced_field; // 0 = odd, 1 = even
     u8 interlaced_display_field;
+    bool frame_end_missed;
     u8 active_line_lsb;
 
     ALWAYS_INLINE void UpdateHBlankFlag()
@@ -591,9 +643,42 @@ protected:
     }
   } m_crtc_state = {};
 
+public:
+  struct DisplayState
+  {
+    CRTCState crtc_state;
+    GPUSTAT gpustat;
+    bool force_progressive_scan;
+
+    DisplayState& operator=(const DisplayState& rhs)
+    {
+      std::memcpy(static_cast<void*>(this), &rhs, sizeof(DisplayState));
+      return *this;
+    }
+
+    ALWAYS_INLINE bool IsDisplayDisabled() const
+    {
+      return gpustat.display_disable || crtc_state.display_vram_width == 0 || crtc_state.display_vram_height == 0;
+    }
+    ALWAYS_INLINE bool IsInterlacedDisplayEnabled() const
+    {
+      return (!force_progressive_scan && gpustat.vertical_interlace);
+    }
+  };
+
+  DisplayState GetDisplayState() const;
+  static float ComputeDisplayAspectRatio(const DisplayState& state);
+  static void CalculateDrawRect(const DisplayState& state, s32 window_width, s32 window_height, bool apply_rotation,
+                                bool apply_aspect_ratio, GSVector4i* display_rect, GSVector4i* draw_rect);
+
+protected:
+  DisplayState m_presented_display_state = {};
+
   BlitterState m_blitter_state = BlitterState::Idle;
   u32 m_command_total_words = 0;
   TickCount m_pending_command_ticks = 0;
+  TickCount m_dreq_hold_ticks = 0;
+  TickCount m_dreq_hold_start_ticks = 0;
 
   /// GPUREAD value for non-VRAM-reads.
   u32 m_GPUREAD_latch = 0;
@@ -618,6 +703,7 @@ protected:
 
   HeapFIFOQueue<u64, MAX_FIFO_SIZE> m_fifo;
   std::vector<u32> m_blit_buffer;
+  std::vector<u64> m_polyline_buffer;
   u32 m_blit_remaining_words;
   GPURenderCommand m_render_command{};
 
@@ -626,7 +712,6 @@ protected:
   ALWAYS_INLINE u32 FifoPeek(u32 i) { return Truncate32(m_fifo.Peek(i)); }
 
   TickCount m_max_run_ahead = 128;
-  u32 m_fifo_size = 128;
 
   void ClearDisplayTexture();
   void SetDisplayTexture(GPUTexture* texture, GPUTexture* depth_texture, s32 view_x, s32 view_y, s32 view_width,
@@ -689,6 +774,8 @@ private:
   using GP0CommandHandler = bool (GPU::*)();
   using GP0CommandHandlerTable = std::array<GP0CommandHandler, 256>;
   static GP0CommandHandlerTable GenerateGP0CommandHandlerTable();
+  static u32 GetGP0CommandWordCount(u32 command);
+  static u32 GetGP0CommandHeldWords(u32 command);
 
   // Rendering commands, returns false if not enough data is provided
   bool HandleUnknownGP0Command();
@@ -714,5 +801,5 @@ private:
 };
 
 extern std::unique_ptr<GPU> g_gpu;
-extern u16 g_vram[VRAM_SIZE / sizeof(u16)];
+extern u16 (&g_vram)[VRAM_SIZE / sizeof(u16)];
 extern u16 g_gpu_clut[GPU_CLUT_SIZE];

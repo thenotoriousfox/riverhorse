@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2019-2024 Connor McLaughlin <stenzek@gmail.com> and contributors.
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #pragma once
 
@@ -67,7 +67,5 @@ private:
 
   TransferState m_transfer_state = TransferState::Idle;
 
-  bool m_popn_controller_mode = false;
-
-  u8 GetButtonsLSBMask() const;
+  u16 m_grounded_buttons_mask = UINT16_C(0xFFFF);
 };

@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2019-2024 Connor McLaughlin <stenzek@gmail.com>
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #pragma once
 
@@ -17,10 +17,11 @@ public:
 
   std::string GenerateBatchVertexShader(bool textured, bool palette, bool uv_limits, bool force_round_texcoords,
                                         bool pgxp_depth);
-  std::string GenerateBatchFragmentShader(GPU_HW::BatchRenderMode render_mode, GPUTransparencyMode transparency,
-                                          GPU_HW::BatchTextureMode texture_mode, GPUTextureFilter texture_filtering,
-                                          bool uv_limits, bool force_round_texcoords, bool dithering, bool interlacing,
-                                          bool check_mask, bool use_rov, bool use_rov_depth, bool rov_depth_test);
+  std::string GenerateBatchFragmentShader(GPU_HW_Backend::BatchRenderMode render_mode, GPUTransparencyMode transparency,
+                                          GPU_HW_Backend::BatchTextureMode texture_mode,
+                                          GPUTextureFilter texture_filtering, bool uv_limits,
+                                          bool force_round_texcoords, bool dithering, bool interlacing, bool check_mask,
+                                          bool use_rov, bool use_rov_depth, bool rov_depth_test);
   std::string GenerateWireframeGeometryShader();
   std::string GenerateWireframeFragmentShader();
   std::string GenerateVRAMReadFragmentShader();

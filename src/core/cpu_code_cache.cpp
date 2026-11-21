@@ -1,7 +1,8 @@
 // SPDX-FileCopyrightText: 2019-2024 Connor McLaughlin <stenzek@gmail.com>
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #include "bus.h"
+#include "cheats.h"
 #include "cpu_code_cache_private.h"
 #include "cpu_core.h"
 #include "cpu_core_private.h"
@@ -72,6 +73,7 @@ static Block* LookupBlock(u32 pc);
 static Block* CreateBlock(u32 pc, const BlockInstructionList& instructions, const BlockMetadata& metadata);
 static bool IsBlockCodeCurrent(const Block* block);
 static bool RevalidateBlock(Block* block);
+static bool HasPatchedInstructions(const Block* block);
 PageProtectionMode GetProtectionModeForPC(u32 pc);
 PageProtectionMode GetProtectionModeForBlock(const Block* block);
 static bool ReadBlockInstructions(u32 start_pc, BlockInstructionList* instructions, BlockMetadata* metadata);
@@ -193,7 +195,7 @@ bool CPU::CodeCache::ProcessStartup(Error* error)
   if (!code_buffer_allocated) [[unlikely]]
   {
     Error::SetStringView(error, "Failed to allocate code storage. The log may contain more information, you will need "
-                                "to run DuckStation with -earlyconsole in the command line.");
+                                "to run Riverhorse with -earlyconsole in the command line.");
     return false;
   }
 
@@ -207,6 +209,7 @@ bool CPU::CodeCache::ProcessStartup(Error* error)
 
 void CPU::CodeCache::ProcessShutdown()
 {
+  PageFaultHandler::Uninstall();
   DeallocateLUTs();
 
 #ifndef USE_CODE_BUFFER_SECTION
@@ -507,7 +510,8 @@ CPU::CodeCache::Block* CPU::CodeCache::CreateBlock(u32 pc, const BlockInstructio
     block->compile_frame = frame_number;
     block->compile_count = 1;
   }
-  else if (block->compile_count >= RECOMPILE_COUNT_FOR_INTERPRETER_FALLBACK)
+  else if (g_settings.cpu_recompiler_interpreter_fallback &&
+           block->compile_count >= RECOMPILE_COUNT_FOR_INTERPRETER_FALLBACK)
   {
     DEV_LOG("{} recompiles in {} frames to block 0x{:08X}, not caching.", block->compile_count, frame_delta, block->pc);
     block->size = 0;
@@ -537,8 +541,26 @@ bool CPU::CodeCache::IsBlockCodeCurrent(const Block* block)
   const PhysicalMemoryAddress phys_addr = VirtualAddressToPhysical(block->pc);
   DebugAssert((phys_addr + (sizeof(Instruction) * block->size)) <= Bus::g_ram_size);
 
-  // can just do a straight memcmp..
-  return (std::memcmp(Bus::g_ram + phys_addr, block->Instructions(), sizeof(Instruction) * block->size) == 0);
+  if (!CheatInstructionPatches::g_any_active) [[likely]]
+    return (std::memcmp(Bus::g_ram + phys_addr, block->Instructions(), sizeof(Instruction) * block->size) == 0);
+
+  const Instruction* instructions = block->Instructions();
+  for (u32 i = 0; i < block->size; i++)
+  {
+    u32 ram_bits;
+    std::memcpy(&ram_bits, Bus::g_ram + phys_addr + (i * sizeof(Instruction)), sizeof(ram_bits));
+    if (CheatInstructionPatches::Apply(block->pc + (i * sizeof(Instruction)), ram_bits) != instructions[i].bits)
+      return false;
+  }
+
+  return true;
+}
+
+bool CPU::CodeCache::HasPatchedInstructions(const Block* block)
+{
+  return (CheatInstructionPatches::g_any_active &&
+          std::memcmp(Bus::g_ram + VirtualAddressToPhysical(block->pc), block->Instructions(),
+                      sizeof(Instruction) * block->size) != 0);
 }
 
 bool CPU::CodeCache::RevalidateBlock(Block* block)
@@ -684,7 +706,7 @@ CPU::CodeCache::PageProtectionMode CPU::CodeCache::GetProtectionModeForBlock(con
 
 void CPU::CodeCache::InvalidateBlock(Block* block, BlockState new_state)
 {
-  if (block->state == BlockState::Valid)
+  if (block->state == BlockState::Valid || block->state == BlockState::FallbackToInterpreter)
   {
     SetCodeLUT(block->pc, g_compile_or_revalidate_block);
     BacklinkBlocks(block->pc, g_compile_or_revalidate_block);
@@ -834,7 +856,7 @@ template<PGXPMode pgxp_mode>
       {
         AddPendingTicks(
           static_cast<TickCount>(block->size * static_cast<u32>(*Bus::GetMemoryAccessTimePtr(
-                                                 block->pc & PHYSICAL_MEMORY_ADDRESS_MASK, MemoryAccessSize::Word))));
+                                                 block->pc & KSEG_MASK, MemoryAccessSize::Word))));
       }
       else
       {
@@ -909,7 +931,7 @@ bool CPU::CodeCache::ReadBlockInstructions(u32 start_pc, BlockInstructionList* i
 
   const PageProtectionMode protection = GetProtectionModeForPC(start_pc);
   const bool use_icache = CPU::IsCachedAddress(start_pc);
-  const bool dynamic_fetch_ticks = (!use_icache && Bus::GetMemoryAccessTimePtr(start_pc & PHYSICAL_MEMORY_ADDRESS_MASK,
+  const bool dynamic_fetch_ticks = (!use_icache && Bus::GetMemoryAccessTimePtr(start_pc & KSEG_MASK,
                                                                                MemoryAccessSize::Word) != nullptr);
   u32 pc = start_pc;
   bool is_branch_delay_slot = false;
@@ -955,10 +977,21 @@ bool CPU::CodeCache::ReadBlockInstructions(u32 start_pc, BlockInstructionList* i
     }
 
     Instruction instruction;
-    if (!SafeReadInstruction(pc, &instruction.bits) || !IsValidInstruction(instruction))
+    const bool read_ok = SafeReadInstruction(pc, &instruction.bits);
+    if (read_ok && CheatInstructionPatches::g_any_active) [[unlikely]]
+      instruction.bits = CheatInstructionPatches::Apply(pc, instruction.bits);
+
+    if (!read_ok || !IsValidInstruction(instruction))
     {
       // Away to the int you go!
       ERROR_LOG("Instruction read failed at PC=0x{:08X}, truncating block.", pc);
+      break;
+    }
+
+    if (IsCoprocessorBranchInstruction(instruction))
+    {
+      if (is_branch_delay_slot)
+        instructions->pop_back();
       break;
     }
 
@@ -1302,6 +1335,9 @@ void CPU::CodeCache::FillBlockRegInfo(Block* block)
             case CopCommonInstruction::ctcn:
               BackpropSetReads(rt);
               break;
+
+            case CopCommonInstruction::bcnc:
+              break;
           }
         }
         break;
@@ -1375,8 +1411,18 @@ void CPU::CodeCache::CompileOrRevalidateBlock(u32 start_pc)
     CodeCache::Reset();
   }
 
-  if ((block = CreateBlock(start_pc, s_block_instructions, metadata)) == nullptr || block->size == 0 ||
-      !CompileBlock(block))
+  block = CreateBlock(start_pc, s_block_instructions, metadata);
+  if (block && block->size > 0 && block->protection == PageProtectionMode::ManualCheck &&
+      HasPatchedInstructions(block))
+  {
+    block->state = BlockState::FallbackToInterpreter;
+    SetCodeLUT(start_pc, g_interpret_block);
+    BacklinkBlocks(start_pc, g_interpret_block);
+    MemMap::EndCodeWrite();
+    return;
+  }
+
+  if (!block || block->size == 0 || !CompileBlock(block))
   {
     ERROR_LOG("Failed to compile block at 0x{:08X}, falling back to uncached interpreter", start_pc);
     SetCodeLUT(start_pc, g_interpret_block);

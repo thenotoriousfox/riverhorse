@@ -1,9 +1,10 @@
 // SPDX-FileCopyrightText: 2019-2024 Connor McLaughlin <stenzek@gmail.com>
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #include "dma.h"
 #include "bus.h"
 #include "cdrom.h"
+#include "cpu_code_cache.h"
 #include "cpu_core.h"
 #include "gpu.h"
 #include "host.h"
@@ -44,9 +45,11 @@ static constexpr PhysicalMemoryAddress BASE_ADDRESS_MASK = UINT32_C(0x00FFFFFF);
 static constexpr PhysicalMemoryAddress TRANSFER_ADDRESS_MASK = UINT32_C(0x00FFFFFC);
 static constexpr PhysicalMemoryAddress LINKED_LIST_TERMINATOR = UINT32_C(0x00FFFFFF);
 
-static constexpr TickCount LINKED_LIST_HEADER_READ_TICKS = 10;
+static constexpr TickCount LINKED_LIST_HEADER_READ_TICKS = 8;
 static constexpr TickCount LINKED_LIST_BLOCK_SETUP_TICKS = 5;
 static constexpr TickCount SLICE_SIZE_WHEN_TRANSMITTING_PAD = 10;
+static constexpr TickCount SLICE_SIZE_WHEN_DECODING_MDEC = 100;
+static constexpr u32 MAX_UNCHOPPED_WORDS = 4;
 
 struct ChannelState
 {
@@ -84,6 +87,8 @@ struct ChannelState
     BitField<u32, bool, 28, 1> start_trigger;
 
     static constexpr u32 WRITE_MASK = 0b01110001'01110111'00000111'00000011;
+    static constexpr u32 OTC_WRITE_MASK = 0b01010001'00000000'00000000'00000000;
+    static constexpr u32 OTC_FIXED_BITS = 0b00000000'00000000'00000000'00000010;
   } channel_control = {};
 
   bool request = false;
@@ -98,7 +103,7 @@ union DPCRRegister
   BitField<u32, u8, 4, 3> MDECout_priority;
   BitField<u32, bool, 7, 1> MDECout_master_enable;
   BitField<u32, u8, 8, 3> GPU_priority;
-  BitField<u32, bool, 10, 1> GPU_master_enable;
+  BitField<u32, bool, 11, 1> GPU_master_enable;
   BitField<u32, u8, 12, 3> CDROM_priority;
   BitField<u32, bool, 15, 1> CDROM_master_enable;
   BitField<u32, u8, 16, 3> SPU_priority;
@@ -110,7 +115,7 @@ union DPCRRegister
   BitField<u32, u8, 28, 3> priority_offset;
   BitField<u32, bool, 31, 1> unused;
 
-  ALWAYS_INLINE u8 GetPriority(Channel channel) const { return ((bits >> (static_cast<u8>(channel) * 4)) & u32(3)); }
+  ALWAYS_INLINE u8 GetPriority(Channel channel) const { return ((bits >> (static_cast<u8>(channel) * 4)) & u32(7)); }
   ALWAYS_INLINE bool GetMasterEnable(Channel channel) const
   {
     return ConvertToBoolUnchecked((bits >> (static_cast<u8>(channel) * 4 + 3)) & u32(1));
@@ -180,6 +185,7 @@ static void UnhaltTransfer(void*, TickCount ticks, TickCount ticks_late);
 
 template<Channel channel>
 static bool TransferChannel();
+static bool RunChannelTransfer(Channel channel);
 
 static bool IsLinkedListTerminator(PhysicalMemoryAddress address);
 static bool CheckForBusError(Channel channel, ChannelState& cs, PhysicalMemoryAddress address, u32 size);
@@ -193,6 +199,7 @@ static TickCount TransferDeviceToMemory(u32 address, u32 increment, u32 word_cou
 template<Channel channel>
 static TickCount TransferMemoryToDevice(u32 address, u32 increment, u32 word_count);
 
+template<Channel channel>
 static TickCount GetMaxSliceTicks(TickCount max_slice_size);
 
 // configuration
@@ -202,6 +209,8 @@ struct DMAState
   std::vector<u32> transfer_buffer;
   TimingEvent unhalt_event{"DMA Transfer Unhalt", 1, 1, &DMA::UnhaltTransfer, nullptr};
   TickCount halt_ticks_remaining = 0;
+  bool transfer_in_progress = false;
+  bool transfer_deferred = false;
 
   std::array<ChannelState, NUM_CHANNELS> channels;
   DPCRRegister DPCR = {};
@@ -260,7 +269,8 @@ void DMA::ClearState()
     ChannelState& cs = s_state.channels[i];
     cs.base_address = 0;
     cs.block_control.bits = 0;
-    cs.channel_control.bits = 0;
+    cs.channel_control.bits =
+      (static_cast<Channel>(i) == Channel::OTC) ? ChannelState::ChannelControl::OTC_FIXED_BITS : 0;
     cs.request = false;
   }
 
@@ -317,6 +327,7 @@ u32 DMA::ReadRegister(u32 offset)
         return s_state.channels[channel_index].block_control.bits;
       }
       case 0x08:
+      case 0x0C:
       {
         TRACE_LOG("DMA[{}] channel control -> 0x{:08X}", static_cast<Channel>(channel_index),
                   s_state.channels[channel_index].channel_control.bits);
@@ -366,6 +377,7 @@ void DMA::WriteRegister(u32 offset, u32 value)
       }
 
       case 0x08:
+      case 0x0C:
       {
         // HACK: Due to running DMA in slices, we can't wait for the current halt time to finish before running the
         // first block of a new channel. This affects games like FF8, where they kick a SPU transfer while a GPU
@@ -373,8 +385,16 @@ void DMA::WriteRegister(u32 offset, u32 value)
         // breaks the interrupt.
         const bool ignore_halt = !state.channel_control.enable_busy && (value & (1u << 24));
 
-        state.channel_control.bits = (state.channel_control.bits & ~ChannelState::ChannelControl::WRITE_MASK) |
-                                     (value & ChannelState::ChannelControl::WRITE_MASK);
+        if (static_cast<Channel>(channel_index) == Channel::OTC)
+        {
+          state.channel_control.bits = (value & ChannelState::ChannelControl::OTC_WRITE_MASK) |
+                                       ChannelState::ChannelControl::OTC_FIXED_BITS;
+        }
+        else
+        {
+          state.channel_control.bits = (state.channel_control.bits & ~ChannelState::ChannelControl::WRITE_MASK) |
+                                       (value & ChannelState::ChannelControl::WRITE_MASK);
+        }
         TRACE_LOG("DMA channel {} channel control <- 0x{:08X}", static_cast<Channel>(channel_index),
                   state.channel_control.bits);
 
@@ -395,7 +415,7 @@ void DMA::WriteRegister(u32 offset, u32 value)
             const u32 cpu_cycles_per_block = (1u << state.channel_control.chopping_cpu_window_size);
             const u32 blocks = state.block_control.manual.word_count / block_words;
             const TickCount delay_cycles = std::min(static_cast<TickCount>(cpu_cycles_per_block * blocks), 500);
-            if (delay_cycles > 1 && true)
+            if (state.block_control.manual.word_count > MAX_UNCHOPPED_WORDS && delay_cycles > 1)
             {
               DEV_LOG("Delaying {} transfer by {} cycles due to chopping", static_cast<Channel>(channel_index),
                       delay_cycles);
@@ -403,12 +423,12 @@ void DMA::WriteRegister(u32 offset, u32 value)
             }
             else
             {
-              s_channel_transfer_functions[channel_index]();
+              RunChannelTransfer(static_cast<Channel>(channel_index));
             }
           }
           else
           {
-            s_channel_transfer_functions[channel_index]();
+            RunChannelTransfer(static_cast<Channel>(channel_index));
           }
         }
         return;
@@ -431,7 +451,7 @@ void DMA::WriteRegister(u32 offset, u32 value)
         {
           if (CanTransferChannel(static_cast<Channel>(i), false))
           {
-            if (!s_channel_transfer_functions[i]())
+            if (!RunChannelTransfer(static_cast<Channel>(i)))
               break;
           }
         }
@@ -464,7 +484,37 @@ void DMA::SetRequest(Channel channel, bool request)
 
   cs.request = request;
   if (CanTransferChannel(channel, false))
-    s_channel_transfer_functions[static_cast<u32>(channel)]();
+    RunChannelTransfer(channel);
+}
+
+bool DMA::RunChannelTransfer(Channel channel)
+{
+  if (s_state.transfer_in_progress)
+  {
+    s_state.transfer_deferred = true;
+    return true;
+  }
+
+  s_state.transfer_in_progress = true;
+  bool result = s_channel_transfer_functions[static_cast<u32>(channel)]();
+  s_state.transfer_in_progress = false;
+
+  while (result && s_state.transfer_deferred)
+  {
+    s_state.transfer_deferred = false;
+    for (u32 i = 0; i < NUM_CHANNELS && result; i++)
+    {
+      if (!CanTransferChannel(static_cast<Channel>(i), false))
+        continue;
+
+      s_state.transfer_in_progress = true;
+      result = s_channel_transfer_functions[i]();
+      s_state.transfer_in_progress = false;
+    }
+  }
+
+  s_state.transfer_deferred = false;
+  return result;
 }
 
 ALWAYS_INLINE_RELEASE bool DMA::CanTransferChannel(Channel channel, bool ignore_halt)
@@ -531,9 +581,12 @@ ALWAYS_INLINE_RELEASE void DMA::CompleteTransfer(Channel channel, ChannelState& 
   }
 }
 
+template<DMA::Channel channel>
 TickCount DMA::GetMaxSliceTicks(TickCount max_slice_size)
 {
-  const TickCount max = Pad::IsTransmitting() ? SLICE_SIZE_WHEN_TRANSMITTING_PAD : max_slice_size;
+  TickCount max = Pad::IsTransmitting() ? SLICE_SIZE_WHEN_TRANSMITTING_PAD : max_slice_size;
+  if constexpr (channel == Channel::MDECin || channel == Channel::MDECout)
+    max = MDEC::IsDecodingMacroblock() ? std::min(max, SLICE_SIZE_WHEN_DECODING_MDEC) : max;
   if (!TimingEvents::IsRunningEvents())
     return max;
 
@@ -591,7 +644,7 @@ bool DMA::TransferChannel()
       const u8* const ram_ptr = Bus::g_ram;
       const u32 mask = Bus::g_ram_mask;
 
-      const TickCount slice_ticks = GetMaxSliceTicks(g_settings.dma_max_slice_ticks);
+      const TickCount slice_ticks = GetMaxSliceTicks<channel>(g_settings.dma_max_slice_ticks);
       TickCount remaining_ticks = slice_ticks;
       while (cs.request && remaining_ticks > 0)
       {
@@ -661,7 +714,7 @@ bool DMA::TransferChannel()
 
       const u32 block_size = cs.block_control.request.GetBlockSize();
       u32 blocks_remaining = cs.block_control.request.GetBlockCount();
-      TickCount ticks_remaining = GetMaxSliceTicks(g_settings.dma_max_slice_ticks);
+      TickCount ticks_remaining = GetMaxSliceTicks<channel>(g_settings.dma_max_slice_ticks);
 
       if (copy_to_device)
       {
@@ -749,22 +802,19 @@ void DMA::HaltTransfer(TickCount duration)
 void DMA::UnhaltTransfer(void*, TickCount ticks, TickCount ticks_late)
 {
   DEBUG_LOG("Resuming DMA after {} ticks, {} ticks late", ticks, -(s_state.halt_ticks_remaining - ticks));
-  s_state.halt_ticks_remaining -= ticks;
+  s_state.halt_ticks_remaining = std::max<TickCount>(s_state.halt_ticks_remaining - ticks, 0);
   s_state.unhalt_event.Deactivate();
 
   // TODO: Use channel priority. But doing it in ascending order is probably good enough.
   // Main thing is that OTC happens after GPU, because otherwise it'll wipe out the LL.
   for (u32 i = 0; i < NUM_CHANNELS; i++)
   {
-    if (CanTransferChannel(static_cast<Channel>(i), false))
-    {
-      if (!s_channel_transfer_functions[i]())
-        return;
-    }
+    if (CanTransferChannel(static_cast<Channel>(i), true))
+      RunChannelTransfer(static_cast<Channel>(i));
   }
 
-  // We didn't run too long, so reset timer.
-  s_state.halt_ticks_remaining = 0;
+  if (!IsTransferHalted())
+    s_state.halt_ticks_remaining = 0;
 }
 
 template<DMA::Channel channel>
@@ -781,7 +831,7 @@ TickCount DMA::TransferMemoryToDevice(u32 address, u32 increment, u32 word_count
   const u32* src_pointer = reinterpret_cast<u32*>(Bus::g_ram + address);
   if constexpr (channel != Channel::GPU)
   {
-    if (static_cast<s32>(increment) < 0 || ((address + (increment * word_count)) & mask) <= address) [[unlikely]]
+    if (static_cast<s32>(increment) < 0 || word_count > ((mask + 1 - address) / sizeof(u32))) [[unlikely]]
     {
       // Use temp buffer if it's wrapping around
       if (s_state.transfer_buffer.size() < word_count)
@@ -865,12 +915,21 @@ TickCount DMA::TransferDeviceToMemory(u32 address, u32 increment, u32 word_count
   }
 
   u32* dest_pointer = reinterpret_cast<u32*>(&Bus::g_ram[address]);
-  if (static_cast<s32>(increment) < 0 || ((address + (increment * word_count)) & mask) <= address) [[unlikely]]
+  if (static_cast<s32>(increment) < 0 || word_count > ((mask + 1 - address) / sizeof(u32))) [[unlikely]]
   {
     // Use temp buffer if it's wrapping around
     if (s_state.transfer_buffer.size() < word_count)
       s_state.transfer_buffer.resize(word_count);
     dest_pointer = s_state.transfer_buffer.data();
+  }
+  else if constexpr (channel == Channel::CDROM)
+  {
+    const u32 last_page = Bus::GetRAMCodePageIndex(address + (word_count * sizeof(u32)) - 1);
+    for (u32 page = Bus::GetRAMCodePageIndex(address); page <= last_page; page++)
+    {
+      if (Bus::IsRAMCodePage(page))
+        CPU::CodeCache::InvalidateBlocksWithPageIndex(page);
+    }
   }
 
   // Read from device.

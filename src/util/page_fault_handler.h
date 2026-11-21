@@ -15,4 +15,5 @@ enum class HandlerResult
 
 HandlerResult HandlePageFault(void* exception_pc, void* fault_address, bool is_write);
 bool Install(Error* error = nullptr);
+void Uninstall();
 } // namespace PageFaultHandler

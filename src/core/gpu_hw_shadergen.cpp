@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2019-2024 Connor McLaughlin <stenzek@gmail.com>
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #include "gpu_hw_shadergen.h"
 
@@ -648,36 +648,40 @@ void FilteredSampleFromVRAM(TEXPAGE_VALUE texpage, float2 coords, float4 uv_limi
   }
 }
 
-std::string GPU_HW_ShaderGen::GenerateBatchFragmentShader(
-  GPU_HW::BatchRenderMode render_mode, GPUTransparencyMode transparency, GPU_HW::BatchTextureMode texture_mode,
-  GPUTextureFilter texture_filtering, bool uv_limits, bool force_round_texcoords, bool dithering, bool interlacing,
-  bool check_mask, bool use_rov, bool use_rov_depth, bool rov_depth_test)
+std::string GPU_HW_ShaderGen::GenerateBatchFragmentShader(GPU_HW_Backend::BatchRenderMode render_mode,
+                                                          GPUTransparencyMode transparency,
+                                                          GPU_HW_Backend::BatchTextureMode texture_mode,
+                                                          GPUTextureFilter texture_filtering, bool uv_limits,
+                                                          bool force_round_texcoords, bool dithering, bool interlacing,
+                                                          bool check_mask, bool use_rov, bool use_rov_depth,
+                                                          bool rov_depth_test)
 {
   // TODO: don't write depth for shader blend
-  DebugAssert(transparency == GPUTransparencyMode::Disabled || render_mode == GPU_HW::BatchRenderMode::ShaderBlend);
+  DebugAssert(transparency == GPUTransparencyMode::Disabled ||
+              render_mode == GPU_HW_Backend::BatchRenderMode::ShaderBlend);
   DebugAssert(!rov_depth_test || (use_rov && use_rov_depth));
 
-  const bool textured = (texture_mode != GPU_HW::BatchTextureMode::Disabled);
-  const bool palette =
-    (texture_mode == GPU_HW::BatchTextureMode::Palette4Bit || texture_mode == GPU_HW::BatchTextureMode::Palette8Bit);
-  const bool shader_blending = (render_mode == GPU_HW::BatchRenderMode::ShaderBlend);
+  const bool textured = (texture_mode != GPU_HW_Backend::BatchTextureMode::Disabled);
+  const bool palette = (texture_mode == GPU_HW_Backend::BatchTextureMode::Palette4Bit ||
+                        texture_mode == GPU_HW_Backend::BatchTextureMode::Palette8Bit);
+  const bool shader_blending = (render_mode == GPU_HW_Backend::BatchRenderMode::ShaderBlend);
   const bool use_dual_source = (!shader_blending && !use_rov && m_supports_dual_source_blend &&
-                                ((render_mode != GPU_HW::BatchRenderMode::TransparencyDisabled &&
-                                  render_mode != GPU_HW::BatchRenderMode::OnlyOpaque) ||
+                                ((render_mode != GPU_HW_Backend::BatchRenderMode::TransparencyDisabled &&
+                                  render_mode != GPU_HW_Backend::BatchRenderMode::OnlyOpaque) ||
                                  texture_filtering != GPUTextureFilter::Nearest));
 
   std::stringstream ss;
   WriteHeader(ss, use_rov);
-  DefineMacro(ss, "TRANSPARENCY", render_mode != GPU_HW::BatchRenderMode::TransparencyDisabled);
-  DefineMacro(ss, "TRANSPARENCY_ONLY_OPAQUE", render_mode == GPU_HW::BatchRenderMode::OnlyOpaque);
-  DefineMacro(ss, "TRANSPARENCY_ONLY_TRANSPARENT", render_mode == GPU_HW::BatchRenderMode::OnlyTransparent);
+  DefineMacro(ss, "TRANSPARENCY", render_mode != GPU_HW_Backend::BatchRenderMode::TransparencyDisabled);
+  DefineMacro(ss, "TRANSPARENCY_ONLY_OPAQUE", render_mode == GPU_HW_Backend::BatchRenderMode::OnlyOpaque);
+  DefineMacro(ss, "TRANSPARENCY_ONLY_TRANSPARENT", render_mode == GPU_HW_Backend::BatchRenderMode::OnlyTransparent);
   DefineMacro(ss, "TRANSPARENCY_MODE", static_cast<s32>(transparency));
   DefineMacro(ss, "SHADER_BLENDING", shader_blending);
   DefineMacro(ss, "CHECK_MASK_BIT", check_mask);
   DefineMacro(ss, "TEXTURED", textured);
   DefineMacro(ss, "PALETTE", palette);
-  DefineMacro(ss, "PALETTE_4_BIT", texture_mode == GPU_HW::BatchTextureMode::Palette4Bit);
-  DefineMacro(ss, "PALETTE_8_BIT", texture_mode == GPU_HW::BatchTextureMode::Palette8Bit);
+  DefineMacro(ss, "PALETTE_4_BIT", texture_mode == GPU_HW_Backend::BatchTextureMode::Palette4Bit);
+  DefineMacro(ss, "PALETTE_8_BIT", texture_mode == GPU_HW_Backend::BatchTextureMode::Palette8Bit);
   DefineMacro(ss, "DITHERING", dithering);
   DefineMacro(ss, "DITHERING_SCALED", m_scaled_dithering);
   // Debanding requires true color to work correctly.

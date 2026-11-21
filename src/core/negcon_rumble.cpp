@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2019-2022 Connor McLaughlin <stenzek@gmail.com> and contributors.
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #include "negcon_rumble.h"
 #include "IconsFontAwesome5.h"
@@ -114,6 +114,9 @@ bool NeGconRumble::DoState(StateWrapper& sw, bool apply_input_state)
 
   if (sw.IsReading())
   {
+    m_command = Command::Idle;
+    m_command_step = 0;
+
     for (u8 i = 0; i < NUM_MOTORS; i++)
       SetMotorState(i, motor_state[i]);
 

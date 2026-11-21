@@ -16,6 +16,14 @@ void GTE_RTPS(float x, float y, float z, u32 value);
 int GTE_NCLIP_valid(u32 sxy0, u32 sxy1, u32 sxy2);
 float GTE_NCLIP();
 
+ALWAYS_INLINE bool TracksMVMVAMatrix(u32 matrix)
+{
+  return (matrix == 1 || matrix == 2);
+}
+void GTE_MVMVA(u32 inst_bits, const u32 old_ir[3]);
+void GTE_GPF_GPL(const u32 old_ir[3], const u32* old_mac, u8 shift);
+void GTE_DropPreciseMACIR();
+
 // Data transfer tracking
 void CPU_MFC2(u32 instr, u32 rdVal); // copy GTE data reg to GPR reg (MFC2)
 void CPU_MTC2(u32 instr, u32 rtVal); // copy GPR reg to GTE data reg (MTC2)
@@ -28,12 +36,14 @@ bool GetPreciseVertex(u32 addr, u32 value, int x, int y, int xOffs, int yOffs, f
 
 // -- CPU functions
 void CPU_LW(u32 instr, u32 addr, u32 rtVal);
+void CPU_LWx(u32 instr, u32 addr, u32 rtVal);
 void CPU_LH(u32 instr, u32 addr, u32 rtVal);
 void CPU_LHU(u32 instr, u32 addr, u32 rtVal);
 void CPU_LBx(u32 instr, u32 addr, u32 rtVal);
 void CPU_SB(u32 instr, u32 addr, u32 rtVal);
 void CPU_SH(u32 instr, u32 addr, u32 rtVal);
 void CPU_SW(u32 instr, u32 addr, u32 rtVal);
+void CPU_SWx(u32 instr, u32 addr, u32 memVal);
 void CPU_MOVE(u32 Rd, u32 Rs, u32 rsVal);
 
 ALWAYS_INLINE static u32 PackMoveArgs(Reg rd, Reg rs)
@@ -75,13 +85,13 @@ void CPU_SRL(u32 instr, u32 rtVal);
 void CPU_SRA(u32 instr, u32 rtVal);
 
 // Shift operations variable
-void CPU_SLLV(u32 instr, u32 rtVal, u32 rsVal);
-void CPU_SRLV(u32 instr, u32 rtVal, u32 rsVal);
-void CPU_SRAV(u32 instr, u32 rtVal, u32 rsVal);
+void CPU_SLLV(u32 instr, u32 rsVal, u32 rtVal);
+void CPU_SRLV(u32 instr, u32 rsVal, u32 rtVal);
+void CPU_SRAV(u32 instr, u32 rsVal, u32 rtVal);
 
 // CP0 Data transfer tracking
 void CPU_MFC0(u32 instr, u32 rdVal);
-void CPU_MTC0(u32 instr, u32 rdVal, u32 rtVal);
+void CPU_MTC0(u32 instr, u32 rtVal);
 
 ALWAYS_INLINE void TryMove(Reg rd, Reg rs, Reg rt)
 {

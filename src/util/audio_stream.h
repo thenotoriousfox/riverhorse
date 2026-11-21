@@ -181,6 +181,8 @@ public:
 
   void EmptyBuffer();
 
+  u32 ReadBufferedFrames(SampleType* samples, u32 max_frames);
+
   /// Nominal rate is used for both resampling and timestretching, input samples are assumed to be this amount faster
   /// than the sample rate.
   void SetNominalRate(float tempo);

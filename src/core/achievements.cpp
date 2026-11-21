@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2019-2024 Connor McLaughlin <stenzek@gmail.com>
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 // TODO: Don't poll when booting the game, e.g. Crash Warped freaks out.
 
@@ -3177,7 +3177,7 @@ void Achievements::SwitchToRAIntegration()
 
 void Achievements::RAIntegration::InitializeRAIntegration(void* main_window_handle)
 {
-  RA_InitClient((HWND)main_window_handle, "DuckStation", g_scm_tag_str);
+  RA_InitClient((HWND)main_window_handle, "Riverhorse", g_scm_tag_str);
   RA_SetUserAgentDetail(Host::GetHTTPUserAgent().c_str());
 
   RA_InstallSharedFunctions(RACallbackIsActive, RACallbackCauseUnpause, RACallbackCausePause, RACallbackRebuildMenu,

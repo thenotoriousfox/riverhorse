@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2019-2022 Connor McLaughlin <stenzek@gmail.com>
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #pragma once
 #include "cd_image.h"
@@ -17,6 +17,7 @@ public:
   u32 GetReplacementSectorCount() const { return static_cast<u32>(m_replacement_subq.size()); }
 
   bool LoadFromImagePath(std::string_view image_path);
+  bool LoadFromFile(std::string_view path);
 
   /// Adds a sector to the replacement map.
   void AddReplacementSubChannelQ(u32 lba, const CDImage::SubChannelQ& subq);

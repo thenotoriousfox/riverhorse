@@ -1,0 +1,50 @@
+name: Game compatibility
+description: A game does not run correctly
+labels: [compatibility]
+body:
+
+- type: markdown
+  attributes:
+    value: |
+      One game per issue. Reproduce with enhancements off and default settings, and check the dump is good.
+
+- type: input
+  attributes:
+    label: Game
+    description: Serial, full title and region.
+    placeholder: SCUS-94467 Spyro - Year of the Dragon (USA)
+  validations:
+    required: true
+
+- type: dropdown
+  attributes:
+    label: How far does it get?
+    options:
+      - Does not boot
+      - Boots, crashes or hangs later
+      - Playable with graphics problems
+      - Playable with sound problems
+      - Playable with timing or speed problems
+      - Other
+  validations:
+    required: true
+
+- type: textarea
+  attributes:
+    label: What goes wrong, and where
+    description: Describe the problem and how to reach it (level, menu, after a video). A memory card save at that point helps.
+  validations:
+    required: true
+
+- type: textarea
+  attributes:
+    label: Renderers tried
+    description: Does it happen with the Software renderer too? With the CPU interpreter? On real hardware, if you know?
+  validations:
+    required: false
+
+- type: input
+  attributes:
+    label: Riverhorse version
+  validations:
+    required: true

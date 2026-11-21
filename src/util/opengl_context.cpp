@@ -111,6 +111,13 @@ OpenGLContext::OpenGLContext(const WindowInfo& wi) : m_wi(wi)
 
 OpenGLContext::~OpenGLContext() = default;
 
+static OpenGLContext::HostContextFactory s_host_context_factory;
+
+void OpenGLContext::SetHostContextFactory(HostContextFactory factory)
+{
+  s_host_context_factory = std::move(factory);
+}
+
 std::unique_ptr<OpenGLContext> OpenGLContext::Create(const WindowInfo& wi, Error* error)
 {
   static constexpr std::array<Version, 14> vlist = {{{Profile::Core, 4, 6},
@@ -148,22 +155,27 @@ std::unique_ptr<OpenGLContext> OpenGLContext::Create(const WindowInfo& wi, Error
   }
 
   std::unique_ptr<OpenGLContext> context;
+  if (s_host_context_factory)
+    context = s_host_context_factory(wi, error);
 #if defined(_WIN32) && !defined(_M_ARM64)
-  context = OpenGLContextWGL::Create(wi, versions_to_try, error);
+  else
+    context = OpenGLContextWGL::Create(wi, versions_to_try, error);
 #elif defined(__APPLE__)
-  context = OpenGLContextAGL::Create(wi, versions_to_try, error);
+  else
+    context = OpenGLContextAGL::Create(wi, versions_to_try, error);
 #elif defined(__ANDROID__)
-  context = ContextEGLAndroid::Create(wi, versions_to_try, error);
+  else
+    context = ContextEGLAndroid::Create(wi, versions_to_try, error);
 #else
 #if defined(ENABLE_X11)
-  if (wi.type == WindowInfo::Type::X11)
+  else if (wi.type == WindowInfo::Type::X11)
     context = OpenGLContextEGLX11::Create(wi, versions_to_try, error);
 #endif
 #if defined(ENABLE_WAYLAND)
-  if (wi.type == WindowInfo::Type::Wayland)
+  else if (wi.type == WindowInfo::Type::Wayland)
     context = OpenGLContextEGLWayland::Create(wi, versions_to_try, error);
 #endif
-  if (wi.type == WindowInfo::Type::Surfaceless)
+  else if (wi.type == WindowInfo::Type::Surfaceless)
     context = OpenGLContextEGL::Create(wi, versions_to_try, error);
 #endif
 

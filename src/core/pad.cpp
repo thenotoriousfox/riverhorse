@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2019-2024 Connor McLaughlin <stenzek@gmail.com> and contributors.
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #include "pad.h"
 #include "controller.h"
@@ -7,6 +7,7 @@
 #include "interrupt_controller.h"
 #include "memory_card.h"
 #include "multitap.h"
+#include "netplay.h"
 #include "save_state_version.h"
 #include "system.h"
 #include "types.h"
@@ -57,6 +58,8 @@ union JOY_CTRL
   BitField<u16, bool, 11, 1> RXINTEN;
   BitField<u16, bool, 12, 1> ACKINTEN;
   BitField<u16, u8, 13, 1> SLOT;
+
+  static constexpr u16 READ_MASK = 0b00111111'00101111;
 };
 
 union JOY_STAT
@@ -80,6 +83,8 @@ union JOY_MODE
   BitField<u16, bool, 4, 1> parity_enable;
   BitField<u16, u8, 5, 1> parity_type;
   BitField<u16, u8, 8, 1> clk_polarity;
+
+  static constexpr u16 WRITE_MASK = 0b00000001'00111111;
 };
 
 static bool CanTransfer();
@@ -104,6 +109,7 @@ static void BeginTransfer();
 static void DoTransfer(TickCount ticks_late);
 static void DoACK();
 static void EndTransfer();
+static void TriggerInterrupt();
 static void ResetDeviceTransferState();
 
 static bool DoStateController(StateWrapper& sw, u32 i);
@@ -171,17 +177,18 @@ void Pad::Reset()
 
   for (u32 i = 0; i < NUM_MULTITAPS; i++)
     s_multitaps[i].Reset();
+
+  s_last_memory_card_transfer_frame = 0;
 }
 
 bool Pad::ShouldAvoidSavingToState()
 {
-  // Currently only runahead, will also be used for netplay.
-  return g_settings.IsRunaheadEnabled();
+  return g_settings.IsRunaheadEnabled() || Netplay::IsActive();
 }
 
 u32 Pad::GetMaximumRollbackFrames()
 {
-  return g_settings.runahead_frames;
+  return Netplay::IsActive() ? Netplay::GetMaxPrediction() : g_settings.runahead_frames;
 }
 
 bool Pad::DoStateController(StateWrapper& sw, u32 i)
@@ -199,45 +206,18 @@ bool Pad::DoStateController(StateWrapper& sw, u32 i)
     const Controller::ControllerInfo* state_cinfo = Controller::GetControllerInfo(state_controller_type);
     Assert(sw.IsReading());
 
-    // UI notification portion is separated from emulation portion (intentional condition check redundancy)
-    if (g_settings.load_devices_from_save_states)
-    {
-      Host::AddOSDMessage(
-        fmt::format(TRANSLATE_FS("OSDMessage",
-                                 "Save state contains controller type {0} in port {1}, but {2} is used. Switching."),
-                    state_cinfo ? state_cinfo->GetDisplayName() : "", i + 1u,
-                    Controller::GetControllerInfo(controller_type)->GetDisplayName()),
-        Host::OSD_WARNING_DURATION);
-    }
-    else
-    {
-      Host::AddOSDMessage(
-        fmt::format(TRANSLATE_FS("OSDMessage", "Ignoring mismatched controller type {0} in port {1}."),
-                    state_cinfo ? state_cinfo->GetDisplayName() : "", i + 1u, Host::OSD_WARNING_DURATION));
-    }
+    Host::AddOSDMessage(
+      fmt::format(TRANSLATE_FS("OSDMessage", "Save state contains controller type {0} in port {1}, keeping {2}."),
+                  state_cinfo ? state_cinfo->GetDisplayName() : "", i + 1u,
+                  Controller::GetControllerInfo(controller_type)->GetDisplayName()),
+      Host::OSD_WARNING_DURATION);
 
-    DEV_LOG("Controller type mismatch in slot {}: state={}({}) ui={}({}) load_from_state={}", i + 1u,
+    DEV_LOG("Controller type mismatch in slot {}: state={}({}) ui={}({})", i + 1u,
             state_cinfo ? state_cinfo->name : "", static_cast<unsigned>(state_controller_type),
-            Controller::GetControllerInfo(controller_type)->name, static_cast<unsigned>(controller_type),
-            g_settings.load_devices_from_save_states ? "yes" : "no");
+            Controller::GetControllerInfo(controller_type)->name, static_cast<unsigned>(controller_type));
 
-    if (g_settings.load_devices_from_save_states)
-    {
-      s_controllers[i].reset();
-      if (state_controller_type != ControllerType::None)
-        s_controllers[i] = Controller::Create(state_controller_type, i);
-    }
-    else
-    {
-      // mismatched controller states prevents us from loading the state into the user's preferred controller.
-      // just doing a reset here is a little dodgy. If there's an active xfer on the state-saved controller
-      // then who knows what might happen as the rest of the packet streams in. (possibly the SIO xfer will
-      // timeout and the controller will just correct itself on the next frame's read attempt -- after all on
-      // physical HW removing a controller is allowed and could happen in the middle of SIO comms)
-
-      if (s_controllers[i])
-        s_controllers[i]->Reset();
-    }
+    if (s_controllers[i])
+      s_controllers[i]->Reset();
   }
 
   // we still need to read/write the save state controller state even if the controller does not exist.
@@ -477,12 +457,7 @@ bool Pad::DoState(StateWrapper& sw, bool is_memory_state)
         // loading from old savestate which only had max 2 controllers.
         // honoring load_devices_from_save_states in this case seems debatable, but might as well...
         if (s_controllers[i])
-        {
-          if (g_settings.load_devices_from_save_states)
-            s_controllers[i].reset();
-          else
-            s_controllers[i]->Reset();
-        }
+          s_controllers[i]->Reset();
 
         if (s_memory_cards[i])
         {
@@ -502,6 +477,9 @@ bool Pad::DoState(StateWrapper& sw, bool is_memory_state)
       if (!DoStateMemcard(sw, i, is_memory_state))
         return false;
     }
+
+    if (sw.IsReading())
+      s_last_memory_card_transfer_frame = 0;
   }
 
   if (sw.GetVersion() >= 50) [[unlikely]]
@@ -522,6 +500,12 @@ bool Pad::DoState(StateWrapper& sw, bool is_memory_state)
   sw.Do(&s_transmit_buffer);
   sw.Do(&s_receive_buffer_full);
   sw.Do(&s_transmit_buffer_full);
+  if (sw.GetVersion() >= 92)
+  {
+    u8 active_device = static_cast<u8>(s_active_device);
+    sw.Do(&active_device);
+    s_active_device = static_cast<ActiveDevice>(active_device);
+  }
 
   if (sw.IsReading() && IsTransmitting())
     s_transfer_event.Activate();
@@ -597,7 +581,7 @@ u32 Pad::ReadRegister(u32 offset)
       return ZeroExtend32(s_JOY_MODE.bits);
 
     case 0x0A: // JOY_CTRL
-      return ZeroExtend32(s_JOY_CTRL.bits);
+      return ZeroExtend32(s_JOY_CTRL.bits & JOY_CTRL::READ_MASK);
 
     case 0x0E: // JOY_BAUD
       return ZeroExtend32(s_JOY_BAUD);
@@ -621,6 +605,12 @@ void Pad::WriteRegister(u32 offset, u32 value)
 
       s_transmit_buffer = Truncate8(value);
       s_transmit_buffer_full = true;
+
+      if (s_JOY_CTRL.TXINTEN)
+      {
+        DEBUG_LOG("Triggering TX interrupt");
+        TriggerInterrupt();
+      }
 
       if (!IsTransmitting() && CanTransfer())
         BeginTransfer();
@@ -664,7 +654,7 @@ void Pad::WriteRegister(u32 offset, u32 value)
     case 0x08: // JOY_MODE
     {
       DEBUG_LOG("JOY_MODE <- 0x{:08X}", value);
-      s_JOY_MODE.bits = Truncate16(value);
+      s_JOY_MODE.bits = Truncate16(value) & JOY_MODE::WRITE_MASK;
       return;
     }
 
@@ -857,6 +847,11 @@ void Pad::DoTransfer(TickCount ticks_late)
 
   s_receive_buffer = data_in;
   s_receive_buffer_full = true;
+  if (s_JOY_CTRL.RXINTEN)
+  {
+    DEBUG_LOG("Triggering RX interrupt");
+    TriggerInterrupt();
+  }
 
   // device no longer active?
   if (!ack)
@@ -879,6 +874,12 @@ void Pad::DoTransfer(TickCount ticks_late)
   UpdateJoyStat();
 }
 
+void Pad::TriggerInterrupt()
+{
+  s_JOY_STAT.INTR = true;
+  InterruptController::SetLineState(InterruptController::IRQ::PAD, true);
+}
+
 void Pad::DoACK()
 {
   s_JOY_STAT.ACKINPUT = true;
@@ -886,8 +887,7 @@ void Pad::DoACK()
   if (s_JOY_CTRL.ACKINTEN)
   {
     DEBUG_LOG("Triggering ACK interrupt");
-    s_JOY_STAT.INTR = true;
-    InterruptController::SetLineState(InterruptController::IRQ::PAD, true);
+    TriggerInterrupt();
   }
 
   EndTransfer();

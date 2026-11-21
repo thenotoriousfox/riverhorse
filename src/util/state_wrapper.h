@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2019-2024 Connor McLaughlin <stenzek@gmail.com>
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #pragma once
 
@@ -126,7 +126,7 @@ public:
     u32 length = static_cast<u32>(data->size());
     Do(&length);
     if (m_mode == Mode::Read)
-      data->resize(length);
+      data->resize(CheckReadCount(length) ? length : 0);
     DoArray(data->data(), data->size());
   }
 
@@ -138,6 +138,9 @@ public:
     if (m_mode == Mode::Read)
     {
       data->clear();
+      if (!CheckReadCount(length))
+        return;
+
       for (u32 i = 0; i < length; i++)
       {
         T value;
@@ -148,7 +151,7 @@ public:
     else
     {
       for (u32 i = 0; i < length; i++)
-        Do(&data[i]);
+        Do(&(*data)[i]);
     }
   }
 
@@ -160,11 +163,18 @@ public:
 
     if (m_mode == Mode::Read)
     {
-      T* temp = new T[size];
-      DoArray(temp, size);
       data->Clear();
-      data->PushRange(temp, size);
-      delete[] temp;
+      if (size > CAPACITY)
+        m_error = true;
+      if (!CheckReadCount(size))
+        return;
+
+      for (u32 i = 0; i < size; i++)
+      {
+        T value;
+        Do(&value);
+        data->Push(value);
+      }
     }
     else
     {
@@ -204,6 +214,9 @@ public:
   }
 
 private:
+  /// When reading, sets the error and returns false if count elements cannot fit in the rest of the state.
+  bool CheckReadCount(u32 count);
+
   bool ReadData(void* buf, size_t size);
   bool WriteData(const void* buf, size_t size);
 

@@ -9,17 +9,31 @@ find_path(
     ${SHADERC_PATH_INCLUDES}
 )
 
-find_library(
-    SHADERC_LIBRARY
-    NAMES shaderc_shared.1 shaderc_shared
-    PATHS ${ADDITIONAL_LIBRARY_PATHS} ${SHADERC_PATH_LIB}
-)
+if(LINK_SHADER_COMPILERS)
+    find_library(
+        SHADERC_LIBRARY
+        NAMES shaderc_combined
+        PATHS ${ADDITIONAL_LIBRARY_PATHS} ${SHADERC_PATH_LIB}
+    )
+else()
+    find_library(
+        SHADERC_LIBRARY
+        NAMES shaderc_shared.1 shaderc_shared
+        PATHS ${ADDITIONAL_LIBRARY_PATHS} ${SHADERC_PATH_LIB}
+    )
+endif()
 
 include(FindPackageHandleStandardArgs)
 find_package_handle_standard_args(Shaderc DEFAULT_MSG
                                   SHADERC_LIBRARY SHADERC_INCLUDE_DIR)
 
-if(SHADERC_FOUND)
+if(SHADERC_FOUND AND LINK_SHADER_COMPILERS)
+    add_library(Shaderc::shaderc_combined STATIC IMPORTED)
+    set_target_properties(Shaderc::shaderc_combined PROPERTIES
+        IMPORTED_LOCATION ${SHADERC_LIBRARY}
+        INTERFACE_INCLUDE_DIRECTORIES ${SHADERC_INCLUDE_DIR}
+    )
+elseif(SHADERC_FOUND)
     add_library(Shaderc::shaderc_shared UNKNOWN IMPORTED)
     set_target_properties(Shaderc::shaderc_shared PROPERTIES
         IMPORTED_LOCATION ${SHADERC_LIBRARY}

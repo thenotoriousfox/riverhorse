@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2024 Connor McLaughlin <stenzek@gmail.com>
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #include "cpu_newrec_compiler_aarch32.h"
 #include "common/align.h"
@@ -340,12 +340,19 @@ void CPU::NewRec::AArch32Compiler::GenerateICacheCheckAndUpdate()
       const u32 line = GetICacheLine(current_pc);
       const u32 offset = OFFSETOF(State, icache_tags) + (line * sizeof(u32));
 
+      MemOperand tag_address(RSTATE, offset);
+      if (offset >= 4096)
+      {
+        EmitMov(RSCRATCH, offset);
+        tag_address = MemOperand(RSTATE, RSCRATCH);
+      }
+
       Label cache_hit;
-      armAsm->ldr(existing_tag_reg, MemOperand(RSTATE, offset));
+      armAsm->ldr(existing_tag_reg, tag_address);
       armAsm->cmp(existing_tag_reg, current_tag_reg);
       armAsm->b(eq, &cache_hit);
 
-      armAsm->str(current_tag_reg, MemOperand(RSTATE, offset));
+      armAsm->str(current_tag_reg, tag_address);
       armAsm->add(ticks_reg, ticks_reg, armCheckAddSubConstant(static_cast<u32>(fill_ticks)));
       armAsm->bind(&cache_hit);
 
@@ -766,7 +773,8 @@ void CPU::NewRec::AArch32Compiler::CheckBranchTarget(const vixl::aarch32::Regist
   SwitchToFarCode(true, ne);
 
   BackupHostState();
-  EndBlockWithException(Exception::AdEL);
+  StoreHostRegToCPUPointer(pcreg.GetCode(), &g_state.cop0_regs.BadVaddr);
+  EndBlockWithBranchTargetException();
 
   RestoreHostState();
   SwitchToNearCode(false);
@@ -874,15 +882,21 @@ void CPU::NewRec::AArch32Compiler::Compile_addi(CompileFlags cf, bool overflow)
 {
   const Register rs = CFGetRegS(cf);
   const Register rt = CFGetRegT(cf);
-  if (const u32 imm = inst->i.imm_sext32(); imm != 0)
+  if (const s32 imm = static_cast<s32>(inst->i.imm_sext32()); imm != 0)
   {
     if (!overflow)
     {
-      armAsm->add(rt, rs, armCheckAddSubConstant(imm));
+      if (imm < 0)
+        armAsm->sub(rt, rs, armCheckAddSubConstant(-imm));
+      else
+        armAsm->add(rt, rs, armCheckAddSubConstant(imm));
     }
     else
     {
-      armAsm->adds(rt, rs, armCheckAddSubConstant(imm));
+      if (imm < 0)
+        armAsm->subs(rt, rs, armCheckAddSubConstant(-imm));
+      else
+        armAsm->adds(rt, rs, armCheckAddSubConstant(imm));
       TestOverflow(rt);
     }
   }
@@ -1346,15 +1360,15 @@ CPU::NewRec::AArch32Compiler::ComputeLoadStoreAddressArg(CompileFlags cf,
   }
   else
   {
-    if (cf.valid_host_s)
-    {
-      armAsm->add(dst, CFGetRegS(cf), armCheckAddSubConstant(static_cast<s32>(inst->i.imm_sext32())));
-    }
-    else
-    {
+    const Register src = cf.valid_host_s ? CFGetRegS(cf) : dst;
+    if (!cf.valid_host_s)
       armAsm->ldr(dst, MipsPtr(cf.MipsS()));
-      armAsm->add(dst, dst, armCheckAddSubConstant(static_cast<s32>(inst->i.imm_sext32())));
-    }
+
+    const s32 offset = static_cast<s32>(inst->i.imm_sext32());
+    if (offset < 0)
+      armAsm->sub(dst, src, armCheckAddSubConstant(-offset));
+    else
+      armAsm->add(dst, src, armCheckAddSubConstant(offset));
   }
 
   return dst;
@@ -1675,9 +1689,9 @@ void CPU::NewRec::AArch32Compiler::Compile_lwx(CompileFlags cf, MemoryAccessSize
   {
     Flush(FLUSH_FOR_C_CALL);
     armAsm->mov(RARG3, value);
-    armAsm->bic(RARG2, addr, 3);
+    armAsm->mov(RARG2, addr);
     EmitMov(RARG1, inst->bits);
-    EmitCall(reinterpret_cast<const void*>(&PGXP::CPU_LW));
+    EmitCall(reinterpret_cast<const void*>(&PGXP::CPU_LWx));
   }
 }
 
@@ -1803,9 +1817,7 @@ void CPU::NewRec::AArch32Compiler::Compile_swx(CompileFlags cf, MemoryAccessSize
   // TODO: this can take over rt's value if it's no longer needed
   // NOTE: can't trust T in cf because of the alloc
   const Register addr = Register(AllocateTempHostReg(HR_CALLEE_SAVED));
-  const Register value = g_settings.gpu_pgxp_enable ? Register(AllocateTempHostReg(HR_CALLEE_SAVED)) : RARG2;
-  if (g_settings.gpu_pgxp_enable)
-    MoveMIPSRegToReg(value, inst->r.rt);
+  const Register value = RARG2;
 
   FlushForLoadStore(address, true, use_fastmem);
 
@@ -1819,9 +1831,7 @@ void CPU::NewRec::AArch32Compiler::Compile_swx(CompileFlags cf, MemoryAccessSize
   armAsm->lsl(RSCRATCH, RSCRATCH, 3); // *8
   armAsm->bic(addr, addr, 3);
 
-  // Need to load down here for PGXP-off, because it's in a volatile reg that can get overwritten by flush.
-  if (!g_settings.gpu_pgxp_enable)
-    MoveMIPSRegToReg(value, inst->r.rt);
+  MoveMIPSRegToReg(value, inst->r.rt);
 
   if (inst->op == InstructionOp::swl)
   {
@@ -1850,23 +1860,8 @@ void CPU::NewRec::AArch32Compiler::Compile_swx(CompileFlags cf, MemoryAccessSize
     armAsm->orr(value, value, RRET);
   }
 
-  if (!g_settings.gpu_pgxp_enable)
-  {
-    GenerateStore(addr, value, MemoryAccessSize::Word, use_fastmem);
-    FreeHostReg(addr.GetCode());
-  }
-  else
-  {
-    GenerateStore(addr, value, MemoryAccessSize::Word, use_fastmem);
-
-    Flush(FLUSH_FOR_C_CALL);
-    armAsm->mov(RARG3, value);
-    FreeHostReg(value.GetCode());
-    armAsm->mov(RARG2, addr);
-    FreeHostReg(addr.GetCode());
-    EmitMov(RARG1, inst->bits);
-    EmitCall(reinterpret_cast<const void*>(&PGXP::CPU_SW));
-  }
+  GenerateStore(addr, value, MemoryAccessSize::Word, use_fastmem);
+  FreeHostReg(addr.GetCode());
 }
 
 void CPU::NewRec::AArch32Compiler::Compile_swc2(CompileFlags cf, MemoryAccessSize size, bool sign, bool use_fastmem,

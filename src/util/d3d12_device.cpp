@@ -1173,7 +1173,7 @@ void D3D12Device::SubmitPresent()
 {
   DebugAssert(m_swap_chain);
 
-  const UINT sync_interval = static_cast<UINT>(m_vsync_mode == GPUVSyncMode::FIFO);
+  const UINT sync_interval = static_cast<UINT>(IsVSyncModeBlocking());
   const UINT flags = (m_vsync_mode == GPUVSyncMode::Disabled && m_using_allow_tearing) ? DXGI_PRESENT_ALLOW_TEARING : 0;
   m_swap_chain->Present(sync_interval, flags);
 }

@@ -12,6 +12,7 @@
 #include "common/assert.h"
 #include "common/log.h"
 
+#include <algorithm>
 #include <climits>
 #include <cmath>
 
@@ -47,6 +48,7 @@ enum : u32
   VALID_X = (1u << 0),
   VALID_Y = (1u << 1),
   VALID_Z = (1u << 2),
+  BITFIELD = (1u << 3),
   VALID_LOWZ = (1u << 16),      // Valid Z from the low part of a 32-bit value.
   VALID_HIGHZ = (1u << 17),     // Valid Z from the high part of a 32-bit value.
   VALID_TAINTED_Z = (1u << 31), // X/Y has been changed, Z may not be accurate.
@@ -77,9 +79,9 @@ static PGXP_value* GetCachedVertex(u32 value);
 static float TruncateVertexPosition(float p);
 static bool IsWithinTolerance(float precise_x, float precise_y, int int_x, int int_y);
 
-static void MakeValid(PGXP_value* pV, u32 psxV);
 
 static void Validate(PGXP_value* pV, u32 psxV);
+static void SetFromNativeValue(PGXP_value& value);
 static void MaskValidate(PGXP_value* pV, u32 psxV, u32 mask, u32 validMask);
 
 static double f16Sign(double in);
@@ -91,7 +93,7 @@ static PGXP_value* GetPtr(u32 addr);
 static void ValidateAndCopyMem(PGXP_value* dest, u32 addr, u32 value);
 static void ValidateAndCopyMem16(PGXP_value* dest, u32 addr, u32 value, bool sign);
 
-static void CPU_MTC2_int(const PGXP_value& value, u32 reg);
+static void CPU_MTC2_int(const PGXP_value& value, u32 reg, u32 native);
 static void CPU_BITWISE(u32 instr, u32 rdVal, u32 rsVal, u32 rtVal);
 
 static void WriteMem(const PGXP_value* value, u32 addr);
@@ -99,6 +101,20 @@ static void WriteMem16(const PGXP_value* src, u32 addr);
 
 static void CopyZIfMissing(PGXP_value& dst, const PGXP_value& src);
 static void SelectZ(PGXP_value& dst, const PGXP_value& src1, const PGXP_value& src2);
+static bool IsExactZero(const PGXP_value& value, u32 psx_value);
+static constexpr u32 AND_FUNCT = 0x24;
+static constexpr u32 GTE_V0 = 0;
+static constexpr u32 GTE_IR1 = 9;
+static constexpr u32 GTE_MAC1 = 25;
+static constexpr u32 GTE_LLM = 40;
+static constexpr u32 GTE_BK = 45;
+static constexpr u32 GTE_LCM = 48;
+static constexpr u32 NOR_FUNCT = 0x27;
+static const PGXP_value* KeepExactHalvesThroughPackedMask(PGXP_value& result, u32 rsVal, u32 rtVal,
+                                                          const PGXP_value& prsVal, const PGXP_value& prtVal,
+                                                          u32 rdVal);
+static void ShiftLeft(u32 instr, u32 rtVal, u32 sh);
+static void ShiftRight(u32 instr, u32 rtVal, u32 sh, bool arithmetic, bool variable);
 
 #ifdef LOG_VALUES
 static void LogInstruction(u32 pc, u32 instr);
@@ -138,6 +154,7 @@ void CPU::PGXP::Initialize()
   std::memset(g_state.pgxp_gpr, 0, sizeof(g_state.pgxp_gpr));
   std::memset(g_state.pgxp_cop0, 0, sizeof(g_state.pgxp_cop0));
   std::memset(g_state.pgxp_gte, 0, sizeof(g_state.pgxp_gte));
+  g_state.pgxp_gpr[static_cast<u8>(Reg::zero)].flags = VALID_XY;
 
   if (!s_mem)
   {
@@ -165,6 +182,7 @@ void CPU::PGXP::Reset()
   std::memset(g_state.pgxp_gpr, 0, sizeof(g_state.pgxp_gpr));
   std::memset(g_state.pgxp_cop0, 0, sizeof(g_state.pgxp_cop0));
   std::memset(g_state.pgxp_gte, 0, sizeof(g_state.pgxp_gte));
+  g_state.pgxp_gpr[static_cast<u8>(Reg::zero)].flags = VALID_XY;
 
   if (s_mem)
     std::memset(s_mem, 0, sizeof(PGXP_value) * PGXP_MEM_SIZE);
@@ -213,16 +231,15 @@ void CPU::PGXP::Shutdown()
 #define SXY2 (g_state.pgxp_gte[14])
 #define SXYP (g_state.pgxp_gte[15])
 
-ALWAYS_INLINE_RELEASE void CPU::PGXP::MakeValid(PGXP_value* pV, u32 psxV)
+ALWAYS_INLINE_RELEASE bool CPU::PGXP::IsExactZero(const PGXP_value& value, u32 psx_value)
 {
-  if ((pV->flags & VALID_XY) == VALID_XY)
-    return;
+  return (psx_value == 0 && (value.flags & (VALID_XY | VALID_Z)) == VALID_XY && value.x == 0.0f && value.y == 0.0f);
+}
 
-  pV->x = static_cast<float>(static_cast<s16>(Truncate16(psxV)));
-  pV->y = static_cast<float>(static_cast<s16>(Truncate16(psxV >> 16)));
-  pV->z = 0.0f;
-  pV->flags = VALID_XY | VALID_TAINTED_Z;
-  pV->value = psxV;
+ALWAYS_INLINE_RELEASE void CPU::PGXP::SetFromNativeValue(PGXP_value& value)
+{
+  value.x = static_cast<float>(static_cast<s16>(value.value));
+  value.y = static_cast<float>(static_cast<s16>(value.value >> 16));
 }
 
 ALWAYS_INLINE_RELEASE void CPU::PGXP::Validate(PGXP_value* pV, u32 psxV)
@@ -246,24 +263,21 @@ ALWAYS_INLINE_RELEASE double CPU::PGXP::f16Unsign(double in)
 }
 ALWAYS_INLINE_RELEASE double CPU::PGXP::f16Overflow(double in)
 {
-  double out = 0;
-  s64 v = ((s64)in) >> 16;
-  out = (double)v;
-  return out;
+  return std::floor(in / static_cast<double>(USHRT_MAX + 1));
 }
 
 ALWAYS_INLINE_RELEASE CPU::PGXP_value* CPU::PGXP::GetPtr(u32 addr)
 {
 #if 0
-  if ((addr & CPU::PHYSICAL_MEMORY_ADDRESS_MASK) >= 0x0017A2B4 &&
-      (addr & CPU::PHYSICAL_MEMORY_ADDRESS_MASK) <= 0x0017A2B4)
+  if ((addr & CPU::KSEG_MASK) >= 0x0017A2B4 &&
+      (addr & CPU::KSEG_MASK) <= 0x0017A2B4)
     __debugbreak();
 #endif
 
   if ((addr & SCRATCHPAD_ADDR_MASK) == SCRATCHPAD_ADDR)
     return &s_mem[PGXP_MEM_SCRATCH_OFFSET + ((addr & SCRATCHPAD_OFFSET_MASK) >> 2)];
 
-  const u32 paddr = (addr & PHYSICAL_MEMORY_ADDRESS_MASK);
+  const u32 paddr = (addr & KSEG_MASK);
   if (paddr < Bus::RAM_MIRROR_END)
     return &s_mem[(paddr & Bus::g_ram_mask) >> 2];
   else
@@ -343,7 +357,8 @@ ALWAYS_INLINE_RELEASE void CPU::PGXP::WriteMem(const PGXP_value* value, u32 addr
   if (pMem)
   {
     *pMem = *value;
-    pMem->flags |= VALID_LOWZ | VALID_HIGHZ;
+    pMem->flags = (value->flags & ~(VALID_LOWZ | VALID_HIGHZ)) |
+                  ((value->flags & VALID_Z) ? (VALID_LOWZ | VALID_HIGHZ) : 0);
   }
 }
 
@@ -492,6 +507,202 @@ int CPU::PGXP::GTE_NCLIP_valid(u32 sxy0, u32 sxy1, u32 sxy2)
   return (((SXY0.flags & SXY1.flags & SXY2.flags & VALID_XYZ) == VALID_XYZ));
 }
 
+void CPU::PGXP::GTE_DropPreciseMACIR()
+{
+  for (u32 i = 0; i < 3; i++)
+  {
+    g_state.pgxp_gte[GTE_IR1 + i].flags = 0;
+    g_state.pgxp_gte[GTE_MAC1 + i].flags = 0;
+  }
+}
+
+ALWAYS_INLINE_RELEASE static void SplitIntoHalves(CPU::PGXP_value& dst, double value)
+{
+  const double high = std::floor(value / static_cast<double>(USHRT_MAX + 1));
+  dst.x = static_cast<float>(CPU::PGXP::f16Sign(value - high * static_cast<double>(USHRT_MAX + 1)));
+  dst.y = static_cast<float>(high);
+}
+
+ALWAYS_INLINE_RELEASE static double NearestToNativeHalf(double precise, double native)
+{
+  if (precise - native > 32768.0)
+    return precise - static_cast<double>(USHRT_MAX + 1);
+  else if (precise - native < -32768.0)
+    return precise + static_cast<double>(USHRT_MAX + 1);
+  else
+    return precise;
+}
+
+void CPU::PGXP::GTE_GPF_GPL(const u32 old_ir[3], const u32* old_mac, u8 shift)
+{
+  const double ir0 = static_cast<double>(g_state.gte_regs.IR0);
+  const double scale = static_cast<double>(1u << shift);
+  for (u32 i = 0; i < 3; i++)
+  {
+    PGXP_value& ir = g_state.pgxp_gte[GTE_IR1 + i];
+    PGXP_value& mac = g_state.pgxp_gte[GTE_MAC1 + i];
+    const u32 new_ir = g_state.gte_regs.dr32[GTE_IR1 + i];
+    const u32 new_mac = g_state.gte_regs.dr32[GTE_MAC1 + i];
+
+    Validate(&ir, old_ir[i]);
+    const double ir_x =
+      NearestToNativeHalf(ir.GetValidX(old_ir[i]), static_cast<double>(static_cast<s16>(old_ir[i])));
+    double value = ir_x * ir0;
+    PGXP_value source = ir;
+    bool precise = (ir.flags & VALID_X) != 0;
+    if (old_mac)
+    {
+      Validate(&mac, old_mac[i]);
+      const bool mac_precise = ((mac.flags & VALID_XY) == VALID_XY);
+      value += (mac_precise ? (f16Unsign(mac.x) + static_cast<double>(mac.y) * (USHRT_MAX + 1)) :
+                              static_cast<double>(static_cast<s32>(old_mac[i]))) *
+               scale;
+      CopyZIfMissing(source, mac);
+      precise |= mac_precise;
+    }
+    value /= scale;
+
+    if (!precise || value < static_cast<double>(INT_MIN) || value > static_cast<double>(INT_MAX))
+    {
+      mac.value = new_mac;
+      mac.flags = 0;
+      ir.value = new_ir;
+      ir.flags = 0;
+      continue;
+    }
+
+    SplitIntoHalves(mac, value);
+    mac.z = source.z;
+    mac.value = new_mac;
+    mac.flags = (source.flags & VALID_Z) | VALID_XY | VALID_TAINTED_Z;
+
+    ir = mac;
+    ir.value = new_ir;
+    if (new_ir != new_mac)
+    {
+      ir.x = static_cast<float>(static_cast<s16>(new_ir));
+      ir.y = static_cast<float>(static_cast<s16>(new_ir >> 16));
+    }
+  }
+}
+
+void CPU::PGXP::GTE_MVMVA(u32 inst_bits, const u32 old_ir[3])
+{
+  const GTE::Instruction inst{inst_bits};
+  const GTE::Regs& regs = g_state.gte_regs;
+  const u32 matrix = (inst.mvmva_multiply_matrix == 1) ? GTE_LLM : GTE_LCM;
+  const u32 vector = inst.mvmva_multiply_vector;
+  const u32 translation = inst.mvmva_translation_vector;
+
+  const auto read_half = [](u32 index, bool high, u32 native, bool* precise) -> double {
+    PGXP_value& value = g_state.pgxp_gte[index];
+    Validate(&value, native);
+    const double native_half = high ? static_cast<s16>(native >> 16) : static_cast<s16>(native);
+    if (!(value.flags & (high ? VALID_Y : VALID_X)))
+      return native_half;
+
+    *precise = true;
+    return NearestToNativeHalf(high ? value.y : value.x, native_half);
+  };
+
+  double v[3];
+  s16 native_v[3];
+  bool v_precise[3] = {};
+  for (u32 i = 0; i < 3; i++)
+  {
+    const u32 index = (vector == 3) ? (GTE_IR1 + i) : (GTE_V0 + vector * 2 + i / 2);
+    const u32 native = (vector == 3) ? old_ir[i] : regs.r32[index];
+    const bool high = (vector != 3 && i == 1);
+    native_v[i] = high ? static_cast<s16>(native >> 16) : static_cast<s16>(native);
+    v[i] = read_half(index, high, native, &v_precise[i]);
+  }
+
+  const double scale = static_cast<double>(1u << inst.GetShift());
+  for (u32 row = 0; row < 3; row++)
+  {
+    PGXP_value& mac = g_state.pgxp_gte[GTE_MAC1 + row];
+    PGXP_value& ir = g_state.pgxp_gte[GTE_IR1 + row];
+    mac = {};
+    ir = {};
+    mac.value = regs.r32[GTE_MAC1 + row];
+    ir.value = regs.r32[GTE_IR1 + row];
+
+    if (regs.FLAG.bits & ((1u << (30 - row)) | (1u << (27 - row))))
+      continue;
+
+    double result = 0.0;
+    s64 native_result = 0;
+    bool precise = false;
+    u8 matrix_word_halves[5] = {};
+    if (translation < 2)
+    {
+      const s32 native = (translation == 0) ? regs.TR[row] : regs.BK[row];
+      native_result = static_cast<s64>(native) * 4096;
+      result = static_cast<double>(native);
+      if (translation == 1)
+      {
+        PGXP_value& background = g_state.pgxp_gte[GTE_BK + row];
+        Validate(&background, static_cast<u32>(native));
+        if ((background.flags & VALID_XY) == VALID_XY)
+        {
+          result = f16Unsign(background.x) + static_cast<double>(background.y) * 65536.0;
+          precise = true;
+        }
+      }
+      result *= 4096.0;
+    }
+
+    for (u32 col = (translation == 2) ? 1 : 0; col < 3; col++)
+    {
+      const u32 element = row * 3 + col;
+      const u32 index = matrix + element / 2;
+      const bool high = (element & 1) != 0;
+      const s16 native_m = high ? static_cast<s16>(regs.r32[index] >> 16) : static_cast<s16>(regs.r32[index]);
+      bool m_precise = false;
+      const double m = read_half(index, high, regs.r32[index], &m_precise);
+      result += m * v[col];
+      native_result += static_cast<s64>(native_m) * native_v[col];
+      precise |= (m_precise && v[col] != 0.0) || (v_precise[col] && m != 0.0);
+      if (m_precise && v[col] != 0.0)
+        matrix_word_halves[element / 2] |= high ? 2 : 1;
+    }
+    result /= scale;
+    native_result >>= inst.GetShift();
+
+    if (!precise || native_result < INT_MIN || native_result > INT_MAX || result < static_cast<double>(INT_MIN) ||
+        result > static_cast<double>(INT_MAX))
+    {
+      continue;
+    }
+
+    SplitIntoHalves(mac, result);
+    mac.flags = VALID_XY | VALID_TAINTED_Z;
+
+    float z_sum = 0.0f;
+    u32 z_count = 0;
+    bool z_valid = true;
+    for (u32 word = 0; word < std::size(matrix_word_halves); word++)
+    {
+      if (matrix_word_halves[word] == 0)
+        continue;
+
+      const PGXP_value& matrix_word = g_state.pgxp_gte[matrix + word];
+      z_valid &= (matrix_word_halves[word] == 3 && (matrix_word.flags & VALID_Z));
+      z_sum += matrix_word.z;
+      z_count++;
+    }
+    if (z_valid && z_count > 0)
+    {
+      mac.z = z_sum / static_cast<float>(z_count);
+      mac.flags |= VALID_Z;
+    }
+
+    SplitIntoHalves(ir, std::clamp(result, inst.lm ? 0.0 : -32768.0, 32767.0));
+    ir.z = mac.z;
+    ir.flags = mac.flags;
+  }
+}
+
 float CPU::PGXP::GTE_NCLIP()
 {
   float nclip = ((SX0 * SY1) + (SX1 * SY2) + (SX2 * SY0) - (SX0 * SY2) - (SX1 * SY0) - (SX2 * SY1));
@@ -517,23 +728,60 @@ float CPU::PGXP::GTE_NCLIP()
   return nclip;
 }
 
-ALWAYS_INLINE_RELEASE void CPU::PGXP::CPU_MTC2_int(const PGXP_value& value, u32 reg)
+ALWAYS_INLINE_RELEASE void CPU::PGXP::CPU_MTC2_int(const PGXP_value& value, u32 reg, u32 native)
 {
+  PGXP_value& gte_value = g_state.pgxp_gte[reg];
   switch (reg)
   {
     case 15:
-      // push FIFO
       SXY0 = SXY1;
       SXY1 = SXY2;
       SXY2 = value;
+      SXY2.value = native;
       SXYP = SXY2;
-      break;
+      return;
 
     case 31:
       return;
-  }
 
-  g_state.pgxp_gte[reg] = value;
+    case 1:
+    case 3:
+    case 5:
+    case 7:
+    case 8:
+    case 9:
+    case 10:
+    case 11:
+    case 16:
+    case 17:
+    case 18:
+    case 19:
+    case 36:
+    case 44:
+    case 52:
+    case 58:
+    case 59:
+    case 61:
+    case 62:
+    {
+      const bool sign_extended = (reg != 7 && (reg < 16 || reg > 19));
+      const float native_low = static_cast<float>(sign_extended ? static_cast<s32>(static_cast<s16>(native)) :
+                                                                  static_cast<s32>(static_cast<u16>(native)));
+      const float distance = value.x - native_low;
+      const float precise_low =
+        value.x + ((distance > 32768.0f) ? -65536.0f : (distance < -32768.0f) ? 65536.0f : 0.0f);
+      gte_value = value;
+      gte_value.y = std::floor(precise_low / static_cast<float>(USHRT_MAX + 1));
+      gte_value.value = sign_extended ? SignExtend32(static_cast<u16>(native)) : ZeroExtend32(static_cast<u16>(native));
+      gte_value.flags = (value.flags & ~VALID_Y) | ((value.flags & VALID_X) << 1);
+      return;
+    }
+
+    default:
+      gte_value = value;
+      gte_value.value = native;
+      return;
+  }
 }
 
 ////////////////////////////////////
@@ -556,8 +804,7 @@ void CPU::PGXP::CPU_MTC2(u32 instr, u32 rtVal)
   const u32 idx = cop2idx(instr);
   LOG_VALUES_C1(rt(instr), rtVal);
   Validate(&g_state.pgxp_gpr[rt(instr)], rtVal);
-  CPU_MTC2_int(g_state.pgxp_gpr[rt(instr)], idx);
-  g_state.pgxp_gte[idx].value = rtVal;
+  CPU_MTC2_int(g_state.pgxp_gpr[rt(instr)], idx, rtVal);
 }
 
 ////////////////////////////////////
@@ -569,7 +816,7 @@ void CPU::PGXP::CPU_LWC2(u32 instr, u32 addr, u32 rtVal)
   LOG_VALUES_LOAD(addr, rtVal);
   PGXP_value val;
   ValidateAndCopyMem(&val, addr, rtVal);
-  CPU_MTC2_int(val, rt(instr));
+  CPU_MTC2_int(val, rt(instr), rtVal);
 }
 
 void CPU::PGXP::CPU_SWC2(u32 instr, u32 addr, u32 rtVal)
@@ -596,7 +843,7 @@ ALWAYS_INLINE_RELEASE CPU::PGXP_value* CPU::PGXP::GetCachedVertex(u32 value)
 {
   const s16 sx = static_cast<s16>(value & 0xFFFFu);
   const s16 sy = static_cast<s16>(value >> 16);
-  return (sx >= -1024 && sx <= 1023 && sy >= -1024 && sy <= 1013) ?
+  return (sx >= -1024 && sx <= 1023 && sy >= -1024 && sy <= 1023) ?
            &s_vertex_cache[(sy + 1024) * VERTEX_CACHE_WIDTH + (sx + 1024)] :
            nullptr;
 }
@@ -724,6 +971,166 @@ void CPU::PGXP::CPU_SW(u32 instr, u32 addr, u32 rtVal)
   WriteMem(val, addr);
 }
 
+namespace CPU::PGXP {
+namespace {
+struct UnalignedWordSources
+{
+  std::array<u8, 4> byte_sources;
+};
+
+static constexpr u8 FROM_SECOND = 0x80;
+
+UnalignedWordSources GetUnalignedWordSources(InstructionOp op, u32 shift)
+{
+  UnalignedWordSources sources;
+  for (u32 i = 0; i < 4; i++)
+  {
+    switch (op)
+    {
+      case InstructionOp::lwl:
+        sources.byte_sources[i] = (i >= 3 - shift) ? static_cast<u8>(FROM_SECOND | (i - (3 - shift))) : static_cast<u8>(i);
+        break;
+      case InstructionOp::lwr:
+        sources.byte_sources[i] = (i + shift <= 3) ? static_cast<u8>(FROM_SECOND | (i + shift)) : static_cast<u8>(i);
+        break;
+      case InstructionOp::swl:
+        sources.byte_sources[i] = (i <= shift) ? static_cast<u8>(FROM_SECOND | (i + (3 - shift))) : static_cast<u8>(i);
+        break;
+      case InstructionOp::swr:
+      default:
+        sources.byte_sources[i] = (i >= shift) ? static_cast<u8>(FROM_SECOND | (i - shift)) : static_cast<u8>(i);
+        break;
+    }
+  }
+  return sources;
+}
+
+u32 GetBytesFromFirstMask(const UnalignedWordSources& sources)
+{
+  u32 mask = 0;
+  for (u32 i = 0; i < 4; i++)
+  {
+    if (!(sources.byte_sources[i] & FROM_SECOND))
+      mask |= 0xFFu << (i * 8);
+  }
+  return mask;
+}
+
+u32 GetSecondSourceBytesAsWord(const UnalignedWordSources& sources, u32 merged)
+{
+  u32 value = 0;
+  for (u32 i = 0; i < 4; i++)
+  {
+    if (sources.byte_sources[i] & FROM_SECOND)
+      value |= ((merged >> (i * 8)) & 0xFFu) << ((sources.byte_sources[i] & 3u) * 8);
+  }
+  return value;
+}
+
+u32 GetSecondSourceMask(const UnalignedWordSources& sources)
+{
+  u32 mask = 0;
+  for (u32 i = 0; i < 4; i++)
+  {
+    if (sources.byte_sources[i] & FROM_SECOND)
+      mask |= 0xFFu << ((sources.byte_sources[i] & 3u) * 8);
+  }
+  return mask;
+}
+
+PGXP_value MergeUnalignedWord(const UnalignedWordSources& sources, const PGXP_value& first,
+                              const std::array<u32, 2>& first_z_flags, const PGXP_value& second,
+                              const std::array<u32, 2>& second_z_flags, u32 merged, std::array<u32, 2>* out_z_flags)
+{
+  PGXP_value result = first;
+  result.value = merged;
+  result.flags &= ~(VALID_X | VALID_Y | VALID_Z | VALID_LOWZ | VALID_HIGHZ);
+
+  bool z_set = false;
+  for (u32 half = 0; half < 2; half++)
+  {
+    const u8 lo = sources.byte_sources[half * 2];
+    const u8 hi = sources.byte_sources[half * 2 + 1];
+    const u32 coord_flag = half ? VALID_Y : VALID_X;
+    float& coord = half ? result.y : result.x;
+    (*out_z_flags)[half] = 0;
+
+    const bool same_source = ((lo & FROM_SECOND) == (hi & FROM_SECOND));
+    const u32 src_lo = lo & 3u;
+    if (!same_source || (src_lo & 1u) != 0 || (hi & 3u) != src_lo + 1)
+    {
+      coord = static_cast<float>(static_cast<s16>(merged >> (half * 16)));
+      continue;
+    }
+
+    const u32 src_half = src_lo >> 1;
+    const PGXP_value& src = (lo & FROM_SECOND) ? second : first;
+    const u32 src_z_flag = ((lo & FROM_SECOND) ? second_z_flags : first_z_flags)[src_half];
+    coord = src_half ? src.y : src.x;
+    if (src.flags & (src_half ? VALID_Y : VALID_X))
+      result.flags |= coord_flag;
+    if (src_z_flag)
+    {
+      result.z = src.z;
+      (*out_z_flags)[half] = half ? VALID_HIGHZ : VALID_LOWZ;
+      z_set = true;
+    }
+  }
+
+  if (z_set)
+    result.flags |= VALID_Z;
+  return result;
+}
+} // namespace
+} // namespace CPU::PGXP
+
+void CPU::PGXP::CPU_LWx(u32 instr, u32 addr, u32 rtVal)
+{
+  LOG_VALUES_LOAD(addr, rtVal);
+
+  const Instruction inst{instr};
+  PGXP_value* pmem = GetPtr(addr & ~3u);
+  PGXP_value& prt = g_state.pgxp_gpr[rt(instr)];
+  if (!pmem)
+  {
+    prt = PGXP_value_invalid;
+    return;
+  }
+
+  const UnalignedWordSources sources = GetUnalignedWordSources(inst.op, addr & 3u);
+  MaskValidate(&prt, rtVal, GetBytesFromFirstMask(sources), VALID_X | VALID_Y | VALID_Z);
+  const u32 second_mask = GetSecondSourceMask(sources);
+  MaskValidate(pmem, GetSecondSourceBytesAsWord(sources, rtVal), second_mask,
+               VALID_X | VALID_Y | VALID_Z | VALID_LOWZ | VALID_HIGHZ);
+
+  const u32 reg_z = (prt.flags & VALID_Z) ? VALID_Z : 0;
+  std::array<u32, 2> z_flags;
+  prt = MergeUnalignedWord(sources, prt, {reg_z, reg_z}, *pmem,
+                           {pmem->flags & VALID_LOWZ, pmem->flags & VALID_HIGHZ}, rtVal, &z_flags);
+}
+
+void CPU::PGXP::CPU_SWx(u32 instr, u32 addr, u32 memVal)
+{
+  LOG_VALUES_STORE(rt(instr), memVal, addr);
+
+  const Instruction inst{instr};
+  PGXP_value* pmem = GetPtr(addr & ~3u);
+  if (!pmem)
+    return;
+
+  PGXP_value& prt = g_state.pgxp_gpr[rt(instr)];
+  const UnalignedWordSources sources = GetUnalignedWordSources(inst.op, addr & 3u);
+  MaskValidate(pmem, memVal, GetBytesFromFirstMask(sources), VALID_X | VALID_Y | VALID_Z | VALID_LOWZ | VALID_HIGHZ);
+  const u32 second_mask = GetSecondSourceMask(sources);
+  MaskValidate(&prt, GetSecondSourceBytesAsWord(sources, memVal), second_mask, VALID_X | VALID_Y | VALID_Z);
+
+  const u32 reg_z = (prt.flags & VALID_Z) ? VALID_Z : 0;
+  std::array<u32, 2> z_flags;
+  *pmem = MergeUnalignedWord(sources, *pmem, {pmem->flags & VALID_LOWZ, pmem->flags & VALID_HIGHZ}, prt,
+                             {reg_z, reg_z}, memVal, &z_flags);
+  pmem->flags |= z_flags[0] | z_flags[1];
+}
+
 void CPU::PGXP::CPU_MOVE_Packed(u32 rd_and_rs, u32 rsVal)
 {
   const u32 Rs = (rd_and_rs & 0xFFu);
@@ -768,17 +1175,11 @@ void CPU::PGXP::CPU_ADDI(u32 instr, u32 rsVal)
     return;
   }
 
-  prtVal.x = (float)f16Unsign(prtVal.x);
-  prtVal.x += (float)tempImm.w.l;
-
-  // carry on over/underflow
-  float of = (prtVal.x > USHRT_MAX) ? 1.f : (prtVal.x < 0) ? -1.f : 0.f;
-  prtVal.x = (float)f16Sign(prtVal.x);
-  // ret.x -= of * (USHRT_MAX + 1);
-  prtVal.y += tempImm.sw.h + of;
-
-  // truncate on overflow/underflow
-  prtVal.y += (prtVal.y > SHRT_MAX) ? -(USHRT_MAX + 1) : (prtVal.y < SHRT_MIN) ? USHRT_MAX + 1 : 0.f;
+  const double x = f16Unsign(prsVal.GetValidX(rsVal)) + static_cast<double>(tempImm.w.l);
+  const float of = (x >= (USHRT_MAX + 1)) ? 1.f : (x < 0) ? -1.f : 0.f;
+  prtVal.x = static_cast<float>(f16Sign(x));
+  prtVal.y = prsVal.GetValidY(rsVal) + tempImm.sw.h + of;
+  prtVal.y += (prtVal.y >= (SHRT_MAX + 1)) ? -(USHRT_MAX + 1) : (prtVal.y < SHRT_MIN) ? USHRT_MAX + 1 : 0.f;
 
   prtVal.value = rsVal + tempImm.d;
 
@@ -805,21 +1206,15 @@ void CPU::PGXP::CPU_ANDI(u32 instr, u32 rsVal)
   prtVal.SetValid(COMP_Y);
   prtVal.flags |= VALID_TAINTED_Z;
 
-  switch (imm(instr))
+  if (imm(instr) == 0)
   {
-    case 0:
-      // if 0 then x == 0
-      prtVal.x = 0.0f;
-      prtVal.SetValid(COMP_X);
-      break;
-    case 0xFFFF:
-      // if saturated then x == x
-      break;
-    default:
-      // otherwise x is low precision value
-      prtVal.x = vRt.sw.l;
-      prtVal.SetValid(COMP_X);
-      break;
+    prtVal.x = 0.0f;
+    prtVal.SetValid(COMP_X);
+  }
+  else if (static_cast<u16>(rtVal) != static_cast<u16>(rsVal))
+  {
+    prtVal.x = vRt.sw.l;
+    prtVal.SetValid(COMP_X);
   }
 }
 
@@ -836,17 +1231,11 @@ void CPU::PGXP::CPU_ORI(u32 instr, u32 rsVal)
   psx_value vRt;
   vRt.d = rtVal;
 
-  switch (imm(instr))
+  if (static_cast<u16>(rtVal) != static_cast<u16>(rsVal))
   {
-    case 0:
-      // if 0 then x == x
-      break;
-    default:
-      // otherwise x is low precision value
-      ret.x = vRt.sw.l;
-      ret.SetValid(COMP_X);
-      ret.flags |= VALID_TAINTED_Z;
-      break;
+    ret.x = vRt.sw.l;
+    ret.SetValid(COMP_X);
+    ret.flags |= VALID_TAINTED_Z;
   }
 
   ret.value = rtVal;
@@ -891,15 +1280,12 @@ void CPU::PGXP::CPU_SLTI(u32 instr, u32 rsVal)
   PGXP_value& prsVal = g_state.pgxp_gpr[rs(instr)];
   Validate(&prsVal, rsVal);
 
-  const float fimmx = static_cast<float>(static_cast<s16>(imm(instr)));
-  const float fimmy = fimmx < 0.0f ? -1.0f : 0.0f;
-
   PGXP_value& prtVal = g_state.pgxp_gpr[rt(instr)];
-  prtVal.x = (prsVal.GetValidY(rsVal) < fimmy || prsVal.GetValidX(rsVal) < fimmx) ? 1.f : 0.f;
+  prtVal.value = BoolToUInt32(static_cast<s32>(rsVal) < imm_sext(instr));
+  prtVal.x = static_cast<float>(prtVal.value);
   prtVal.y = 0.0f;
   prtVal.z = prsVal.z;
   prtVal.flags = prsVal.flags | VALID_X | VALID_Y | VALID_TAINTED_Z;
-  prtVal.value = BoolToUInt32(static_cast<s32>(rsVal) < imm_sext(instr));
 }
 
 void CPU::PGXP::CPU_SLTIU(u32 instr, u32 rsVal)
@@ -910,16 +1296,12 @@ void CPU::PGXP::CPU_SLTIU(u32 instr, u32 rsVal)
   PGXP_value& prsVal = g_state.pgxp_gpr[rs(instr)];
   Validate(&g_state.pgxp_gpr[rs(instr)], rsVal);
 
-  const float fimmx = static_cast<float>(static_cast<s16>(imm(instr)));
-  const float fimmy = fimmx < 0.0f ? -1.0f : 0.0f;
-
   PGXP_value& prtVal = g_state.pgxp_gpr[rt(instr)];
-  prtVal.x =
-    (f16Unsign(prsVal.GetValidY(rsVal)) < f16Unsign(fimmy) || f16Unsign(prsVal.GetValidX(rsVal)) < fimmx) ? 1.0f : 0.0f;
+  prtVal.value = BoolToUInt32(rsVal < static_cast<u32>(imm_sext(instr)));
+  prtVal.x = static_cast<float>(prtVal.value);
   prtVal.y = 0.f;
   prtVal.z = prsVal.z;
   prtVal.flags = prsVal.flags | VALID_X | VALID_Y | VALID_TAINTED_Z;
-  prtVal.value = BoolToUInt32(rsVal < imm(instr));
 }
 
 ////////////////////////////////////
@@ -946,13 +1328,13 @@ void CPU::PGXP::CPU_ADD(u32 instr, u32 rsVal, u32 rtVal)
 
   PGXP_value& prsVal = g_state.pgxp_gpr[rs(instr)];
   PGXP_value& prtVal = g_state.pgxp_gpr[rt(instr)];
-  PGXP_value& prdVal = g_state.pgxp_gpr[rd(instr)];
+  PGXP_value prdVal;
 
   // Rd = Rs + Rt (signed)
   Validate(&prsVal, rsVal);
   Validate(&prtVal, rtVal);
 
-  if (rtVal == 0)
+  if (rtVal == 0 && !IsExactZero(prsVal, rsVal))
   {
     prdVal = prsVal;
     CopyZIfMissing(prdVal, prtVal);
@@ -967,13 +1349,13 @@ void CPU::PGXP::CPU_ADD(u32 instr, u32 rsVal, u32 rtVal)
     const double x = f16Unsign(prsVal.GetValidX(rsVal)) + f16Unsign(prtVal.GetValidX(rtVal));
 
     // carry on over/underflow
-    const float of = (x > USHRT_MAX) ? 1.f : (x < 0) ? -1.f : 0.f;
+    const float of = (x >= (USHRT_MAX + 1)) ? 1.f : (x < 0) ? -1.f : 0.f;
     prdVal.x = static_cast<float>(f16Sign(x));
     // prdVal.x -= of * (USHRT_MAX + 1);
     prdVal.y = prsVal.GetValidY(rsVal) + prtVal.GetValidY(rtVal) + of;
 
     // truncate on overflow/underflow
-    prdVal.y += (prdVal.y > SHRT_MAX) ? -(USHRT_MAX + 1) : (prdVal.y < SHRT_MIN) ? USHRT_MAX + 1 : 0.f;
+    prdVal.y += (prdVal.y >= (SHRT_MAX + 1)) ? -(USHRT_MAX + 1) : (prdVal.y < SHRT_MIN) ? USHRT_MAX + 1 : 0.f;
 
     prdVal.value = rsVal + rtVal;
 
@@ -981,7 +1363,13 @@ void CPU::PGXP::CPU_ADD(u32 instr, u32 rsVal, u32 rtVal)
     prdVal.flags = prsVal.flags | (prtVal.flags & VALID_XY) | VALID_TAINTED_Z;
 
     SelectZ(prdVal, prsVal, prtVal);
+    if (prsVal.flags & prtVal.flags & VALID_Z)
+      prdVal.z = 0.5f * (prsVal.z + prtVal.z);
+    if (prsVal.flags & prtVal.flags & VALID_Z)
+      prdVal.z = 0.5f * (prsVal.z + prtVal.z);
   }
+
+  g_state.pgxp_gpr[rd(instr)] = prdVal;
 }
 
 void CPU::PGXP::CPU_SUB(u32 instr, u32 rsVal, u32 rtVal)
@@ -990,7 +1378,7 @@ void CPU::PGXP::CPU_SUB(u32 instr, u32 rsVal, u32 rtVal)
 
   PGXP_value& prsVal = g_state.pgxp_gpr[rs(instr)];
   PGXP_value& prtVal = g_state.pgxp_gpr[rt(instr)];
-  PGXP_value& prdVal = g_state.pgxp_gpr[rd(instr)];
+  PGXP_value prdVal;
 
   // Rd = Rs - Rt (signed)
   Validate(&prsVal, rsVal);
@@ -1000,27 +1388,53 @@ void CPU::PGXP::CPU_SUB(u32 instr, u32 rsVal, u32 rtVal)
   {
     prdVal = prsVal;
     CopyZIfMissing(prdVal, prtVal);
+    if (IsExactZero(prsVal, rsVal) && !IsExactZero(prtVal, rtVal))
+      prdVal.flags &= ~VALID_XY;
   }
   else
   {
     const double x = f16Unsign(prsVal.GetValidX(rsVal)) - f16Unsign(prtVal.GetValidX(rtVal));
 
     // carry on over/underflow
-    const float of = (x > USHRT_MAX) ? 1.f : (x < 0) ? -1.f : 0.f;
+    const float of = (x >= (USHRT_MAX + 1)) ? 1.f : (x < 0) ? -1.f : 0.f;
     prdVal.x = static_cast<float>(f16Sign(x));
     // prdVal.x -= of * (USHRT_MAX + 1);
     prdVal.y = prsVal.GetValidY(rsVal) - (prtVal.GetValidY(rtVal) - of);
 
     // truncate on overflow/underflow
-    prdVal.y += (prdVal.y > SHRT_MAX) ? -(USHRT_MAX + 1) : (prdVal.y < SHRT_MIN) ? USHRT_MAX + 1 : 0.f;
+    prdVal.y += (prdVal.y >= (SHRT_MAX + 1)) ? -(USHRT_MAX + 1) : (prdVal.y < SHRT_MIN) ? USHRT_MAX + 1 : 0.f;
 
     prdVal.value = rsVal - rtVal;
 
     // valid x/y only if one side had a valid x/y
-    prdVal.flags = prsVal.flags | (prtVal.flags & VALID_XY) | VALID_TAINTED_Z;
+    prdVal.flags = (IsExactZero(prsVal, rsVal) ? 0u : prsVal.flags) | (prtVal.flags & VALID_XY) | VALID_TAINTED_Z;
 
     SelectZ(prdVal, prsVal, prtVal);
   }
+
+  g_state.pgxp_gpr[rd(instr)] = prdVal;
+}
+
+ALWAYS_INLINE_RELEASE const CPU::PGXP_value*
+CPU::PGXP::KeepExactHalvesThroughPackedMask(PGXP_value& result, u32 rsVal, u32 rtVal, const PGXP_value& prsVal,
+                                            const PGXP_value& prtVal, u32 rdVal)
+{
+  const bool rt_is_mask = ((rtVal >> 16) == 0xFFFFu);
+  const u32 mask_value = rt_is_mask ? rtVal : rsVal;
+  const u32 source_value = rt_is_mask ? rsVal : rtVal;
+  const PGXP_value& source = rt_is_mask ? prsVal : prtVal;
+  const u16 low_mask = static_cast<u16>(mask_value);
+  const s16 source_high = static_cast<s16>(source_value >> 16);
+  if ((mask_value >> 16) != 0xFFFFu || low_mask < 0x0FFF || low_mask == 0xFFFF || (low_mask & (low_mask + 1)) != 0 ||
+      source_high == 0 || source_high == -1 || (source.flags & VALID_ALL) != VALID_ALL)
+  {
+    return nullptr;
+  }
+
+  result.x = static_cast<float>(static_cast<s16>(rdVal)) + (source.x - static_cast<float>(static_cast<s16>(source_value)));
+  result.y = source.y + static_cast<float>(static_cast<u16>(source_value) & ~low_mask) /
+                          static_cast<float>(USHRT_MAX + 1);
+  return &source;
 }
 
 ALWAYS_INLINE_RELEASE void CPU::PGXP::CPU_BITWISE(u32 instr, u32 rdVal, u32 rsVal, u32 rtVal)
@@ -1036,28 +1450,43 @@ ALWAYS_INLINE_RELEASE void CPU::PGXP::CPU_BITWISE(u32 instr, u32 rdVal, u32 rsVa
   vals.d = rsVal;
   valt.d = rtVal;
 
-  PGXP_value ret;
-  ret.flags = ((prsVal.flags | prtVal.flags) & VALID_XY) ? (VALID_XY | VALID_TAINTED_Z) : 0;
+  const bool rs_zero = IsExactZero(prsVal, rsVal);
+  const bool rt_zero = IsExactZero(prtVal, rtVal);
+  const u32 source_flags = (rs_zero ? 0u : prsVal.flags) | (rt_zero ? 0u : prtVal.flags);
+  const bool exact_zero_result = (rdVal == 0 && (rs_zero || rt_zero) && (instr & 0x3F) != NOR_FUNCT);
 
+  PGXP_value ret;
+  ret.flags = ((source_flags & VALID_XY) || exact_zero_result) ? (VALID_XY | VALID_TAINTED_Z) : 0;
+
+  const PGXP_value* x_source = nullptr;
+  const PGXP_value* y_source = nullptr;
   if (vald.w.l == 0)
     ret.x = 0.f;
-  else if (vald.w.l == vals.w.l)
-    ret.x = prsVal.GetValidX(rsVal);
-  else if (vald.w.l == valt.w.l)
-    ret.x = prtVal.GetValidX(rtVal);
+  else if (vald.w.l == vals.w.l && (prsVal.flags & VALID_X))
+    ret.x = (x_source = &prsVal)->x;
+  else if (vald.w.l == valt.w.l && (prtVal.flags & VALID_X))
+    ret.x = (x_source = &prtVal)->x;
   else
     ret.x = static_cast<float>(vald.sw.l);
 
   if (vald.w.h == 0)
     ret.y = 0.f;
-  else if (vald.w.h == vals.w.h)
-    ret.y = prsVal.GetValidY(rsVal);
-  else if (vald.w.h == valt.w.h)
-    ret.y = prtVal.GetValidY(rtVal);
+  else if (vald.w.h == vals.w.h && (prsVal.flags & VALID_Y))
+    ret.y = (y_source = &prsVal)->y;
+  else if (vald.w.h == valt.w.h && (prtVal.flags & VALID_Y))
+    ret.y = (y_source = &prtVal)->y;
   else
     ret.y = static_cast<float>(vald.sw.h);
 
+  if ((instr & 0x3F) == AND_FUNCT)
+  {
+    if (const PGXP_value* mask_source = KeepExactHalvesThroughPackedMask(ret, rsVal, rtVal, prsVal, prtVal, rdVal))
+      x_source = y_source = mask_source;
+  }
+
   SelectZ(ret, prsVal, prtVal);
+  if (x_source && y_source && x_source != y_source && (x_source->flags & y_source->flags & VALID_Z))
+    ret.z = 0.5f * (x_source->z + y_source->z);
 
   ret.value = rdVal;
   g_state.pgxp_gpr[rd(instr)] = ret;
@@ -1077,8 +1506,12 @@ void CPU::PGXP::CPU_OR_(u32 instr, u32 rsVal, u32 rtVal)
   LOG_VALUES_C2(rs(instr), rsVal, rt(instr), rtVal);
 
   // Rd = Rs | Rt
-  const u32 rdVal = rsVal | rtVal;
-  CPU_BITWISE(instr, rdVal, rsVal, rtVal);
+  if (rtVal == 0 && !IsExactZero(g_state.pgxp_gpr[rs(instr)], rsVal))
+    CPU_MOVE(rd(instr), rs(instr), rsVal);
+  else if (rsVal == 0)
+    CPU_MOVE(rd(instr), rt(instr), rtVal);
+  else
+    CPU_BITWISE(instr, rsVal | rtVal, rsVal, rtVal);
 }
 
 void CPU::PGXP::CPU_XOR_(u32 instr, u32 rsVal, u32 rtVal)
@@ -1086,8 +1519,14 @@ void CPU::PGXP::CPU_XOR_(u32 instr, u32 rsVal, u32 rtVal)
   LOG_VALUES_C2(rs(instr), rsVal, rt(instr), rtVal);
 
   // Rd = Rs ^ Rt
-  const u32 rdVal = rsVal ^ rtVal;
-  CPU_BITWISE(instr, rdVal, rsVal, rtVal);
+  if (rs(instr) == rt(instr))
+    CPU_BITWISE(instr, 0, rsVal, rtVal);
+  else if (rtVal == 0 && !IsExactZero(g_state.pgxp_gpr[rs(instr)], rsVal))
+    CPU_MOVE(rd(instr), rs(instr), rsVal);
+  else if (rsVal == 0)
+    CPU_MOVE(rd(instr), rt(instr), rtVal);
+  else
+    CPU_BITWISE(instr, rsVal ^ rtVal, rsVal, rtVal);
 }
 
 void CPU::PGXP::CPU_NOR(u32 instr, u32 rsVal, u32 rtVal)
@@ -1110,13 +1549,10 @@ void CPU::PGXP::CPU_SLT(u32 instr, u32 rsVal, u32 rtVal)
   Validate(&prtVal, rtVal);
 
   PGXP_value ret = prsVal;
-  ret.x = (prsVal.GetValidY(rsVal) < prtVal.GetValidY(rtVal) ||
-           f16Unsign(prsVal.GetValidX(rsVal)) < f16Unsign(prtVal.GetValidX(rtVal))) ?
-            1.f :
-            0.f;
+  ret.value = BoolToUInt32(static_cast<s32>(rsVal) < static_cast<s32>(rtVal));
+  ret.x = static_cast<float>(ret.value);
   ret.y = 0.f;
   ret.flags |= VALID_TAINTED_Z | VALID_X | VALID_Y;
-  ret.value = BoolToUInt32(static_cast<s32>(rsVal) < static_cast<s32>(rtVal));
   g_state.pgxp_gpr[rd(instr)] = ret;
 }
 
@@ -1125,19 +1561,16 @@ void CPU::PGXP::CPU_SLTU(u32 instr, u32 rsVal, u32 rtVal)
   LOG_VALUES_C2(rs(instr), rsVal, rt(instr), rtVal);
 
   // Rd = Rs < Rt (unsigned)
-  PGXP_value& prsVal = g_state.pgxp_gpr[rt(instr)];
+  PGXP_value& prsVal = g_state.pgxp_gpr[rs(instr)];
   PGXP_value& prtVal = g_state.pgxp_gpr[rt(instr)];
   Validate(&prsVal, rsVal);
   Validate(&prtVal, rtVal);
 
   PGXP_value ret = prsVal;
-  ret.x = (f16Unsign(prsVal.GetValidY(rsVal)) < f16Unsign(prtVal.GetValidY(rtVal)) ||
-           f16Unsign(prsVal.GetValidX(rsVal)) < f16Unsign(prtVal.GetValidX(rtVal))) ?
-            1.f :
-            0.f;
+  ret.value = BoolToUInt32(rsVal < rtVal);
+  ret.x = static_cast<float>(ret.value);
   ret.y = 0.f;
   ret.flags |= VALID_TAINTED_Z | VALID_X | VALID_Y;
-  ret.value = BoolToUInt32(rsVal < rtVal);
   g_state.pgxp_gpr[rd(instr)] = ret;
 }
 
@@ -1158,7 +1591,7 @@ void CPU::PGXP::CPU_MULT(u32 instr, u32 rsVal, u32 rtVal)
   PGXP_value& ploVal = g_state.pgxp_gpr[static_cast<u8>(Reg::lo)];
   PGXP_value& phiVal = g_state.pgxp_gpr[static_cast<u8>(Reg::hi)];
   ploVal = prsVal;
-  CopyZIfMissing(ploVal, prsVal);
+  CopyZIfMissing(ploVal, prtVal);
 
   // Z/valid is the same
   phiVal = ploVal;
@@ -1214,7 +1647,7 @@ void CPU::PGXP::CPU_MULTU(u32 instr, u32 rsVal, u32 rtVal)
   PGXP_value& ploVal = g_state.pgxp_gpr[static_cast<u8>(Reg::lo)];
   PGXP_value& phiVal = g_state.pgxp_gpr[static_cast<u8>(Reg::hi)];
   ploVal = prsVal;
-  CopyZIfMissing(ploVal, prsVal);
+  CopyZIfMissing(ploVal, prtVal);
 
   // Z/valid is the same
   phiVal = ploVal;
@@ -1271,7 +1704,7 @@ void CPU::PGXP::CPU_DIV(u32 instr, u32 rsVal, u32 rtVal)
   PGXP_value& ploVal = g_state.pgxp_gpr[static_cast<u8>(Reg::lo)];
   PGXP_value& phiVal = g_state.pgxp_gpr[static_cast<u8>(Reg::hi)];
   ploVal = prsVal;
-  CopyZIfMissing(ploVal, prsVal);
+  CopyZIfMissing(ploVal, prtVal);
 
   // Z/valid is the same
   phiVal = ploVal;
@@ -1279,15 +1712,16 @@ void CPU::PGXP::CPU_DIV(u32 instr, u32 rsVal, u32 rtVal)
   double vs = f16Unsign(prsVal.GetValidX(rsVal)) + prsVal.GetValidY(rsVal) * (double)(1 << 16);
   double vt = f16Unsign(prtVal.GetValidX(rtVal)) + prtVal.GetValidY(rtVal) * (double)(1 << 16);
 
-  double lo = vs / vt;
+  const bool zero_divisor = (rtVal == 0 || vt == 0.0);
+  double lo = zero_divisor ? 0.0 : (vs / vt);
   ploVal.y = (float)f16Sign(f16Overflow(lo));
   ploVal.x = (float)f16Sign(lo);
-  ploVal.flags |= VALID_TAINTED_Z | (prtVal.flags & VALID_XY);
+  ploVal.flags |= VALID_TAINTED_Z | (zero_divisor ? 0u : (prtVal.flags & VALID_XY));
 
-  double hi = fmod(vs, vt);
+  double hi = zero_divisor ? 0.0 : fmod(vs, vt);
   phiVal.y = (float)f16Sign(f16Overflow(hi));
   phiVal.x = (float)f16Sign(hi);
-  phiVal.flags |= VALID_TAINTED_Z | (prtVal.flags & VALID_XY);
+  phiVal.flags |= VALID_TAINTED_Z | (zero_divisor ? 0u : (prtVal.flags & VALID_XY));
 
   // compute PSX value
   if (static_cast<s32>(rtVal) == 0)
@@ -1307,6 +1741,12 @@ void CPU::PGXP::CPU_DIV(u32 instr, u32 rsVal, u32 rtVal)
     ploVal.value = static_cast<u32>(static_cast<s32>(rsVal) / static_cast<s32>(rtVal));
     phiVal.value = static_cast<u32>(static_cast<s32>(rsVal) % static_cast<s32>(rtVal));
   }
+
+  if (zero_divisor)
+  {
+    SetFromNativeValue(ploVal);
+    SetFromNativeValue(phiVal);
+  }
 }
 
 void CPU::PGXP::CPU_DIVU(u32 instr, u32 rsVal, u32 rtVal)
@@ -1323,7 +1763,7 @@ void CPU::PGXP::CPU_DIVU(u32 instr, u32 rsVal, u32 rtVal)
   PGXP_value& ploVal = g_state.pgxp_gpr[static_cast<u8>(Reg::lo)];
   PGXP_value& phiVal = g_state.pgxp_gpr[static_cast<u8>(Reg::hi)];
   ploVal = prsVal;
-  CopyZIfMissing(ploVal, prsVal);
+  CopyZIfMissing(ploVal, prtVal);
 
   // Z/valid is the same
   phiVal = ploVal;
@@ -1331,15 +1771,16 @@ void CPU::PGXP::CPU_DIVU(u32 instr, u32 rsVal, u32 rtVal)
   double vs = f16Unsign(prsVal.GetValidX(rsVal)) + f16Unsign(prsVal.GetValidY(rsVal)) * (double)(1 << 16);
   double vt = f16Unsign(prtVal.GetValidX(rtVal)) + f16Unsign(prtVal.GetValidY(rtVal)) * (double)(1 << 16);
 
-  double lo = vs / vt;
+  const bool zero_divisor = (rtVal == 0 || vt == 0.0);
+  double lo = zero_divisor ? 0.0 : (vs / vt);
   ploVal.y = (float)f16Sign(f16Overflow(lo));
   ploVal.x = (float)f16Sign(lo);
-  ploVal.flags |= VALID_TAINTED_Z | (prtVal.flags & VALID_XY);
+  ploVal.flags |= VALID_TAINTED_Z | (zero_divisor ? 0u : (prtVal.flags & VALID_XY));
 
-  double hi = fmod(vs, vt);
+  double hi = zero_divisor ? 0.0 : fmod(vs, vt);
   phiVal.y = (float)f16Sign(f16Overflow(hi));
   phiVal.x = (float)f16Sign(hi);
-  phiVal.flags |= VALID_TAINTED_Z | (prtVal.flags & VALID_XY);
+  phiVal.flags |= VALID_TAINTED_Z | (zero_divisor ? 0u : (prtVal.flags & VALID_XY));
 
   if (rtVal == 0)
   {
@@ -1352,377 +1793,186 @@ void CPU::PGXP::CPU_DIVU(u32 instr, u32 rsVal, u32 rtVal)
     ploVal.value = rsVal / rtVal;
     phiVal.value = rsVal % rtVal;
   }
+
+  if (zero_divisor)
+  {
+    SetFromNativeValue(ploVal);
+    SetFromNativeValue(phiVal);
+  }
 }
 
 ////////////////////////////////////
 // Shift operations (sa)
 ////////////////////////////////////
-void CPU::PGXP::CPU_SLL(u32 instr, u32 rtVal)
+ALWAYS_INLINE_RELEASE void CPU::PGXP::ShiftLeft(u32 instr, u32 rtVal, u32 sh)
 {
-  LOG_VALUES_C1(rt(instr), rtVal);
-
-  // Rd = Rt << Sa
-  const u32 rdVal = rtVal << sa(instr);
-  const u32 sh = sa(instr);
+  const u32 rdVal = rtVal << sh;
   PGXP_value& prtVal = g_state.pgxp_gpr[rt(instr)];
   Validate(&prtVal, rtVal);
 
-  // TODO: Shift flags
-  double x = f16Unsign(prtVal.x);
-  double y = f16Unsign(prtVal.y);
+  PGXP_value result;
+  result.z = prtVal.z;
+  result.value = rdVal;
+
   if (sh >= 32)
   {
-    x = 0.f;
-    y = 0.f;
-  }
-  else if (sh == 16)
-  {
-    y = f16Sign(x);
-    x = 0.f;
+    result.x = 0.0f;
+    result.y = 0.0f;
+    result.flags = prtVal.flags | VALID_XY | VALID_TAINTED_Z;
   }
   else if (sh >= 16)
   {
-    y = x * (1 << (sh - 16));
-    y = f16Sign(y);
-    x = 0.f;
+    const double y = prtVal.GetValidX(rtVal) * static_cast<double>(1u << (sh - 16));
+    result.y = static_cast<float>((sh == 16) ? y : f16Sign(f16Unsign(y)));
+    result.x = 0.0f;
+    result.flags = prtVal.flags | VALID_TAINTED_Z | ((prtVal.flags & VALID_Y) >> 1);
   }
   else
   {
-    x = x * (1 << sh);
-    y = y * (1 << sh);
-    y += f16Overflow(x);
-    x = f16Sign(x);
-    y = f16Sign(y);
+    const bool bits_lost = ((static_cast<s32>(rdVal) >> sh) != static_cast<s32>(rtVal));
+    const double x = f16Unsign(prtVal.GetValidX(rtVal)) * static_cast<double>(1u << sh);
+    const double y_in = bits_lost ? static_cast<double>(static_cast<u16>(rtVal >> 16)) :
+                                    f16Unsign(prtVal.GetValidY(rtVal));
+    const double y = y_in * static_cast<double>(1u << sh) + f16Overflow(x);
+    result.x = static_cast<float>(f16Sign(x));
+    result.y = static_cast<float>(f16Sign(y));
+    result.flags = (prtVal.flags & ~BITFIELD) | VALID_TAINTED_Z | (bits_lost ? BITFIELD : 0u);
   }
 
-  PGXP_value& prdVal = g_state.pgxp_gpr[rd(instr)];
-  prdVal = prtVal;
-  prdVal.x = static_cast<float>(x);
-  prdVal.y = static_cast<float>(y);
-  prdVal.value = rdVal;
-  prdVal.flags |= VALID_TAINTED_Z;
+  g_state.pgxp_gpr[rd(instr)] = result;
+}
+
+ALWAYS_INLINE_RELEASE void CPU::PGXP::ShiftRight(u32 instr, u32 rtVal, u32 sh, bool arithmetic, bool variable)
+{
+  PGXP_value& prtVal = g_state.pgxp_gpr[rt(instr)];
+  Validate(&prtVal, rtVal);
+  if (sh == 0)
+  {
+    g_state.pgxp_gpr[rd(instr)] = prtVal;
+    return;
+  }
+
+  const u32 rdVal = arithmetic ? static_cast<u32>(static_cast<s32>(rtVal) >> sh) : (rtVal >> sh);
+  const s16 native_high = static_cast<s16>(rtVal >> 16);
+  const s16 native_low = static_cast<s16>(rtVal);
+  const double high_offset = f16Sign(prtVal.GetValidY(rtVal) - native_high);
+
+  PGXP_value result;
+  result.z = prtVal.z;
+  result.value = rdVal;
+
+  if (sh >= 16)
+  {
+    const double base = (prtVal.flags & BITFIELD) ?
+                          static_cast<double>(static_cast<s32>(rdVal)) * static_cast<double>(1u << (sh - 16)) :
+                          static_cast<double>(arithmetic ? native_high : static_cast<u16>(native_high));
+    const double value = std::trunc((base + high_offset) / static_cast<double>(1u << (sh - 16)) * (USHRT_MAX + 1)) /
+                         static_cast<double>(USHRT_MAX + 1);
+    result.x = static_cast<float>(f16Sign(value));
+    result.y = static_cast<float>(std::floor(value / static_cast<double>(USHRT_MAX + 1)));
+    result.flags = (prtVal.flags & ~(VALID_X | BITFIELD)) | ((prtVal.flags & VALID_Y) >> 1) | VALID_TAINTED_Z;
+    g_state.pgxp_gpr[rd(instr)] = result;
+    return;
+  }
+
+  if (arithmetic && !variable && !(prtVal.flags & VALID_Z))
+  {
+    result.x = static_cast<float>(static_cast<s16>(rdVal));
+    result.y = static_cast<float>(static_cast<s16>(rdVal >> 16));
+    result.z = 0.0f;
+    result.flags = VALID_XY | VALID_TAINTED_Z;
+    g_state.pgxp_gpr[rd(instr)] = result;
+    return;
+  }
+
+  double x = prtVal.GetValidX(rtVal);
+  double y = arithmetic ? prtVal.GetValidY(rtVal) : f16Unsign(prtVal.GetValidY(rtVal));
+  if (x - native_low > 32768.0)
+    x -= static_cast<double>(USHRT_MAX + 1);
+  else if (x - native_low < -32768.0)
+    x += static_cast<double>(USHRT_MAX + 1);
+  const bool x_negative = (x < 0.0);
+
+  const s32 low_extended = native_low;
+  const u32 high_with_low_sign = (rtVal & 0xFFFF0000u) | (static_cast<u32>(low_extended >> 16) & 0xFFFFu);
+  const s32 shifted_low = low_extended >> sh;
+  const u32 shifted_high = arithmetic ? static_cast<u32>(static_cast<s32>(high_with_low_sign) >> sh) :
+                                        (high_with_low_sign >> sh);
+  const s16 low_sign = static_cast<s16>(low_extended >> 16);
+  const s16 shifted_high_upper = static_cast<s16>(shifted_high >> 16);
+
+  if (static_cast<s16>(shifted_low) != low_sign)
+    x /= static_cast<double>(1u << sh);
+  else
+    x = static_cast<s16>(shifted_low);
+
+  const bool high_only_sign = (shifted_high_upper == 0 || shifted_high_upper == -1);
+  const bool high_moved_into_low = (static_cast<s16>(shifted_high) != low_sign);
+  if (high_moved_into_low)
+  {
+    x += (high_only_sign ? y : static_cast<double>(static_cast<u16>(native_high))) *
+         static_cast<double>(1u << (16 - sh));
+    if (x_negative)
+      x += static_cast<double>(1u << (16 - sh));
+  }
+
+  if (high_only_sign)
+  {
+    if (high_moved_into_low)
+    {
+      x = std::trunc(x * (USHRT_MAX + 1)) / static_cast<double>(USHRT_MAX + 1);
+      y = std::floor(x / static_cast<double>(USHRT_MAX + 1));
+    }
+    else
+    {
+      y = shifted_high_upper;
+    }
+  }
+  else
+  {
+    y = shifted_high_upper + high_offset / static_cast<double>(1u << sh);
+  }
+
+  result.x = static_cast<float>(f16Sign(x));
+  result.y = static_cast<float>(f16Sign(y));
+  result.flags = prtVal.flags | VALID_TAINTED_Z;
+  g_state.pgxp_gpr[rd(instr)] = result;
+}
+
+void CPU::PGXP::CPU_SLL(u32 instr, u32 rtVal)
+{
+  LOG_VALUES_C1(rt(instr), rtVal);
+  ShiftLeft(instr, rtVal, sa(instr));
 }
 
 void CPU::PGXP::CPU_SRL(u32 instr, u32 rtVal)
 {
   LOG_VALUES_C1(rt(instr), rtVal);
-
-  // Rd = Rt >> Sa
-  const u32 rdVal = rtVal >> sa(instr);
-  const u32 sh = sa(instr);
-  PGXP_value& prtVal = g_state.pgxp_gpr[rt(instr)];
-  Validate(&prtVal, rtVal);
-
-  double x = prtVal.x;
-  double y = f16Unsign(prtVal.y);
-
-  psx_value iX;
-  iX.d = rtVal;
-  psx_value iY;
-  iY.d = rtVal;
-
-  iX.sd = (iX.sd << 16) >> 16; // remove Y
-  iY.sw.l = iX.sw.h;           // overwrite x with sign(x)
-
-  // Shift test values
-  psx_value dX;
-  dX.sd = iX.sd >> sh;
-  psx_value dY;
-  dY.d = iY.d >> sh;
-
-  if (dX.sw.l != iX.sw.h)
-    x = x / (1 << sh);
-  else
-    x = dX.sw.l; // only sign bits left
-
-  if (dY.sw.l != iX.sw.h)
-  {
-    if (sh == 16)
-    {
-      x = y;
-    }
-    else if (sh < 16)
-    {
-      x += y * (1 << (16 - sh));
-      if (g_state.pgxp_gpr[rt(instr)].x < 0)
-        x += 1 << (16 - sh);
-    }
-    else
-    {
-      x += y / (1 << (sh - 16));
-    }
-  }
-
-  if ((dY.sw.h == 0) || (dY.sw.h == -1))
-    y = dY.sw.h;
-  else
-    y = y / (1 << sh);
-
-  x = f16Sign(x);
-  y = f16Sign(y);
-
-  PGXP_value& prdVal = g_state.pgxp_gpr[rd(instr)];
-  prdVal = prtVal;
-  prdVal.x = static_cast<float>(x);
-  prdVal.y = static_cast<float>(y);
-  prdVal.value = rdVal;
-  prdVal.flags |= VALID_TAINTED_Z;
+  ShiftRight(instr, rtVal, sa(instr), false, false);
 }
 
 void CPU::PGXP::CPU_SRA(u32 instr, u32 rtVal)
 {
   LOG_VALUES_C1(rt(instr), rtVal);
-
-  // Rd = Rt >> Sa
-  const u32 rdVal = static_cast<u32>(static_cast<s32>(rtVal) >> sa(instr));
-  const u32 sh = sa(instr);
-  PGXP_value& prtVal = g_state.pgxp_gpr[rt(instr)];
-  Validate(&prtVal, rtVal);
-
-  double x = prtVal.x;
-  double y = prtVal.y;
-
-  psx_value iX;
-  iX.d = rtVal;
-  psx_value iY;
-  iY.d = rtVal;
-
-  iX.sd = (iX.sd << 16) >> 16; // remove Y
-  iY.sw.l = iX.sw.h;           // overwrite x with sign(x)
-
-  // Shift test values
-  psx_value dX;
-  dX.sd = iX.sd >> sh;
-  psx_value dY;
-  dY.sd = iY.sd >> sh;
-
-  if (dX.sw.l != iX.sw.h)
-    x = x / (1 << sh);
-  else
-    x = dX.sw.l; // only sign bits left
-
-  if (dY.sw.l != iX.sw.h)
-  {
-    if (sh == 16)
-    {
-      x = y;
-    }
-    else if (sh < 16)
-    {
-      x += y * (1 << (16 - sh));
-      if (g_state.pgxp_gpr[rt(instr)].x < 0)
-        x += 1 << (16 - sh);
-    }
-    else
-    {
-      x += y / (1 << (sh - 16));
-    }
-  }
-
-  if ((dY.sw.h == 0) || (dY.sw.h == -1))
-    y = dY.sw.h;
-  else
-    y = y / (1 << sh);
-
-  x = f16Sign(x);
-  y = f16Sign(y);
-
-  PGXP_value& prdVal = g_state.pgxp_gpr[rd(instr)];
-  prdVal = prtVal;
-  prdVal.x = static_cast<float>(x);
-  prdVal.y = static_cast<float>(y);
-  prdVal.value = rdVal;
-  prdVal.flags |= VALID_TAINTED_Z;
-
-  // Use low precision/rounded values when we're not shifting an entire component,
-  // and it's not originally from a 3D value. Too many false positives in P2/etc.
-  // What we probably should do is not set the valid flag on non-3D values to begin
-  // with, only letting them become valid when used in another expression.
-  if (!(prdVal.flags & VALID_Z) && sh < 16)
-  {
-    prdVal.flags = 0;
-    MakeValid(&prdVal, rdVal);
-  }
+  ShiftRight(instr, rtVal, sa(instr), true, false);
 }
 
-////////////////////////////////////
-// Shift operations variable
-////////////////////////////////////
-void CPU::PGXP::CPU_SLLV(u32 instr, u32 rtVal, u32 rsVal)
+void CPU::PGXP::CPU_SLLV(u32 instr, u32 rsVal, u32 rtVal)
 {
   LOG_VALUES_C2(rt(instr), rtVal, rs(instr), rsVal);
-
-  // Rd = Rt << Rs
-  const u32 rdVal = rtVal << rsVal;
-  const u32 sh = rsVal & 0x1F;
-  PGXP_value& prtVal = g_state.pgxp_gpr[rt(instr)];
-  PGXP_value& prsVal = g_state.pgxp_gpr[rs(instr)];
-  Validate(&prtVal, rtVal);
-  Validate(&prsVal, rsVal);
-
-  double x = f16Unsign(prtVal.x);
-  double y = f16Unsign(prtVal.y);
-  if (sh >= 32)
-  {
-    x = 0.f;
-    y = 0.f;
-  }
-  else if (sh == 16)
-  {
-    y = f16Sign(x);
-    x = 0.f;
-  }
-  else if (sh >= 16)
-  {
-    y = x * (1 << (sh - 16));
-    y = f16Sign(y);
-    x = 0.f;
-  }
-  else
-  {
-    x = x * (1 << sh);
-    y = y * (1 << sh);
-    y += f16Overflow(x);
-    x = f16Sign(x);
-    y = f16Sign(y);
-  }
-
-  PGXP_value& prdVal = g_state.pgxp_gpr[rd(instr)];
-  prdVal = prtVal;
-  prdVal.x = static_cast<float>(x);
-  prdVal.y = static_cast<float>(y);
-  prdVal.value = rdVal;
-  prdVal.flags |= VALID_TAINTED_Z;
+  ShiftLeft(instr, rtVal, rsVal & 0x1F);
 }
 
-void CPU::PGXP::CPU_SRLV(u32 instr, u32 rtVal, u32 rsVal)
+void CPU::PGXP::CPU_SRLV(u32 instr, u32 rsVal, u32 rtVal)
 {
   LOG_VALUES_C2(rt(instr), rtVal, rs(instr), rsVal);
-
-  // Rd = Rt >> Sa
-  const u32 rdVal = rtVal >> rsVal;
-  const u32 sh = rsVal & 0x1F;
-  PGXP_value& prtVal = g_state.pgxp_gpr[rt(instr)];
-  PGXP_value& prsVal = g_state.pgxp_gpr[rs(instr)];
-  Validate(&prtVal, rtVal);
-  Validate(&prsVal, rsVal);
-
-  double x = prtVal.x;
-  double y = f16Unsign(prtVal.y);
-
-  psx_value iX;
-  iX.d = rtVal;
-  psx_value iY;
-  iY.d = rtVal;
-
-  iX.sd = (iX.sd << 16) >> 16; // remove Y
-  iY.sw.l = iX.sw.h;           // overwrite x with sign(x)
-
-  // Shift test values
-  psx_value dX;
-  dX.sd = iX.sd >> sh;
-  psx_value dY;
-  dY.d = iY.d >> sh;
-
-  if (dX.sw.l != iX.sw.h)
-    x = x / (1 << sh);
-  else
-    x = dX.sw.l; // only sign bits left
-
-  if (dY.sw.l != iX.sw.h)
-  {
-    if (sh == 16)
-    {
-      x = y;
-    }
-    else if (sh < 16)
-    {
-      x += y * (1 << (16 - sh));
-      if (g_state.pgxp_gpr[rt(instr)].x < 0)
-        x += 1 << (16 - sh);
-    }
-    else
-    {
-      x += y / (1 << (sh - 16));
-    }
-  }
-
-  if ((dY.sw.h == 0) || (dY.sw.h == -1))
-    y = dY.sw.h;
-  else
-    y = y / (1 << sh);
-
-  PGXP_value& prdVal = g_state.pgxp_gpr[rd(instr)];
-  prdVal = prtVal;
-  prdVal.x = static_cast<float>(f16Sign(x));
-  prdVal.y = static_cast<float>(f16Sign(y));
-  prdVal.value = rdVal;
-  prdVal.flags |= VALID_TAINTED_Z;
+  ShiftRight(instr, rtVal, rsVal & 0x1F, false, true);
 }
 
-void CPU::PGXP::CPU_SRAV(u32 instr, u32 rtVal, u32 rsVal)
+void CPU::PGXP::CPU_SRAV(u32 instr, u32 rsVal, u32 rtVal)
 {
   LOG_VALUES_C2(rt(instr), rtVal, rs(instr), rsVal);
-
-  // Rd = Rt >> Sa
-  const u32 rdVal = static_cast<u32>(static_cast<s32>(rtVal) >> rsVal);
-  const u32 sh = rsVal & 0x1F;
-  PGXP_value& prtVal = g_state.pgxp_gpr[rt(instr)];
-  PGXP_value& prsVal = g_state.pgxp_gpr[rs(instr)];
-  Validate(&prtVal, rtVal);
-  Validate(&prsVal, rsVal);
-
-  double x = prtVal.x;
-  double y = prtVal.y;
-
-  psx_value iX;
-  iX.d = rtVal;
-  psx_value iY;
-  iY.d = rtVal;
-
-  iX.sd = (iX.sd << 16) >> 16; // remove Y
-  iY.sw.l = iX.sw.h;           // overwrite x with sign(x)
-
-  // Shift test values
-  psx_value dX;
-  dX.sd = iX.sd >> sh;
-  psx_value dY;
-  dY.sd = iY.sd >> sh;
-
-  if (dX.sw.l != iX.sw.h)
-    x = x / (1 << sh);
-  else
-    x = dX.sw.l; // only sign bits left
-
-  if (dY.sw.l != iX.sw.h)
-  {
-    if (sh == 16)
-    {
-      x = y;
-    }
-    else if (sh < 16)
-    {
-      x += y * (1 << (16 - sh));
-      if (g_state.pgxp_gpr[rt(instr)].x < 0)
-        x += 1 << (16 - sh);
-    }
-    else
-    {
-      x += y / (1 << (sh - 16));
-    }
-  }
-
-  if ((dY.sw.h == 0) || (dY.sw.h == -1))
-    y = dY.sw.h;
-  else
-    y = y / (1 << sh);
-
-  PGXP_value& prdVal = g_state.pgxp_gpr[rd(instr)];
-  prdVal = prtVal;
-  prdVal.x = static_cast<float>(f16Sign(x));
-  prdVal.y = static_cast<float>(f16Sign(y));
-  prdVal.value = rdVal;
-  prdVal.flags |= VALID_TAINTED_Z;
+  ShiftRight(instr, rtVal, rsVal & 0x1F, true, true);
 }
 
 void CPU::PGXP::CPU_MFC0(u32 instr, u32 rdVal)
@@ -1735,12 +1985,12 @@ void CPU::PGXP::CPU_MFC0(u32 instr, u32 rdVal)
   g_state.pgxp_gpr[rt(instr)].value = rdVal;
 }
 
-void CPU::PGXP::CPU_MTC0(u32 instr, u32 rdVal, u32 rtVal)
+void CPU::PGXP::CPU_MTC0(u32 instr, u32 rtVal)
 {
   LOG_VALUES_C1(rt(instr), rtVal);
 
   // CP0[Rd] = CPU[Rt]
   Validate(&g_state.pgxp_gpr[rt(instr)], rtVal);
   g_state.pgxp_cop0[rd(instr)] = g_state.pgxp_gpr[rt(instr)];
-  g_state.pgxp_cop0[rd(instr)].value = rdVal;
+  g_state.pgxp_cop0[rd(instr)].value = rtVal;
 }

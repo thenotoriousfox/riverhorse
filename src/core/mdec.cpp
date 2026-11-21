@@ -1,7 +1,8 @@
 // SPDX-FileCopyrightText: 2019-2024 Connor McLaughlin <stenzek@gmail.com>
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #include "mdec.h"
+#include "cdrom.h"
 #include "cpu_core.h"
 #include "dma.h"
 #include "host.h"
@@ -130,6 +131,7 @@ namespace {
 struct MDECState
 {
   StatusRegister status = {};
+  u8 active_frame_count = 0;
   bool enable_dma_in = false;
   bool enable_dma_out = false;
 
@@ -173,13 +175,20 @@ void MDEC::Shutdown()
 
 void MDEC::Reset()
 {
+  s_state.active_frame_count = 0;
   s_state.block_copy_out_event.Deactivate();
   SoftReset();
+}
+
+bool MDEC::IsDecodingMacroblock()
+{
+  return (s_state.state == State::DecodingMacroblock);
 }
 
 bool MDEC::DoState(StateWrapper& sw)
 {
   sw.Do(&s_state.status.bits);
+  sw.DoEx(&s_state.active_frame_count, 91, static_cast<u8>(0));
   sw.Do(&s_state.enable_dma_in);
   sw.Do(&s_state.enable_dma_out);
   sw.Do(&s_state.data_in_fifo);
@@ -209,7 +218,20 @@ bool MDEC::DoState(StateWrapper& sw)
   bool block_copy_out_pending = HasPendingBlockCopyOut();
   sw.Do(&block_copy_out_pending);
   if (sw.IsReading())
+  {
+    const bool valid_state =
+      s_state.state <= State::NoCommand && (s_state.state == State::WritingMacroblock) == block_copy_out_pending &&
+      (s_state.state != State::SetIqTable || s_state.remaining_halfwords == 32 ||
+       s_state.remaining_halfwords == 64) &&
+      (s_state.state != State::SetScaleTable || s_state.remaining_halfwords == 64);
+    if (!valid_state)
+    {
+      SoftReset();
+      return false;
+    }
+
     s_state.block_copy_out_event.SetState(block_copy_out_pending);
+  }
 
   return !sw.HasError();
 }
@@ -295,7 +317,7 @@ void MDEC::DMAWrite(const u32* words, u32 word_count)
     WARNING_LOG("Input FIFO overflow (writing {}, space {})", word_count * 2, s_state.data_in_fifo.GetSpace());
   }
 
-  const u32 halfwords_to_write = std::min(word_count * 2, s_state.data_in_fifo.GetSpace() & ~u32(2));
+  const u32 halfwords_to_write = std::min(word_count * 2, s_state.data_in_fifo.GetSpace() & ~u32(1));
   s_state.data_in_fifo.PushRange(reinterpret_cast<const u16*>(words), halfwords_to_write);
   Execute();
 }
@@ -338,7 +360,9 @@ void MDEC::UpdateStatus()
   s_state.status.current_block = (s_state.current_block + 4) % NUM_BLOCKS;
 
   // we always want data in if it's enabled
-  const bool data_in_request = s_state.enable_dma_in && s_state.data_in_fifo.GetSpace() >= (32 * 2);
+  const bool data_in_request =
+    (s_state.enable_dma_in && s_state.state != State::Idle &&
+     s_state.data_in_fifo.GetSize() < s_state.remaining_halfwords && s_state.data_in_fifo.GetSpace() >= (32 * 2));
   s_state.status.data_in_request = data_in_request;
   DMA::SetRequest(DMA::Channel::MDECin, data_in_request);
 
@@ -357,6 +381,9 @@ u32 MDEC::ReadDataRegister()
     {
       DEV_LOG("MDEC data out FIFO empty on read - stalling CPU");
       CPU::AddPendingTicks(s_state.block_copy_out_event.GetTicksUntilNextExecution());
+      s_state.block_copy_out_event.InvokeEarly(true);
+      if (s_state.data_out_fifo.IsEmpty())
+        return UINT32_C(0xFFFFFFFF);
     }
     else
     {
@@ -378,14 +405,34 @@ void MDEC::WriteCommandRegister(u32 value)
 {
   TRACE_LOG("MDEC command/data register <- 0x{:08X}", value);
 
+  if (s_state.data_in_fifo.GetSpace() < 2)
+    return;
+
   s_state.data_in_fifo.Push(Truncate16(value));
   s_state.data_in_fifo.Push(Truncate16(value >> 16));
 
   Execute();
 }
 
+bool MDEC::IsActive()
+{
+  return (s_state.active_frame_count > 0);
+}
+
+void MDEC::EndFrame()
+{
+  s_state.active_frame_count -= BoolToUInt8(s_state.active_frame_count > 0);
+}
+
 void MDEC::Execute()
 {
+  static constexpr u8 ACTIVE_FRAMES_AFTER_DECODE = 30;
+  if (std::exchange(s_state.active_frame_count, ACTIVE_FRAMES_AFTER_DECODE) == 0 &&
+      g_settings.cdrom_disable_speedup_on_mdec)
+  {
+    CDROM::DisableReadSpeedup();
+  }
+
   for (;;)
   {
     switch (s_state.state)
@@ -402,7 +449,6 @@ void MDEC::Execute()
         s_state.status.data_output_signed = cw.data_output_signed;
         s_state.status.data_output_bit15 = cw.data_output_bit15;
         s_state.data_in_fifo.Remove(2);
-        s_state.data_out_fifo.Clear();
 
         u32 num_words;
         State new_state;
@@ -435,7 +481,6 @@ void MDEC::Execute()
 
         s_state.remaining_halfwords = num_words * 2;
         s_state.state = new_state;
-        UpdateStatus();
         continue;
       }
 
@@ -472,7 +517,6 @@ void MDEC::Execute()
 
         HandleSetQuantTableCommand();
         s_state.state = State::Idle;
-        UpdateStatus();
         continue;
       }
 
@@ -483,7 +527,6 @@ void MDEC::Execute()
 
         HandleSetScaleCommand();
         s_state.state = State::Idle;
-        UpdateStatus();
         continue;
       }
 
@@ -493,11 +536,10 @@ void MDEC::Execute()
         const u32 words_to_consume = std::min(s_state.remaining_halfwords, s_state.data_in_fifo.GetSize());
         s_state.data_in_fifo.Remove(words_to_consume);
         s_state.remaining_halfwords -= words_to_consume;
-        if (s_state.remaining_halfwords == 0)
+        if (s_state.remaining_halfwords > 0)
           goto finished;
 
         s_state.state = State::Idle;
-        UpdateStatus();
         continue;
       }
 
@@ -707,13 +749,13 @@ void MDEC::CopyOutBlock(void* param, TickCount ticks, TickCount ticks_late)
           u16 r = Truncate16((color >> 3) & 0x1Fu);
           u16 g = Truncate16((color >> 11) & 0x1Fu);
           u16 b = Truncate16((color >> 19) & 0x1Fu);
-          const u16 color15a = r | (g << 5) | (b << 10) | (a << 15);
+          const u16 color15a = static_cast<u16>(r | (g << 5) | (b << 10)) | a;
 
           color = s_state.block_rgb[i++];
           r = Truncate16((color >> 3) & 0x1Fu);
           g = Truncate16((color >> 11) & 0x1Fu);
           b = Truncate16((color >> 19) & 0x1Fu);
-          const u16 color15b = r | (g << 5) | (b << 10) | (a << 15);
+          const u16 color15b = static_cast<u16>(r | (g << 5) | (b << 10)) | a;
 
           s_state.data_out_fifo.Push(ZeroExtend32(color15a) | (ZeroExtend32(color15b) << 16));
         }
@@ -861,22 +903,25 @@ void MDEC::IDCT_Old(s16* blk)
 void MDEC::YUVToRGB_Old(u32 xx, u32 yy, const std::array<s16, 64>& Crblk, const std::array<s16, 64>& Cbblk,
                         const std::array<s16, 64>& Yblk)
 {
+  static constexpr s32 FRACTION_ONE = 1 << 14;
+  static constexpr s32 CR_TO_R = static_cast<s32>(1.402 * FRACTION_ONE);
+  static constexpr s32 CB_TO_B = static_cast<s32>(1.772 * FRACTION_ONE);
+  static constexpr s32 CB_TO_G = static_cast<s32>(-0.3437 * FRACTION_ONE);
+  static constexpr s32 CR_TO_G = static_cast<s32>(-0.7143 * FRACTION_ONE);
+
   const s16 addval = s_state.status.data_output_signed ? 0 : 0x80;
   for (u32 y = 0; y < 8; y++)
   {
     for (u32 x = 0; x < 8; x++)
     {
-      s16 R = Crblk[((x + xx) / 2) + ((y + yy) / 2) * 8];
-      s16 B = Cbblk[((x + xx) / 2) + ((y + yy) / 2) * 8];
-      s16 G = static_cast<s16>((-0.3437f * static_cast<float>(B)) + (-0.7143f * static_cast<float>(R)));
+      const s32 Cr = Crblk[((x + xx) / 2) + ((y + yy) / 2) * 8];
+      const s32 Cb = Cbblk[((x + xx) / 2) + ((y + yy) / 2) * 8];
+      const s32 Y = Yblk[x + y * 8];
 
-      R = static_cast<s16>(1.402f * static_cast<float>(R));
-      B = static_cast<s16>(1.772f * static_cast<float>(B));
-
-      s16 Y = Yblk[x + y * 8];
-      R = static_cast<s16>(std::clamp(static_cast<int>(Y) + R, -128, 127)) + addval;
-      G = static_cast<s16>(std::clamp(static_cast<int>(Y) + G, -128, 127)) + addval;
-      B = static_cast<s16>(std::clamp(static_cast<int>(Y) + B, -128, 127)) + addval;
+      const s16 R = static_cast<s16>(std::clamp(Y + (CR_TO_R * Cr) / FRACTION_ONE, -128, 127)) + addval;
+      const s16 G =
+        static_cast<s16>(std::clamp(Y + ((CB_TO_G * Cb) + (CR_TO_G * Cr)) / FRACTION_ONE, -128, 127)) + addval;
+      const s16 B = static_cast<s16>(std::clamp(Y + (CB_TO_B * Cb) / FRACTION_ONE, -128, 127)) + addval;
 
       s_state.block_rgb[(x + xx) + ((y + yy) * 16)] = ZeroExtend32(static_cast<u16>(R)) |
                                                       (ZeroExtend32(static_cast<u16>(G)) << 8) |
@@ -990,8 +1035,8 @@ void MDEC::YUVToRGB_New(u32 xx, u32 yy, const std::array<s16, 64>& Crblk, const 
 
     // Need to do the multiply as 32-bit, since 127 * 359 is greater than INT16_MAX.
     // upl16(self) = interleave XYZW0000 -> XXYYZZWW.
-    const GSVector4i Crmul = Cr.mul32l(GSVector4i::cxpr(359)).add16(GSVector4i::cxpr(0x80)).sra32<8>().ps32();
-    const GSVector4i Cbmul = Cb.mul32l(GSVector4i::cxpr(454)).add16(GSVector4i::cxpr(0x80)).sra32<8>().ps32();
+    const GSVector4i Crmul = Cr.mul32l(GSVector4i::cxpr(359)).add32(GSVector4i::cxpr(0x80)).sra32<8>().ps32();
+    const GSVector4i Cbmul = Cb.mul32l(GSVector4i::cxpr(454)).add32(GSVector4i::cxpr(0x80)).sra32<8>().ps32();
     const GSVector4i CrCbmul = (Cb.mul32l(GSVector4i::cxpr(-88)) & GSVector4i::cxpr(~0x1F))
                                  .add32(Cr.mul32l(GSVector4i::cxpr(-183)) & GSVector4i::cxpr(~0x07))
                                  .add32(GSVector4i::cxpr(0x80))
@@ -1015,7 +1060,7 @@ void MDEC::YUVToMono(const std::array<s16, 64>& Yblk)
 {
   const s32 addval = s_state.status.data_output_signed ? 0 : 0x80;
   for (u32 i = 0; i < 64; i++)
-    s_state.block_rgb[i] = static_cast<u32>(std::clamp(SignExtendN<9, s32>(Yblk[i]), -128, 127) + addval);
+    s_state.block_rgb[i] = ZeroExtend32(static_cast<u8>(std::clamp(SignExtendN<9, s32>(Yblk[i]), -128, 127) + addval));
 }
 
 void MDEC::HandleSetQuantTableCommand()
@@ -1033,6 +1078,7 @@ void MDEC::HandleSetQuantTableCommand()
     DebugAssert(s_state.remaining_halfwords >= 32);
 
     s_state.data_in_fifo.PopRange(packed_data.data(), static_cast<u32>(packed_data.size()));
+    s_state.remaining_halfwords -= 32;
     std::memcpy(s_state.iq_uv.data(), packed_data.data(), s_state.iq_uv.size());
   }
 }
@@ -1043,7 +1089,7 @@ void MDEC::HandleSetScaleCommand()
 
   std::array<u16, 64> packed_data;
   s_state.data_in_fifo.PopRange(packed_data.data(), static_cast<u32>(packed_data.size()));
-  s_state.remaining_halfwords -= 32;
+  s_state.remaining_halfwords -= 64;
   SetScaleMatrix(packed_data.data());
 }
 

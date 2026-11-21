@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2019-2022 Connor McLaughlin <stenzek@gmail.com>
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #include "gte.h"
 
@@ -16,6 +16,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <numeric>
 
 namespace GTE {
@@ -208,6 +209,8 @@ static void Execute_DCPL(Instruction inst);
 static void Execute_INTPL(Instruction inst);
 static void Execute_GPL(Instruction inst);
 static void Execute_GPF(Instruction inst);
+static void Execute_PGXPCPU(Instruction inst);
+static InstructionImpl GetNativeInstructionImpl(u32 inst_bits, TickCount* ticks);
 
 } // namespace GTE
 
@@ -801,7 +804,19 @@ void GTE::RTPS(const s16 V[3], u8 shift, bool lm, bool last)
 
     precise_x = std::clamp<float>(precise_x, -1024.0f, 1023.0f);
     precise_y = std::clamp<float>(precise_y, -1024.0f, 1023.0f);
-    CPU::PGXP::GTE_RTPS(precise_x, precise_y, precise_z, REGS.dr32[14]);
+
+    float precise_depth = precise_z;
+    if (g_settings.gpu_pgxp_normalize_depth)
+    {
+      const float depth_row_scale =
+        std::sqrt(static_cast<float>(s32(REGS.RT[2][0]) * REGS.RT[2][0] + s32(REGS.RT[2][1]) * REGS.RT[2][1] +
+                                     s32(REGS.RT[2][2]) * REGS.RT[2][2])) /
+        4096.0f;
+      if (depth_row_scale > 0.0f)
+        precise_depth /= depth_row_scale;
+    }
+
+    CPU::PGXP::GTE_RTPS(precise_x, precise_y, precise_depth, REGS.dr32[14]);
   }
 
   if (last)
@@ -1183,8 +1198,22 @@ void GTE::Execute_GPF(Instruction inst)
 void GTE::ExecuteInstruction(u32 inst_bits)
 {
   const Instruction inst{inst_bits};
+  if (g_settings.UsingPGXPCPUMode())
+  {
+    TickCount ticks;
+    GetNativeInstructionImpl(inst_bits, &ticks);
+    CPU::AddGTETicks(ticks);
+    Execute_PGXPCPU(inst);
+    return;
+  }
+
   switch (inst.command)
   {
+    case 0x00:
+      CPU::AddGTETicks(16);
+      Execute_RTPS(inst);
+      break;
+
     case 0x01:
       CPU::AddGTETicks(15);
       Execute_RTPS(inst);
@@ -1211,7 +1240,7 @@ void GTE::ExecuteInstruction(u32 inst_bits)
       break;
 
     case 0x11:
-      CPU::AddGTETicks(7);
+      CPU::AddGTETicks(8);
       Execute_INTPL(inst);
       break;
 
@@ -1260,6 +1289,7 @@ void GTE::ExecuteInstruction(u32 inst_bits)
       Execute_SQR(inst);
       break;
 
+    case 0x1A:
     case 0x29:
       CPU::AddGTETicks(8);
       Execute_DCPL(inst);
@@ -1306,11 +1336,62 @@ void GTE::ExecuteInstruction(u32 inst_bits)
   }
 }
 
+void GTE::Execute_PGXPCPU(Instruction inst)
+{
+  TickCount native_ticks;
+  const InstructionImpl native_impl = GetNativeInstructionImpl(inst.bits, &native_ticks);
+  const u32 old_ir[3] = {REGS.dr32[9], REGS.dr32[10], REGS.dr32[11]};
+  switch (inst.command)
+  {
+    case 0x06:
+    case 0x2D:
+    case 0x2E:
+      native_impl(inst);
+      break;
+
+    case 0x12:
+      native_impl(inst);
+      if (CPU::PGXP::TracksMVMVAMatrix(inst.mvmva_multiply_matrix))
+        CPU::PGXP::GTE_MVMVA(inst.bits, old_ir);
+      else
+        CPU::PGXP::GTE_DropPreciseMACIR();
+      break;
+
+    case 0x3D:
+      native_impl(inst);
+      CPU::PGXP::GTE_GPF_GPL(old_ir, nullptr, inst.GetShift());
+      break;
+
+    case 0x3E:
+    {
+      const u32 old_mac[3] = {REGS.dr32[25], REGS.dr32[26], REGS.dr32[27]};
+      native_impl(inst);
+      CPU::PGXP::GTE_GPF_GPL(old_ir, old_mac, inst.GetShift());
+    }
+    break;
+
+    default:
+      native_impl(inst);
+      CPU::PGXP::GTE_DropPreciseMACIR();
+      break;
+  }
+}
+
 GTE::InstructionImpl GTE::GetInstructionImpl(u32 inst_bits, TickCount* ticks)
+{
+  const InstructionImpl native_impl = GetNativeInstructionImpl(inst_bits, ticks);
+  return g_settings.UsingPGXPCPUMode() ? &Execute_PGXPCPU : native_impl;
+}
+
+GTE::InstructionImpl GTE::GetNativeInstructionImpl(u32 inst_bits, TickCount* ticks)
 {
   const Instruction inst{inst_bits};
   switch (inst.command)
   {
+    case 0x00:
+      *ticks = 16;
+      return &Execute_RTPS;
+
     case 0x01:
       *ticks = 15;
       return &Execute_RTPS;
@@ -1333,7 +1414,7 @@ GTE::InstructionImpl GTE::GetInstructionImpl(u32 inst_bits, TickCount* ticks)
       return &Execute_DPCS;
 
     case 0x11:
-      *ticks = 7;
+      *ticks = 8;
       return &Execute_INTPL;
 
     case 0x12:
@@ -1372,6 +1453,7 @@ GTE::InstructionImpl GTE::GetInstructionImpl(u32 inst_bits, TickCount* ticks)
       *ticks = 5;
       return &Execute_SQR;
 
+    case 0x1A:
     case 0x29:
       *ticks = 8;
       return &Execute_DCPL;

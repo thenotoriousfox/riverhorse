@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2019-2024 Connor McLaughlin <stenzek@gmail.com>
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #pragma once
 
@@ -87,6 +87,18 @@ struct GPUDrawingArea
   u32 bottom;
 };
 
+ALWAYS_INLINE GSVector4i GetClampedDrawingAreaRect(const GPUDrawingArea& area)
+{
+  if (area.left > area.right || area.top > area.bottom) [[unlikely]]
+    return GSVector4i::zero();
+
+  const u32 right = std::min(area.right + 1, static_cast<u32>(VRAM_WIDTH));
+  const u32 left = std::min(area.left, std::min(area.right, VRAM_WIDTH - 1));
+  const u32 bottom = std::min(area.bottom + 1, static_cast<u32>(VRAM_HEIGHT));
+  const u32 top = std::min(area.top, std::min(area.bottom, VRAM_HEIGHT - 1));
+  return GSVector4i(left, top, right, bottom);
+}
+
 struct GPUDrawingOffset
 {
   s32 x;
@@ -105,7 +117,7 @@ union GPURenderCommand
   BitField<u32, bool, 27, 1> quad_polygon;                   // only for polygons
   BitField<u32, bool, 27, 1> polyline;                       // only for lines
   BitField<u32, bool, 28, 1> shading_enable;                 // 0 - flat, 1 = gouraud
-  BitField<u32, GPUPrimitive, 29, 21> primitive;
+  BitField<u32, GPUPrimitive, 29, 3> primitive;
 
   /// Returns true if texturing should be enabled. Depends on the primitive type.
   ALWAYS_INLINE bool IsTexturingEnabled() const { return (primitive != GPUPrimitive::Line) ? texture_enable : false; }
@@ -168,7 +180,7 @@ static constexpr s32 TruncateGPUVertexPosition(s32 x)
 // bits in GP0(E1h) or texpage part of polygon
 union GPUDrawModeReg
 {
-  static constexpr u16 MASK = 0b1111111111111;
+  static constexpr u16 MASK = 0b11111111111111;
   static constexpr u16 TEXTURE_PAGE_MASK = UINT16_C(0b0000000000011111);
 
   // Polygon texpage commands only affect bits 0-8, 11
@@ -188,7 +200,7 @@ union GPUDrawModeReg
   BitField<u16, GPUTextureMode, 7, 2> texture_mode;
   BitField<u16, bool, 9, 1> dither_enable;
   BitField<u16, bool, 10, 1> draw_to_displayed_field;
-  BitField<u16, bool, 11, 1> texture_disable;
+  BitField<u16, bool, 11, 1> texture_page_y_base_2;
   BitField<u16, bool, 12, 1> texture_x_flip;
   BitField<u16, bool, 13, 1> texture_y_flip;
 
@@ -253,14 +265,18 @@ enum class GPUBackendCommandType : u8
 {
   Wraparound,
   Sync,
+  RunCallback,
+  FlushRender,
   FillVRAM,
   UpdateVRAM,
   CopyVRAM,
   SetDrawingArea,
   UpdateCLUT,
   DrawPolygon,
+  DrawPrecisePolygon,
   DrawRectangle,
   DrawLine,
+  DrawPreciseLine,
 };
 
 union GPUBackendCommandParameters
@@ -274,6 +290,8 @@ union GPUBackendCommandParameters
 
   BitField<u8, bool, 2, 1> set_mask_while_drawing;
   BitField<u8, bool, 3, 1> check_mask_before_draw;
+  BitField<u8, bool, 4, 1> texture_page_changed;
+  BitField<u8, bool, 5, 1> texture_window_changed;
 
   ALWAYS_INLINE bool IsMaskingEnabled() const { return (bits & 12u) != 0u; }
 
@@ -387,6 +405,22 @@ struct GPUBackendDrawPolygonCommand : public GPUBackendDrawCommand
   Vertex vertices[0];
 };
 
+struct GPUBackendDrawPrecisePolygonCommand : public GPUBackendDrawCommand
+{
+  u16 num_vertices;
+  bool valid_w;
+
+  struct Vertex
+  {
+    float x, y, w;
+    s32 native_x, native_y;
+    u32 color;
+    u16 texcoord;
+  };
+
+  Vertex vertices[0];
+};
+
 struct GPUBackendDrawRectangleCommand : public GPUBackendDrawCommand
 {
   s32 x, y;
@@ -417,6 +451,20 @@ struct GPUBackendDrawLineCommand : public GPUBackendDrawCommand
       y = y_;
       color = color_;
     }
+  };
+
+  Vertex vertices[0];
+};
+
+struct GPUBackendDrawPreciseLineCommand : public GPUBackendDrawCommand
+{
+  u16 num_vertices;
+
+  struct Vertex
+  {
+    float x, y;
+    s32 native_x, native_y;
+    u32 color;
   };
 
   Vertex vertices[0];

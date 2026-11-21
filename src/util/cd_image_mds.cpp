@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2019-2024 Connor McLaughlin <stenzek@gmail.com>
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #include "assert.h"
 #include "cd_image.h"
@@ -48,6 +48,7 @@ public:
 
   bool ReadSubChannelQ(SubChannelQ* subq, const Index& index, LBA lba_in_index) override;
   bool HasNonStandardSubchannel() const override;
+  bool LoadSubchannelReplacementFile(std::string_view path) override;
   s64 GetSizeOnDisk() const override;
 
 protected:
@@ -254,6 +255,11 @@ bool CDImageMds::ReadSubChannelQ(SubChannelQ* subq, const Index& index, LBA lba_
     return true;
 
   return CDImage::ReadSubChannelQ(subq, index, lba_in_index);
+}
+
+bool CDImageMds::LoadSubchannelReplacementFile(std::string_view path)
+{
+  return m_sbi.LoadFromFile(path);
 }
 
 bool CDImageMds::HasNonStandardSubchannel() const

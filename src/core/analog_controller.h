@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2019-2024 Connor McLaughlin <stenzek@gmail.com> and contributors.
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #pragma once
 
@@ -117,12 +117,15 @@ private:
   void ProcessAnalogModeToggle();
   void SetMotorState(u32 motor, u8 value);
   void UpdateHostVibration();
-  u8 GetExtraButtonMaskLSB() const;
+  u16 GetExtraButtonMask() const;
+  bool IsRightStickMappingActive(u8 mode) const;
   void ResetRumbleConfig();
   void SetMotorStateForConfigIndex(int index, u8 value);
 
   bool m_force_analog_on_reset = false;
   bool m_analog_dpad_in_digital_mode = false;
+  u8 m_right_stick_shoulder_buttons = 0;
+  u8 m_right_stick_trigger_buttons = 0;
   float m_analog_deadzone = 0.0f;
   float m_analog_sensitivity = 1.33f;
   float m_button_deadzone = 0.0f;

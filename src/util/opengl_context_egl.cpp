@@ -395,6 +395,11 @@ bool OpenGLContextEGL::CreatePBufferSurface()
   return true;
 }
 
+bool OpenGLContextEGL::IsConfigCompatibleWithWindow(EGLConfig config)
+{
+  return true;
+}
+
 bool OpenGLContextEGL::CheckConfigSurfaceFormat(EGLConfig config, GPUTexture::Format format)
 {
   int red_size, green_size, blue_size, alpha_size;
@@ -441,7 +446,7 @@ GPUTexture::Format OpenGLContextEGL::GetSurfaceTextureFormat() const
   {
     return GPUTexture::Format::RGBA5551;
   }
-  else if (red_size == 8 && green_size == 8 && blue_size == 8 && alpha_size == 8)
+  else if (red_size == 8 && green_size == 8 && blue_size == 8 && (alpha_size == 8 || alpha_size == 0))
   {
     return GPUTexture::Format::RGBA8;
   }
@@ -509,8 +514,6 @@ bool OpenGLContextEGL::CreateContext(const Version& version, EGLContext share_co
       surface_attribs[nsurface_attribs++] = 8;
       surface_attribs[nsurface_attribs++] = EGL_BLUE_SIZE;
       surface_attribs[nsurface_attribs++] = 8;
-      surface_attribs[nsurface_attribs++] = EGL_ALPHA_SIZE;
-      surface_attribs[nsurface_attribs++] = 8;
       break;
 
     case GPUTexture::Format::RGB565:
@@ -548,6 +551,16 @@ bool OpenGLContextEGL::CreateContext(const Version& version, EGLContext share_co
   }
   configs.resize(static_cast<u32>(num_configs));
 
+  if (m_wi.type != WindowInfo::Type::Surfaceless)
+  {
+    std::erase_if(configs, [this](EGLConfig check_config) { return !IsConfigCompatibleWithWindow(check_config); });
+    if (configs.empty())
+    {
+      ERROR_LOG("No EGL configs are compatible with the window.");
+      return false;
+    }
+  }
+
   std::optional<EGLConfig> config;
   for (EGLConfig check_config : configs)
   {
@@ -560,7 +573,7 @@ bool OpenGLContextEGL::CreateContext(const Version& version, EGLContext share_co
 
   if (!config.has_value())
   {
-    WARNING_LOG("No EGL configs matched exactly, using first.");
+    INFO_LOG("No EGL configs matched exactly, using first.");
     config = configs.front();
   }
 

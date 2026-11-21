@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2019-2023 Connor McLaughlin <stenzek@gmail.com>
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #include "cue_parser.h"
 
@@ -224,13 +224,15 @@ bool CueParser::File::HandleFileCommand(const char* line, u32 line_number, Error
     return false;
   }
 
-  if (!TokenMatch(mode, "BINARY"))
+  const bool is_wave = TokenMatch(mode, "WAVE");
+  if (!TokenMatch(mode, "BINARY") && !is_wave)
   {
-    SetError(line_number, error, "Only BINARY modes are supported");
+    SetError(line_number, error, "Only BINARY and WAVE files are supported");
     return false;
   }
 
   m_current_file = filename;
+  m_current_file_is_wave = is_wave;
   DEBUG_LOG("File '{}'", filename);
   return true;
 }
@@ -287,6 +289,7 @@ bool CueParser::File::HandleTrackCommand(const char* line, u32 line_number, Erro
   m_current_track = Track();
   m_current_track->number = static_cast<u32>(track_number.value());
   m_current_track->file = m_current_file.value();
+  m_current_track->file_is_wave = m_current_file_is_wave;
   m_current_track->mode = mode;
   return true;
 }

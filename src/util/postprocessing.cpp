@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2019-2023 Connor McLaughlin <stenzek@gmail.com>
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #include "postprocessing.h"
 #include "gpu_device.h"
@@ -653,47 +653,55 @@ bool PostProcessing::Chain::Apply(GPUTexture* input_color, GPUTexture* input_dep
 
 void PostProcessing::Initialize()
 {
-  DisplayChain.LoadStages();
-  InternalChain.LoadStages();
-  s_timer.Reset();
+  GPUDevice::RunOnDeviceThread([&]() {
+    DisplayChain.LoadStages();
+    InternalChain.LoadStages();
+    s_timer.Reset();
+  });
 }
 
 void PostProcessing::UpdateSettings()
 {
-  auto lock = Host::GetSettingsLock();
-  ForAllChains([&lock](Chain& chain) { chain.UpdateSettings(lock); });
+  GPUDevice::RunOnDeviceThread([&]() {
+    auto lock = Host::GetSettingsLock();
+    ForAllChains([&lock](Chain& chain) { chain.UpdateSettings(lock); });
+  });
 }
 
 void PostProcessing::Shutdown()
 {
-  g_gpu_device->RecycleTexture(std::move(s_dummy_texture));
-  s_samplers.clear();
-  ForAllChains([](Chain& chain) {
-    chain.ClearStages();
-    chain.DestroyTextures();
+  GPUDevice::RunOnDeviceThread([&]() {
+    g_gpu_device->RecycleTexture(std::move(s_dummy_texture));
+    s_samplers.clear();
+    ForAllChains([](Chain& chain) {
+      chain.ClearStages();
+      chain.DestroyTextures();
+    });
   });
 }
 
 bool PostProcessing::ReloadShaders()
 {
-  if (!DisplayChain.HasStages() && !InternalChain.HasStages())
-  {
+  return GPUDevice::CallOnDeviceThread([&]() -> bool {
+    if (!DisplayChain.HasStages() && !InternalChain.HasStages())
+    {
+      Host::AddIconOSDMessage("PostProcessing", ICON_FA_PAINT_ROLLER,
+                              TRANSLATE_STR("OSDMessage", "No post-processing shaders are selected."),
+                              Host::OSD_QUICK_DURATION);
+      return false;
+    }
+
+    ForAllChains([](Chain& chain) {
+      chain.ClearStages();
+      chain.DestroyTextures();
+      chain.LoadStages();
+    });
+    s_timer.Reset();
+
     Host::AddIconOSDMessage("PostProcessing", ICON_FA_PAINT_ROLLER,
-                            TRANSLATE_STR("OSDMessage", "No post-processing shaders are selected."),
-                            Host::OSD_QUICK_DURATION);
-    return false;
-  }
-
-  ForAllChains([](Chain& chain) {
-    chain.ClearStages();
-    chain.DestroyTextures();
-    chain.LoadStages();
+                            TRANSLATE_STR("OSDMessage", "Post-processing shaders reloaded."), Host::OSD_QUICK_DURATION);
+    return true;
   });
-  s_timer.Reset();
-
-  Host::AddIconOSDMessage("PostProcessing", ICON_FA_PAINT_ROLLER,
-                          TRANSLATE_STR("OSDMessage", "Post-processing shaders reloaded."), Host::OSD_QUICK_DURATION);
-  return true;
 }
 
 std::unique_ptr<PostProcessing::Shader> PostProcessing::TryLoadingShader(const std::string& shader_name,

@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2019-2023 Connor McLaughlin <stenzek@gmail.com>
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #include "guncon.h"
 #include "gpu.h"
@@ -107,10 +107,13 @@ void GunCon::SetBindState(u32 index, float value)
     return;
   }
 
-  if (pressed)
-    m_button_state &= ~(u16(1) << s_button_indices[static_cast<u8>(index)]);
-  else
-    m_button_state |= u16(1) << s_button_indices[static_cast<u8>(index)];
+  const u16 bit = u16(1) << s_button_indices[static_cast<u8>(index)];
+  const u16 new_state = pressed ? (m_button_state & ~bit) : (m_button_state | bit);
+  if (new_state != m_button_state)
+  {
+    System::SetRunaheadReplayFlag();
+    m_button_state = new_state;
+  }
 }
 
 void GunCon::ResetTransferState()

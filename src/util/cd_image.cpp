@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2019-2023 Connor McLaughlin <stenzek@gmail.com>
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #include "cd_image.h"
 
@@ -10,6 +10,8 @@
 #include "common/log.h"
 #include "common/path.h"
 #include "common/string_util.h"
+
+#include "libchdr/cdrom.h"
 
 #include <array>
 
@@ -23,6 +25,121 @@ u32 CDImage::GetBytesPerSector(TrackMode mode)
 {
   static constexpr std::array<u32, 8> sizes = {{2352, 2048, 2352, 2336, 2048, 2324, 2332, 2352}};
   return sizes[static_cast<u32>(mode)];
+}
+
+const std::array<u8, CDImage::SECTOR_SYNC_SIZE> CDImage::SECTOR_SYNC_PATTERN = {
+  {0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00}};
+
+static constexpr std::array<u32, 256> MakeEDCTable()
+{
+  std::array<u32, 256> table = {};
+  for (u32 i = 0; i < 256; i++)
+  {
+    u32 value = i;
+    for (u32 bit = 0; bit < 8; bit++)
+      value = (value >> 1) ^ ((value & 1) ? 0xD8018001u : 0u);
+    table[i] = value;
+  }
+  return table;
+}
+
+static constexpr std::array<u32, 256> s_edc_table = MakeEDCTable();
+
+static void WriteSectorEDC(u8* sector, u32 start, u32 length, u32 edc_offset)
+{
+  u32 edc = 0;
+  for (u32 i = start; i < start + length; i++)
+    edc = (edc >> 8) ^ s_edc_table[(edc ^ sector[i]) & 0xFF];
+
+  sector[edc_offset + 0] = static_cast<u8>(edc);
+  sector[edc_offset + 1] = static_cast<u8>(edc >> 8);
+  sector[edc_offset + 2] = static_cast<u8>(edc >> 16);
+  sector[edc_offset + 3] = static_cast<u8>(edc >> 24);
+}
+
+static void WriteMode2SectorECC(u8* sector)
+{
+  std::array<u8, CDImage::SECTOR_HEADER_SIZE> header;
+  std::memcpy(header.data(), &sector[CDImage::SECTOR_SYNC_SIZE], header.size());
+  std::memset(&sector[CDImage::SECTOR_SYNC_SIZE], 0, header.size());
+  ecc_generate(sector);
+  std::memcpy(&sector[CDImage::SECTOR_SYNC_SIZE], header.data(), header.size());
+}
+
+static void WriteSectorSyncAndHeader(u8* sector, CDImage::LBA lba, u8 sector_mode)
+{
+  std::memcpy(sector, CDImage::SECTOR_SYNC_PATTERN.data(), CDImage::SECTOR_SYNC_PATTERN.size());
+  const auto [minute, second, frame] = CDImage::Position::FromLBA(lba).ToBCD();
+  sector[12] = minute;
+  sector[13] = second;
+  sector[14] = frame;
+  sector[15] = sector_mode;
+}
+
+static void WriteMode2Subheader(u8* sector, u8 submode)
+{
+  std::memset(&sector[16], 0, 8);
+  sector[18] = submode;
+  sector[22] = submode;
+}
+
+void CDImage::ConvertSectorToRaw(void* buffer, LBA lba, TrackMode mode)
+{
+  static constexpr u32 MODE2_FORM2_DATA_SIZE = 2324;
+  static constexpr u32 MODE2_FORMMIX_DATA_SIZE = 2332;
+  static constexpr u8 SUBMODE_DATA = 0x08;
+  static constexpr u8 SUBMODE_FORM2 = 0x20;
+
+  u8* const sector = static_cast<u8*>(buffer);
+  switch (mode)
+  {
+    case TrackMode::Mode1:
+      std::memmove(&sector[16], sector, DATA_SECTOR_SIZE);
+      WriteSectorSyncAndHeader(sector, lba, 1);
+      WriteSectorEDC(sector, 0, 2064, 2064);
+      std::memset(&sector[2068], 0, 8);
+      ecc_generate(sector);
+      break;
+
+    case TrackMode::Mode2:
+      std::memmove(&sector[16], sector, MODE2_DATA_SECTOR_SIZE);
+      WriteSectorSyncAndHeader(sector, lba, 2);
+      break;
+
+    case TrackMode::Mode2Form1:
+      std::memmove(&sector[24], sector, DATA_SECTOR_SIZE);
+      WriteSectorSyncAndHeader(sector, lba, 2);
+      WriteMode2Subheader(sector, SUBMODE_DATA);
+      WriteSectorEDC(sector, 16, 2056, 2072);
+      WriteMode2SectorECC(sector);
+      break;
+
+    case TrackMode::Mode2Form2:
+      std::memmove(&sector[24], sector, MODE2_FORM2_DATA_SIZE);
+      WriteSectorSyncAndHeader(sector, lba, 2);
+      WriteMode2Subheader(sector, SUBMODE_DATA | SUBMODE_FORM2);
+      WriteSectorEDC(sector, 16, 2332, 2348);
+      break;
+
+    case TrackMode::Mode2FormMix:
+      std::memmove(&sector[16], sector, MODE2_FORMMIX_DATA_SIZE);
+      WriteSectorSyncAndHeader(sector, lba, 2);
+      if (sector[18] & SUBMODE_FORM2)
+      {
+        WriteSectorEDC(sector, 16, 2332, 2348);
+      }
+      else
+      {
+        WriteSectorEDC(sector, 16, 2056, 2072);
+        WriteMode2SectorECC(sector);
+      }
+      break;
+
+    case TrackMode::Audio:
+    case TrackMode::Mode1Raw:
+    case TrackMode::Mode2Raw:
+      break;
+  }
 }
 
 // Adapted from
@@ -81,6 +198,15 @@ std::unique_ptr<CDImage> CDImage::Open(const char* filename, bool allow_patches,
   else if (StringUtil::Strcasecmp(extension, ".cue") == 0)
   {
     image = OpenCueSheetImage(filename, error);
+  }
+  else if (StringUtil::Strcasecmp(extension, ".ccd") == 0)
+  {
+    image = OpenCCDImage(filename, error);
+  }
+  else if (StringUtil::Strcasecmp(extension, ".img") == 0 &&
+           FileSystem::FileExists(Path::ReplaceExtension(filename, "ccd").c_str()))
+  {
+    image = OpenCCDImage(Path::ReplaceExtension(filename, "ccd").c_str(), error);
   }
   else if (StringUtil::Strcasecmp(extension, ".bin") == 0 || StringUtil::Strcasecmp(extension, ".img") == 0 ||
            StringUtil::Strcasecmp(extension, ".iso") == 0)
@@ -302,13 +428,14 @@ bool CDImage::ReadRawSector(void* buffer, SubChannelQ* subq)
   {
     if (m_current_index->file_sector_size > 0)
     {
-      // TODO: This is where we'd reconstruct the header for other mode tracks.
       if (!ReadSectorFromIndex(buffer, *m_current_index, m_position_in_index))
       {
         ERROR_LOG("Read of LBA {} failed", m_position_on_disc);
         Seek(m_position_on_disc);
         return false;
       }
+
+      ConvertSectorToRaw(buffer, m_position_on_disc, m_current_index->mode);
     }
     else
     {
@@ -342,6 +469,11 @@ bool CDImage::ReadSubChannelQ(SubChannelQ* subq, const Index& index, LBA lba_in_
 {
   GenerateSubChannelQ(subq, index, lba_in_index);
   return true;
+}
+
+bool CDImage::LoadSubchannelReplacementFile(std::string_view path)
+{
+  return false;
 }
 
 bool CDImage::HasNonStandardSubchannel() const

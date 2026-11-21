@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2019-2024 Connor McLaughlin <stenzek@gmail.com>
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #include "settings.h"
 #include "achievements.h"
@@ -162,7 +162,7 @@ void Settings::Load(SettingsInterface& si)
   disable_all_enhancements = si.GetBoolValue("Main", "DisableAllEnhancements", false);
   enable_discord_presence = si.GetBoolValue("Main", "EnableDiscordPresence", false);
   rewind_enable = si.GetBoolValue("Main", "RewindEnable", false);
-  rewind_save_frequency = si.GetFloatValue("Main", "RewindFrequency", 10.0f);
+  rewind_save_frequency = si.GetFloatValue("Main", "RewindFrequency", 0.5f);
   rewind_save_slots = static_cast<u32>(si.GetIntValue("Main", "RewindSaveSlots", 10));
   runahead_frames = static_cast<u32>(si.GetIntValue("Main", "RunaheadFrameCount", 0));
 
@@ -180,6 +180,7 @@ void Settings::Load(SettingsInterface& si)
   UpdateOverclockActive();
   cpu_recompiler_memory_exceptions = si.GetBoolValue("CPU", "RecompilerMemoryExceptions", false);
   cpu_recompiler_block_linking = si.GetBoolValue("CPU", "RecompilerBlockLinking", true);
+  cpu_recompiler_interpreter_fallback = si.GetBoolValue("CPU", "RecompilerInterpreterFallback", true);
   cpu_recompiler_icache = si.GetBoolValue("CPU", "RecompilerICache", false);
   cpu_fastmem_mode = ParseCPUFastmemMode(
                        si.GetStringValue("CPU", "FastmemMode", GetCPUFastmemModeName(DEFAULT_CPU_FASTMEM_MODE)).c_str())
@@ -200,6 +201,9 @@ void Settings::Load(SettingsInterface& si)
   gpu_disable_raster_order_views = si.GetBoolValue("GPU", "DisableRasterOrderViews", false);
   gpu_per_sample_shading = si.GetBoolValue("GPU", "PerSampleShading", false);
   gpu_use_thread = si.GetBoolValue("GPU", "UseThread", true);
+  gpu_use_hardware_thread = si.GetBoolValue("GPU", "UseHardwareThread", false);
+  gpu_software_fast_rasterizer =
+    si.GetBoolValue("GPU", "SoftwareFastRasterizer", DEFAULT_GPU_SOFTWARE_FAST_RASTERIZER);
   gpu_use_software_renderer_for_readbacks = si.GetBoolValue("GPU", "UseSoftwareRendererForReadbacks", false);
   gpu_threaded_presentation = si.GetBoolValue("GPU", "ThreadedPresentation", DEFAULT_THREADED_PRESENTATION);
   gpu_true_color = si.GetBoolValue("GPU", "TrueColor", true);
@@ -242,6 +246,7 @@ void Settings::Load(SettingsInterface& si)
   gpu_pgxp_tolerance = si.GetFloatValue("GPU", "PGXPTolerance", -1.0f);
   gpu_pgxp_depth_buffer = si.GetBoolValue("GPU", "PGXPDepthBuffer", false);
   gpu_pgxp_disable_2d = si.GetBoolValue("GPU", "PGXPDisableOn2DPolygons", false);
+  gpu_pgxp_normalize_depth = si.GetBoolValue("GPU", "PGXPNormalizeDepth", false);
   SetPGXPDepthClearThreshold(si.GetFloatValue("GPU", "PGXPDepthClearThreshold", DEFAULT_GPU_PGXP_DEPTH_THRESHOLD));
 
   display_deinterlacing_mode =
@@ -297,6 +302,7 @@ void Settings::Load(SettingsInterface& si)
   display_skip_presenting_duplicate_frames = si.GetBoolValue("Display", "SkipPresentingDuplicateFrames", false);
   display_vsync = si.GetBoolValue("Display", "VSync", false);
   display_disable_mailbox_presentation = si.GetBoolValue("Display", "DisableMailboxPresentation", false);
+  display_relaxed_vsync = si.GetBoolValue("Display", "RelaxedVSync", false);
   display_force_4_3_for_24bit = si.GetBoolValue("Display", "Force4_3For24Bit", false);
   display_active_start_offset = static_cast<s16>(si.GetIntValue("Display", "ActiveStartOffset", 0));
   display_active_end_offset = static_cast<s16>(si.GetIntValue("Display", "ActiveEndOffset", 0));
@@ -331,10 +337,17 @@ void Settings::Load(SettingsInterface& si)
       .value_or(DEFAULT_CDROM_MECHACON_VERSION);
   cdrom_region_check = si.GetBoolValue("CDROM", "RegionCheck", false);
   cdrom_load_image_to_ram = si.GetBoolValue("CDROM", "LoadImageToRAM", false);
+  cdrom_fast_forward_loading = si.GetBoolValue("CDROM", "FastForwardLoading", false);
+  cdrom_disable_speedup_on_mdec = si.GetBoolValue("CDROM", "DisableSpeedupOnMDEC", false);
   cdrom_load_image_patches = si.GetBoolValue("CDROM", "LoadImagePatches", false);
   cdrom_mute_cd_audio = si.GetBoolValue("CDROM", "MuteCDAudio", false);
+  cdrom_subq_skew = si.GetBoolValue("CDROM", "SubQSkew", false);
   cdrom_read_speedup = si.GetIntValue("CDROM", "ReadSpeedup", 1);
   cdrom_seek_speedup = si.GetIntValue("CDROM", "SeekSpeedup", 1);
+  cdrom_max_read_speedup_cycles =
+    std::max<u32>(si.GetUIntValue("CDROM", "MaxReadSpeedupCycles", DEFAULT_CDROM_MAX_SPEEDUP_CYCLES), 1u);
+  cdrom_max_seek_speedup_cycles =
+    std::max<u32>(si.GetUIntValue("CDROM", "MaxSeekSpeedupCycles", DEFAULT_CDROM_MAX_SPEEDUP_CYCLES), 1u);
 
   audio_backend =
     AudioStream::ParseBackendName(
@@ -356,7 +369,6 @@ void Settings::Load(SettingsInterface& si)
 
   dma_max_slice_ticks = si.GetIntValue("Hacks", "DMAMaxSliceTicks", DEFAULT_DMA_MAX_SLICE_TICKS);
   dma_halt_ticks = si.GetIntValue("Hacks", "DMAHaltTicks", DEFAULT_DMA_HALT_TICKS);
-  gpu_fifo_size = static_cast<u32>(si.GetIntValue("Hacks", "GPUFIFOSize", DEFAULT_GPU_FIFO_SIZE));
   gpu_max_run_ahead = si.GetIntValue("Hacks", "GPUMaxRunAhead", DEFAULT_GPU_MAX_RUN_AHEAD);
 
   bios_tty_logging = si.GetBoolValue("BIOS", "TTYLogging", false);
@@ -496,6 +508,7 @@ void Settings::Save(SettingsInterface& si, bool ignore_base) const
   si.SetIntValue("CPU", "OverclockDenominator", cpu_overclock_denominator);
   si.SetBoolValue("CPU", "RecompilerMemoryExceptions", cpu_recompiler_memory_exceptions);
   si.SetBoolValue("CPU", "RecompilerBlockLinking", cpu_recompiler_block_linking);
+  si.SetBoolValue("CPU", "RecompilerInterpreterFallback", cpu_recompiler_interpreter_fallback);
   si.SetBoolValue("CPU", "RecompilerICache", cpu_recompiler_icache);
   si.SetStringValue("CPU", "FastmemMode", GetCPUFastmemModeName(cpu_fastmem_mode));
 
@@ -518,6 +531,8 @@ void Settings::Save(SettingsInterface& si, bool ignore_base) const
 
   si.SetBoolValue("GPU", "PerSampleShading", gpu_per_sample_shading);
   si.SetBoolValue("GPU", "UseThread", gpu_use_thread);
+  si.SetBoolValue("GPU", "UseHardwareThread", gpu_use_hardware_thread);
+  si.SetBoolValue("GPU", "SoftwareFastRasterizer", gpu_software_fast_rasterizer);
   si.SetBoolValue("GPU", "ThreadedPresentation", gpu_threaded_presentation);
   si.SetBoolValue("GPU", "UseSoftwareRendererForReadbacks", gpu_use_software_renderer_for_readbacks);
   si.SetBoolValue("GPU", "TrueColor", gpu_true_color);
@@ -547,6 +562,7 @@ void Settings::Save(SettingsInterface& si, bool ignore_base) const
   si.SetFloatValue("GPU", "PGXPTolerance", gpu_pgxp_tolerance);
   si.SetBoolValue("GPU", "PGXPDepthBuffer", gpu_pgxp_depth_buffer);
   si.SetBoolValue("GPU", "PGXPDisableOn2DPolygons", gpu_pgxp_disable_2d);
+  si.SetBoolValue("GPU", "PGXPNormalizeDepth", gpu_pgxp_normalize_depth);
   si.SetFloatValue("GPU", "PGXPDepthClearThreshold", GetPGXPDepthClearThreshold());
 
   si.SetStringValue("Display", "DeinterlacingMode", GetDisplayDeinterlacingModeName(display_deinterlacing_mode));
@@ -566,6 +582,7 @@ void Settings::Save(SettingsInterface& si, bool ignore_base) const
   si.SetFloatValue("Display", "PreFrameSleepBuffer", display_pre_frame_sleep_buffer);
   si.SetBoolValue("Display", "VSync", display_vsync);
   si.SetBoolValue("Display", "DisableMailboxPresentation", display_disable_mailbox_presentation);
+  si.SetBoolValue("Display", "RelaxedVSync", display_relaxed_vsync);
   si.SetStringValue("Display", "ExclusiveFullscreenControl",
                     GetDisplayExclusiveFullscreenControlName(display_exclusive_fullscreen_control));
   si.SetStringValue("Display", "ScreenshotMode", GetDisplayScreenshotModeName(display_screenshot_mode));
@@ -596,10 +613,15 @@ void Settings::Save(SettingsInterface& si, bool ignore_base) const
   si.SetStringValue("CDROM", "MechaconVersion", GetCDROMMechVersionName(cdrom_mechacon_version));
   si.SetBoolValue("CDROM", "RegionCheck", cdrom_region_check);
   si.SetBoolValue("CDROM", "LoadImageToRAM", cdrom_load_image_to_ram);
+  si.SetBoolValue("CDROM", "FastForwardLoading", cdrom_fast_forward_loading);
+  si.SetBoolValue("CDROM", "DisableSpeedupOnMDEC", cdrom_disable_speedup_on_mdec);
   si.SetBoolValue("CDROM", "LoadImagePatches", cdrom_load_image_patches);
   si.SetBoolValue("CDROM", "MuteCDAudio", cdrom_mute_cd_audio);
+  si.SetBoolValue("CDROM", "SubQSkew", cdrom_subq_skew);
   si.SetIntValue("CDROM", "ReadSpeedup", cdrom_read_speedup);
   si.SetIntValue("CDROM", "SeekSpeedup", cdrom_seek_speedup);
+  si.SetUIntValue("CDROM", "MaxReadSpeedupCycles", cdrom_max_read_speedup_cycles);
+  si.SetUIntValue("CDROM", "MaxSeekSpeedupCycles", cdrom_max_seek_speedup_cycles);
 
   si.SetStringValue("Audio", "Backend", AudioStream::GetBackendName(audio_backend));
   si.SetStringValue("Audio", "Driver", audio_driver.c_str());
@@ -616,7 +638,6 @@ void Settings::Save(SettingsInterface& si, bool ignore_base) const
   {
     si.SetIntValue("Hacks", "DMAMaxSliceTicks", dma_max_slice_ticks);
     si.SetIntValue("Hacks", "DMAHaltTicks", dma_halt_ticks);
-    si.SetIntValue("Hacks", "GPUFIFOSize", gpu_fifo_size);
     si.SetIntValue("Hacks", "GPUMaxRunAhead", gpu_max_run_ahead);
   }
 
@@ -787,6 +808,7 @@ void Settings::FixIncompatibleSettings(bool display_osd_messages)
     g_settings.gpu_pgxp_preserve_proj_fp = false;
     g_settings.gpu_pgxp_depth_buffer = false;
     g_settings.gpu_pgxp_disable_2d = false;
+    g_settings.gpu_pgxp_normalize_depth = false;
   }
 
 #ifndef ENABLE_MMAP_FASTMEM
@@ -869,7 +891,7 @@ void Settings::UpdateLogSettings()
 
   if (log_to_file)
   {
-    Log::SetFileOutputParams(log_to_file, Path::Combine(EmuFolders::DataRoot, "duckstation.log").c_str(),
+    Log::SetFileOutputParams(log_to_file, Path::Combine(EmuFolders::DataRoot, "riverhorse.log").c_str(),
                              log_timestamps);
   }
   else
@@ -1828,6 +1850,7 @@ std::string EmuFolders::Resources;
 std::string EmuFolders::SaveStates;
 std::string EmuFolders::Screenshots;
 std::string EmuFolders::Shaders;
+std::string EmuFolders::Subchannels;
 std::string EmuFolders::Textures;
 std::string EmuFolders::UserResources;
 std::string EmuFolders::Videos;
@@ -1846,6 +1869,7 @@ void EmuFolders::SetDefaults()
   SaveStates = Path::Combine(DataRoot, "savestates");
   Screenshots = Path::Combine(DataRoot, "screenshots");
   Shaders = Path::Combine(DataRoot, "shaders");
+  Subchannels = Path::Combine(DataRoot, "subchannels");
   Textures = Path::Combine(DataRoot, "textures");
   UserResources = Path::Combine(DataRoot, "resources");
   Videos = Path::Combine(DataRoot, "videos");
@@ -1877,6 +1901,7 @@ void EmuFolders::LoadConfig(SettingsInterface& si)
   SaveStates = LoadPathFromSettings(si, DataRoot, "Folders", "SaveStates", "savestates");
   Screenshots = LoadPathFromSettings(si, DataRoot, "Folders", "Screenshots", "screenshots");
   Shaders = LoadPathFromSettings(si, DataRoot, "Folders", "Shaders", "shaders");
+  Subchannels = LoadPathFromSettings(si, DataRoot, "Folders", "Subchannels", "subchannels");
   Textures = LoadPathFromSettings(si, DataRoot, "Folders", "Textures", "textures");
   UserResources = LoadPathFromSettings(si, DataRoot, "Folders", "UserResources", "resources");
   Videos = LoadPathFromSettings(si, DataRoot, "Folders", "Videos", "videos");
@@ -1894,6 +1919,7 @@ void EmuFolders::LoadConfig(SettingsInterface& si)
   DEV_LOG("SaveStates Directory: {}", SaveStates);
   DEV_LOG("Screenshots Directory: {}", Screenshots);
   DEV_LOG("Shaders Directory: {}", Shaders);
+  DEV_LOG("Subchannels Directory: {}", Subchannels);
   DEV_LOG("Textures Directory: {}", Textures);
   DEV_LOG("User Resources Directory: {}", UserResources);
   DEV_LOG("Videos Directory: {}", Videos);
@@ -1914,6 +1940,7 @@ void EmuFolders::Save(SettingsInterface& si)
   si.SetStringValue("Folders", "SaveStates", Path::MakeRelative(SaveStates, DataRoot).c_str());
   si.SetStringValue("Folders", "Screenshots", Path::MakeRelative(Screenshots, DataRoot).c_str());
   si.SetStringValue("Folders", "Shaders", Path::MakeRelative(Shaders, DataRoot).c_str());
+  si.SetStringValue("Folders", "Subchannels", Path::MakeRelative(Subchannels, DataRoot).c_str());
   si.SetStringValue("Folders", "Textures", Path::MakeRelative(Textures, DataRoot).c_str());
   si.SetStringValue("Folders", "UserResources", Path::MakeRelative(UserResources, DataRoot).c_str());
   si.SetStringValue("Folders", "Videos", Path::MakeRelative(Videos, DataRoot).c_str());
@@ -1964,6 +1991,7 @@ bool EmuFolders::EnsureFoldersExist()
              Path::Combine(Shaders, "reshade" FS_OSPATH_SEPARATOR_STR "Textures").c_str(), false) &&
            result;
   result = FileSystem::EnsureDirectoryExists(Textures.c_str(), false) && result;
+  result = FileSystem::EnsureDirectoryExists(Subchannels.c_str(), false) && result;
   result = FileSystem::EnsureDirectoryExists(UserResources.c_str(), false) && result;
   result = FileSystem::EnsureDirectoryExists(Videos.c_str(), false) && result;
   return result;

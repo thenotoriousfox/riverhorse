@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2019-2024 Connor McLaughlin <stenzek@gmail.com>
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #include "opengl_texture.h"
 #include "opengl_device.h"
@@ -99,12 +99,14 @@ OpenGLTexture::OpenGLTexture(u32 width, u32 height, u32 layers, u32 levels, u32 
 
 OpenGLTexture::~OpenGLTexture()
 {
-  if (m_id != 0)
-  {
-    OpenGLDevice::GetInstance().UnbindTexture(this);
-    glDeleteTextures(1, &m_id);
-    m_id = 0;
-  }
+  GPUDevice::RunOnDeviceThread([&]() {
+    if (m_id != 0)
+    {
+      OpenGLDevice::GetInstance().UnbindTexture(this);
+      glDeleteTextures(1, &m_id);
+      m_id = 0;
+    }
+  });
 }
 
 bool OpenGLTexture::UseTextureStorage(bool multisampled)
@@ -610,16 +612,18 @@ OpenGLTextureBuffer::OpenGLTextureBuffer(Format format, u32 size_in_elements,
 
 OpenGLTextureBuffer::~OpenGLTextureBuffer()
 {
-  OpenGLDevice& dev = OpenGLDevice::GetInstance();
-  if (m_texture_id != 0)
-  {
-    dev.UnbindTexture(m_texture_id);
-    glDeleteTextures(1, &m_texture_id);
-  }
-  else if (dev.GetFeatures().texture_buffers_emulated_with_ssbo && m_buffer)
-  {
-    dev.UnbindSSBO(m_buffer->GetGLBufferId());
-  }
+  GPUDevice::RunOnDeviceThread([&]() {
+    OpenGLDevice& dev = OpenGLDevice::GetInstance();
+    if (m_texture_id != 0)
+    {
+      dev.UnbindTexture(m_texture_id);
+      glDeleteTextures(1, &m_texture_id);
+    }
+    else if (dev.GetFeatures().texture_buffers_emulated_with_ssbo && m_buffer)
+    {
+      dev.UnbindSSBO(m_buffer->GetGLBufferId());
+    }
+  });
 }
 
 bool OpenGLTextureBuffer::CreateBuffer()
@@ -733,24 +737,26 @@ OpenGLDownloadTexture::OpenGLDownloadTexture(u32 width, u32 height, GPUTexture::
 
 OpenGLDownloadTexture::~OpenGLDownloadTexture()
 {
-  if (m_buffer_id != 0)
-  {
-    if (m_sync)
-      glDeleteSync(m_sync);
-
-    if (m_map_pointer)
+  GPUDevice::RunOnDeviceThread([&]() {
+    if (m_buffer_id != 0)
     {
-      glBindBuffer(GL_PIXEL_PACK_BUFFER, m_buffer_id);
-      glUnmapBuffer(GL_PIXEL_PACK_BUFFER);
-      glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
-    }
+      if (m_sync)
+        glDeleteSync(m_sync);
 
-    glDeleteBuffers(1, &m_buffer_id);
-  }
-  else if (m_cpu_buffer && !m_is_imported)
-  {
-    Common::AlignedFree(m_cpu_buffer);
-  }
+      if (m_map_pointer)
+      {
+        glBindBuffer(GL_PIXEL_PACK_BUFFER, m_buffer_id);
+        glUnmapBuffer(GL_PIXEL_PACK_BUFFER);
+        glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
+      }
+
+      glDeleteBuffers(1, &m_buffer_id);
+    }
+    else if (m_cpu_buffer && !m_is_imported)
+    {
+      Common::AlignedFree(m_cpu_buffer);
+    }
+  });
 }
 
 std::unique_ptr<OpenGLDownloadTexture> OpenGLDownloadTexture::Create(u32 width, u32 height, GPUTexture::Format format,

@@ -107,6 +107,7 @@
     <ClCompile Include="cd_image.cpp" />
     <ClCompile Include="cd_image_bin.cpp" />
     <ClCompile Include="cd_image_chd.cpp" />
+    <ClCompile Include="cd_image_ccd.cpp" />
     <ClCompile Include="cd_image_cue.cpp" />
     <ClCompile Include="cd_image_device.cpp" />
     <ClCompile Include="cd_image_ecm.cpp" />

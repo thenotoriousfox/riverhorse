@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2019-2024 Connor McLaughlin <stenzek@gmail.com> and contributors.
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #include "bios.h"
 #include "cpu_disasm.h"
@@ -405,7 +405,7 @@ std::optional<BIOS::Image> BIOS::FindBIOSImageInDirectory(ConsoleRegion region, 
 #ifndef __ANDROID__
     Error::SetStringFmt(
       error,
-      TRANSLATE_FS("System", "No BIOS image found for {} region.\n\nDuckStation requires a PS1 or PS2 BIOS in order to "
+      TRANSLATE_FS("System", "No BIOS image found for {} region.\n\nRiverhorse requires a PS1 or PS2 BIOS in order to "
                              "run.\n\nFor legal reasons, you *must* obtain a BIOS from an actual PS1 unit that you own "
                              "(borrowing doesn't count).\n\nOnce dumped, this BIOS image should be placed in the bios "
                              "folder within the data directory (Tools Menu -> Open Data Directory)."),
@@ -445,6 +445,25 @@ std::vector<std::pair<std::string, const BIOS::ImageInfo*>> BIOS::FindBIOSImages
   }
 
   return results;
+}
+
+std::string BIOS::FindBIOSFileWithHash(const char* directory, const ImageInfo::Hash& hash)
+{
+  FileSystem::FindResultsArray files;
+  FileSystem::FindFiles(directory, "*",
+                        FILESYSTEM_FIND_FILES | FILESYSTEM_FIND_HIDDEN_FILES | FILESYSTEM_FIND_RELATIVE_PATHS, &files);
+
+  for (FILESYSTEM_FIND_DATA& fd : files)
+  {
+    if (fd.Size != BIOS_SIZE && fd.Size != BIOS_SIZE_PS2 && fd.Size != BIOS_SIZE_PS3)
+      continue;
+
+    const std::optional<Image> image = LoadImageFromFile(Path::Combine(directory, fd.FileName).c_str(), nullptr);
+    if (image.has_value() && image->hash == hash)
+      return std::move(fd.FileName);
+  }
+
+  return {};
 }
 
 bool BIOS::HasAnyBIOSImages()

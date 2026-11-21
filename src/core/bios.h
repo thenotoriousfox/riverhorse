@@ -95,6 +95,9 @@ std::optional<Image> FindBIOSImageInDirectory(ConsoleRegion region, const char* 
 /// Returns a list of filenames and descriptions for BIOS images in a directory.
 std::vector<std::pair<std::string, const BIOS::ImageInfo*>> FindBIOSImagesInDirectory(const char* directory);
 
+/// Returns the name of the BIOS image in a directory with the given hash, or an empty string.
+std::string FindBIOSFileWithHash(const char* directory, const ImageInfo::Hash& hash);
+
 /// Returns true if any BIOS images are found in the configured BIOS directory.
 bool HasAnyBIOSImages();
 } // namespace BIOS

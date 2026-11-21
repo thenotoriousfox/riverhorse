@@ -77,6 +77,7 @@
     <ClCompile Include="state_wrapper.cpp" />
     <ClCompile Include="cd_image.cpp" />
     <ClCompile Include="audio_stream.cpp" />
+    <ClCompile Include="cd_image_ccd.cpp" />
     <ClCompile Include="cd_image_cue.cpp" />
     <ClCompile Include="cd_image_bin.cpp" />
     <ClCompile Include="iso_reader.cpp" />

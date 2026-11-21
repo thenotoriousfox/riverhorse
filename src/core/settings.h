@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2019-2024 Connor McLaughlin <stenzek@gmail.com>
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #pragma once
 
@@ -69,6 +69,7 @@ struct Settings
   bool cpu_overclock_active : 1 = false;
   bool cpu_recompiler_memory_exceptions : 1 = false;
   bool cpu_recompiler_block_linking : 1 = true;
+  bool cpu_recompiler_interpreter_fallback : 1 = true;
   bool cpu_recompiler_icache : 1 = false;
   u32 cpu_overclock_numerator = 1;
   u32 cpu_overclock_denominator = 1;
@@ -95,7 +96,7 @@ struct Settings
   bool pine_enable : 1 = false;
 
   bool rewind_enable : 1 = false;
-  float rewind_save_frequency = 10.0f;
+  float rewind_save_frequency = 0.5f;
   u32 rewind_save_slots = 10;
   u32 runahead_frames = 0;
   u16 pine_slot = DEFAULT_PINE_SLOT;
@@ -105,6 +106,8 @@ struct Settings
   u8 gpu_resolution_scale = 1;
   u8 gpu_multisamples = 1;
   bool gpu_use_thread : 1 = true;
+  bool gpu_use_hardware_thread : 1 = false;
+  bool gpu_software_fast_rasterizer : 1 = DEFAULT_GPU_SOFTWARE_FAST_RASTERIZER;
   bool gpu_use_software_renderer_for_readbacks : 1 = false;
   bool gpu_threaded_presentation : 1 = DEFAULT_THREADED_PRESENTATION;
   bool gpu_use_debug_device : 1 = false;
@@ -133,6 +136,7 @@ struct Settings
   bool gpu_pgxp_preserve_proj_fp : 1 = false;
   bool gpu_pgxp_depth_buffer : 1 = false;
   bool gpu_pgxp_disable_2d : 1 = false;
+  bool gpu_pgxp_normalize_depth : 1 = false;
   GPUTextureFilter gpu_texture_filter = DEFAULT_GPU_TEXTURE_FILTER;
   GPUTextureFilter gpu_sprite_texture_filter = DEFAULT_GPU_TEXTURE_FILTER;
   GPULineDetectMode gpu_line_detect_mode = DEFAULT_GPU_LINE_DETECT_MODE;
@@ -160,6 +164,7 @@ struct Settings
   bool display_skip_presenting_duplicate_frames : 1 = false;
   bool display_vsync : 1 = false;
   bool display_disable_mailbox_presentation : 1 = true;
+  bool display_relaxed_vsync : 1 = false;
   bool display_force_4_3_for_24bit : 1 = false;
   bool display_24bit_chroma_smoothing : 1 = false;
   bool display_show_osd_messages : 1 = true;
@@ -186,10 +191,15 @@ struct Settings
   CDROMMechaconVersion cdrom_mechacon_version = DEFAULT_CDROM_MECHACON_VERSION;
   bool cdrom_region_check : 1 = false;
   bool cdrom_load_image_to_ram : 1 = false;
+  bool cdrom_fast_forward_loading : 1 = false;
+  bool cdrom_disable_speedup_on_mdec : 1 = false;
   bool cdrom_load_image_patches : 1 = false;
   bool cdrom_mute_cd_audio : 1 = false;
+  bool cdrom_subq_skew : 1 = false;
   u32 cdrom_read_speedup = 1;
   u32 cdrom_seek_speedup = 1;
+  u32 cdrom_max_read_speedup_cycles = DEFAULT_CDROM_MAX_SPEEDUP_CYCLES;
+  u32 cdrom_max_seek_speedup_cycles = DEFAULT_CDROM_MAX_SPEEDUP_CYCLES;
 
   std::string audio_driver;
   std::string audio_output_device;
@@ -206,7 +216,6 @@ struct Settings
   // timing hacks section
   TickCount dma_max_slice_ticks = DEFAULT_DMA_MAX_SLICE_TICKS;
   TickCount dma_halt_ticks = DEFAULT_DMA_HALT_TICKS;
-  u32 gpu_fifo_size = DEFAULT_GPU_FIFO_SIZE;
   TickCount gpu_max_run_ahead = DEFAULT_GPU_MAX_RUN_AHEAD;
 
   // achievements
@@ -348,10 +357,10 @@ struct Settings
 
   enum : u32
   {
+    DEFAULT_CDROM_MAX_SPEEDUP_CYCLES = 30000,
     DEFAULT_DMA_MAX_SLICE_TICKS = 1000,
     DEFAULT_DMA_HALT_TICKS = 100,
-    DEFAULT_GPU_FIFO_SIZE = 16,
-    DEFAULT_GPU_MAX_RUN_AHEAD = 128,
+    DEFAULT_GPU_MAX_RUN_AHEAD = 512,
     DEFAULT_VRAM_WRITE_DUMP_WIDTH_THRESHOLD = 128,
     DEFAULT_VRAM_WRITE_DUMP_HEIGHT_THRESHOLD = 128,
   };
@@ -474,6 +483,12 @@ struct Settings
   static constexpr float DEFAULT_GPU_PGXP_DEPTH_THRESHOLD = 300.0f;
   static constexpr float GPU_PGXP_DEPTH_THRESHOLD_SCALE = 4096.0f;
 
+#if defined(CPU_ARCH_ARM32) || defined(CPU_ARCH_ARM64)
+  static constexpr bool DEFAULT_GPU_SOFTWARE_FAST_RASTERIZER = true;
+#else
+  static constexpr bool DEFAULT_GPU_SOFTWARE_FAST_RASTERIZER = false;
+#endif
+
   // Prefer oldrec over newrec for now. Except on RISC-V, where there is no oldrec.
 #if defined(CPU_ARCH_RISCV64)
   static constexpr CPUExecutionMode DEFAULT_CPU_EXECUTION_MODE = CPUExecutionMode::NewRec;
@@ -570,6 +585,7 @@ extern std::string Resources;
 extern std::string SaveStates;
 extern std::string Screenshots;
 extern std::string Shaders;
+extern std::string Subchannels;
 extern std::string Textures;
 extern std::string UserResources;
 extern std::string Videos;

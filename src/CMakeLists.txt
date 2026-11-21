@@ -8,15 +8,19 @@ if(WIN32 OR APPLE)
 endif()
 
 if(BUILD_NOGUI_FRONTEND)
-  add_subdirectory(duckstation-nogui)
+  add_subdirectory(riverhorse-nogui)
 endif()
 
 if(BUILD_QT_FRONTEND)
-  add_subdirectory(duckstation-qt)
+  add_subdirectory(riverhorse-qt)
 endif()
 
 if(BUILD_REGTEST)
-  add_subdirectory(duckstation-regtest)
+  add_subdirectory(riverhorse-regtest)
+endif()
+
+if(BUILD_LIBRETRO_CORE)
+  add_subdirectory(riverhorse-libretro)
 endif()
 
 if(BUILD_TESTS)

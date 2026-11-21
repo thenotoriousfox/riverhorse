@@ -120,7 +120,9 @@ ImRect CenterImage(const ImRect& fit_rect, const ImVec2& image_size);
 /// Initializes, setting up any state.
 bool Initialize(const char* placeholder_image_path);
 
-void SetTheme(bool light);
+bool ApplyTheme(std::string_view theme_ini);
+void SetLayoutScaleMultiplier(float multiplier);
+std::string GetThemeName(std::string_view theme_ini);
 void SetFonts(ImFont* standard_font, ImFont* medium_font, ImFont* large_font);
 bool UpdateLayoutScale();
 
@@ -292,7 +294,7 @@ void CloseChoiceDialog();
 using InputStringDialogCallback = std::function<void(std::string text)>;
 bool IsInputDialogOpen();
 void OpenInputStringDialog(std::string title, std::string message, std::string caption, std::string ok_button_text,
-                           InputStringDialogCallback callback);
+                           InputStringDialogCallback callback, std::string initial_value = {});
 void CloseInputDialog();
 
 using ConfirmMessageDialogCallback = std::function<void(bool)>;

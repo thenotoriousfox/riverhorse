@@ -1,0 +1,24 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="..\msvc\vsprops\Configurations.props" />
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{5085FE3A-29FC-40F9-B6C6-5898EEA430A0}</ProjectGuid>
+  </PropertyGroup>
+  <ItemGroup>
+    <ClInclude Include="riverhorse_psx_gpu.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="riverhorse_psx_gpu.c" />
+    <ClCompile Include="plugins\gpulib\prim.c" />
+    <ClCompile Include="plugins\gpu_neon\psx_gpu\psx_gpu_simd.c" />
+  </ItemGroup>
+  <Import Project="..\msvc\vsprops\StaticLibrary.props" />
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <WarningLevel>TurnOffAllWarnings</WarningLevel>
+      <PreprocessorDefinitions>GPU_NEON;TEXTURE_CACHE_4BPP;TEXTURE_CACHE_8BPP;NEON_BUILD;SIMD_BUILD;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)win32;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <Import Project="..\msvc\vsprops\Targets.props" />
+</Project>

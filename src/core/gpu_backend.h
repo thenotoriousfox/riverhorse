@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2019-2024 Connor McLaughlin <stenzek@gmail.com>
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #pragma once
 
@@ -10,8 +10,10 @@
 
 #include <atomic>
 #include <condition_variable>
+#include <functional>
 #include <memory>
 #include <mutex>
+#include <vector>
 
 #ifdef _MSC_VER
 #pragma warning(push)
@@ -37,11 +39,22 @@ public:
   GPUBackendSetDrawingAreaCommand* NewSetDrawingAreaCommand();
   GPUBackendUpdateCLUTCommand* NewUpdateCLUTCommand();
   GPUBackendDrawPolygonCommand* NewDrawPolygonCommand(u32 num_vertices);
+  GPUBackendDrawPrecisePolygonCommand* NewDrawPrecisePolygonCommand(u32 num_vertices);
   GPUBackendDrawRectangleCommand* NewDrawRectangleCommand();
   GPUBackendDrawLineCommand* NewDrawLineCommand(u32 num_vertices);
+  GPUBackendDrawPreciseLineCommand* NewDrawPreciseLineCommand(u32 num_vertices);
+
+  virtual bool UsesPreciseVertices() const;
+  virtual bool OwnsDevice() const;
+
+  bool IsOnBackendThread() const;
 
   void PushCommand(GPUBackendCommand* cmd);
   void Sync(bool allow_sleep);
+
+  void PushFlushRender();
+  void RunOnBackendThread(std::function<void()> func);
+  void RunOnBackendThreadAndWait(std::function<void()> func);
 
   /// Processes all pending GPU commands.
   void RunGPULoop();
@@ -61,6 +74,8 @@ protected:
   virtual void DrawPolygon(const GPUBackendDrawPolygonCommand* cmd) = 0;
   virtual void DrawRectangle(const GPUBackendDrawRectangleCommand* cmd) = 0;
   virtual void DrawLine(const GPUBackendDrawLineCommand* cmd) = 0;
+  virtual void DrawPrecisePolygon(const GPUBackendDrawPrecisePolygonCommand* cmd);
+  virtual void DrawPreciseLine(const GPUBackendDrawPreciseLineCommand* cmd);
   virtual void FlushRender() = 0;
   virtual void DrawingAreaChanged() = 0;
   virtual void UpdateCLUT(GPUTexturePaletteReg reg, bool clut_is_8bit) = 0;
@@ -87,6 +102,7 @@ protected:
   };
 
   FixedHeapArray<u8, COMMAND_QUEUE_SIZE> m_command_fifo_data;
+  std::vector<u8> m_backend_thread_command;
   alignas(HOST_CACHE_LINE_SIZE) std::atomic<u32> m_command_fifo_read_ptr{0};
   alignas(HOST_CACHE_LINE_SIZE) std::atomic<u32> m_command_fifo_write_ptr{0};
 };

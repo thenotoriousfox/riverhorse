@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2019-2022 Connor McLaughlin <stenzek@gmail.com>
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #include "cdrom_async_reader.h"
 #include "common/assert.h"
@@ -108,7 +108,7 @@ void CDROMAsyncReader::QueueReadSector(CDImage::LBA lba)
   }
 
   const u32 buffer_count = m_buffer_count.load();
-  if (buffer_count > 0)
+  if (buffer_count > 0 && !m_next_position_set.load())
   {
     // don't re-read the same sector if it was the last one we read
     // the CDC code does this when seeking->reading
@@ -143,13 +143,14 @@ void CDROMAsyncReader::QueueReadSector(CDImage::LBA lba)
 
 bool CDROMAsyncReader::ReadSectorUncached(CDImage::LBA lba, CDImage::SubChannelQ* subq, SectorBuffer* data)
 {
-  if (!IsUsingThread())
-    return InternalReadSectorUncached(lba, subq, data);
+  std::unique_lock<std::mutex> lock;
+  if (IsUsingThread())
+  {
+    lock = std::unique_lock(m_mutex);
 
-  std::unique_lock lock(m_mutex);
-
-  // wait until the read thread is idle
-  m_notify_read_complete_cv.wait(lock, [this]() { return !m_is_reading.load(); });
+    // wait until the read thread is idle
+    m_notify_read_complete_cv.wait(lock, [this]() { return !m_is_reading.load(); });
+  }
 
   // read while the lock is held so it has to wait
   const CDImage::LBA prev_lba = m_media->GetPositionOnDisc();

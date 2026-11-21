@@ -137,6 +137,15 @@ std::unique_ptr<AudioStream> AudioStream::CreateStream(AudioBackend backend, u32
   }
 }
 
+u32 AudioStream::ReadBufferedFrames(SampleType* samples, u32 max_frames)
+{
+  const u32 num_frames = std::min(GetBufferedFramesRelaxed(), max_frames);
+  if (num_frames > 0)
+    ReadFrames(samples, num_frames);
+
+  return num_frames;
+}
+
 u32 AudioStream::GetAlignedBufferSize(u32 size)
 {
   static_assert(Common::IsPow2(CHUNK_SIZE));

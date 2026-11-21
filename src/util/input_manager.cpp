@@ -10,6 +10,7 @@
 #include "common/timer.h"
 #include "core/controller.h"
 #include "core/host.h"
+#include "core/netplay.h"
 #include "core/system.h"
 #include "imgui_manager.h"
 #include "input_source.h"
@@ -835,9 +836,16 @@ void InputManager::AddPadBindings(SettingsInterface& si, const std::string& sect
                         if (!System::IsValid())
                           return;
 
+                        const float scaled_value = ApplySingleBindingScale(sensitivity, deadzone, value);
+                        if (Netplay::IsActive())
+                        {
+                          Netplay::CollectInput(pad_index, bind_index, scaled_value);
+                          return;
+                        }
+
                         Controller* c = System::GetController(pad_index);
                         if (c)
-                          c->SetBindState(bind_index, ApplySingleBindingScale(sensitivity, deadzone, value));
+                          c->SetBindState(bind_index, scaled_value);
                       }});
         }
       }

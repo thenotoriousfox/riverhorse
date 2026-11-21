@@ -22056,6 +22056,8 @@ SLUS-01476:
     linkCable: false
 SLPS-01567:
   name: "Captain Commando (Japan)"
+  traits:
+    - ForceCDROMSubQSkew
   compatibility:
     rating: GraphicalAudioIssues
     versionTested: "0.1-2433-g9089c973"
@@ -65841,6 +65843,8 @@ SCES-00984:
     - AnalogController
     - DigitalController
     - NeGcon
+  traits:
+    - NormalizePGXPDepth # Shrinks the transforms of distant objects, breaking the depth buffer.
   metadata:
     publisher: "Sony"
     developer: "Polyphony Digital"
@@ -65879,6 +65883,8 @@ SCPS-10045:
     - SCPS-45149
     - SCPS-91128
     - SCPS-91301
+  traits:
+    - NormalizePGXPDepth # Shrinks the transforms of distant objects, breaking the depth buffer.
   metadata:
     publisher: "Sony"
     developer: "Polyphony Digital"
@@ -65902,6 +65908,8 @@ SCUS-94194:
     - AnalogController
     - DigitalController
     - NeGcon
+  traits:
+    - NormalizePGXPDepth # Shrinks the transforms of distant objects, breaking the depth buffer.
   metadata:
     publisher: "Sony"
     developer: "Polyphony Digital"
@@ -149949,6 +149957,8 @@ SLPS-01172:
     linkCable: false
 SCES-00577:
   name: "Soul Blade (Europe)"
+  traits:
+    - DisablePGXPDepthBuffer
   compatibility:
     rating: NoIssues
     versionTested: "0.1-2949-gcd2c581f"
@@ -149974,6 +149984,8 @@ SCES-00577:
     linkCable: false
 SLUS-00240:
   name: "Soul Blade (USA)"
+  traits:
+    - DisablePGXPDepthBuffer
   compatibility:
     rating: NoIssues
     versionTested: "0.1-1409-ge198e315"
@@ -149999,6 +150011,8 @@ SLUS-00240:
     linkCable: false
 SLPS-00555:
   name: "Soul Edge (Japan)"
+  traits:
+    - DisablePGXPDepthBuffer
   compatibility:
     rating: NoIssues
     versionTested: "0.1-2202-ga17e15f1"
@@ -150024,6 +150038,8 @@ SLPS-00555:
     linkCable: false
 SLPS-00545:
   name: "Soul Edge (Japan) (Gentei Box)"
+  traits:
+    - DisablePGXPDepthBuffer
   compatibility:
     rating: NoIssues
     versionTested: "0.1-2202-ga17e15f1"
@@ -150049,6 +150065,8 @@ SLPS-00545:
     linkCable: false
 SLPS-91168:
   name: "Soul Edge (Japan) (Rev 1)"
+  traits:
+    - DisablePGXPDepthBuffer
   controllers:
     - DigitalController
   codes:
@@ -164101,6 +164119,8 @@ SLPS-01216:
     linkCable: false
 SCES-00005:
   name: "Tekken (Europe)"
+  traits:
+    - DisablePGXPDepthBuffer
   compatibility:
     rating: NoIssues
     versionTested: "0.1-2148-g7078f73e"
@@ -164123,6 +164143,8 @@ SCES-00005:
     linkCable: false
 SLPS-00040:
   name: "Tekken (Japan)"
+  traits:
+    - DisablePGXPDepthBuffer
   controllers:
     - DigitalController
     - NeGcon
@@ -164145,6 +164167,8 @@ SLPS-00040:
     linkCable: false
 SLUS-00006:
   name: "Tekken (USA)"
+  traits:
+    - DisablePGXPDepthBuffer
   compatibility:
     rating: NoIssues
     versionTested: "0.1-986-gfc911de1"
@@ -164167,6 +164191,8 @@ SLUS-00006:
     linkCable: false
 SCES-00255:
   name: "Tekken 2 (Europe)"
+  traits:
+    - DisablePGXPDepthBuffer
   compatibility:
     rating: NoIssues
     versionTested: "0.1-2148-g7078f73e"
@@ -164189,6 +164215,8 @@ SCES-00255:
     linkCable: false
 SLPS-00300:
   name: "Tekken 2 (Japan)"
+  traits:
+    - DisablePGXPDepthBuffer
   compatibility:
     rating: NoIssues
     versionTested: "9d1eb32"
@@ -164211,6 +164239,8 @@ SLPS-00300:
     linkCable: false
 SLUS-00213:
   name: "Tekken 2 (USA)"
+  traits:
+    - DisablePGXPDepthBuffer
   compatibility:
     rating: NoIssues
     versionTested: "0.1-986-gfc911de1"
@@ -164237,6 +164267,8 @@ SCED-00467:
   name: "Tekken 2 + Fade to Black + V-CD (France)"
 SCES-01237:
   name: "Tekken 3 (Europe)"
+  traits:
+    - DisablePGXPDepthBuffer
   compatibility:
     rating: NoIssues
     versionTested: "0.1-2148-g7078f73e"
@@ -164264,6 +164296,8 @@ SCED-01384:
   name: "Tekken 3 (France) (Demo)"
 SLPS-91202:
   name: "Tekken 3 (Japan) (Rev 1)"
+  traits:
+    - DisablePGXPDepthBuffer
   controllers:
     - AnalogController
     - DigitalController
@@ -164284,6 +164318,8 @@ SLPS-91202:
     linkCable: false
 SCPS-45213:
   name: "Tekken 3 (Japan, Asia)"
+  traits:
+    - DisablePGXPDepthBuffer
   compatibility:
     rating: NoIssues
     versionTested: "0.1-2148-g7078f73e"
@@ -164311,6 +164347,8 @@ SCPS-45213:
     linkCable: false
 SLUS-00402:
   name: "Tekken 3 (USA)"
+  traits:
+    - DisablePGXPDepthBuffer
   compatibility:
     rating: NoIssues
     versionTested: "0.1-774-g5a1b008"

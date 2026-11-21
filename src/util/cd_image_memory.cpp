@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2019-2023 Connor McLaughlin <stenzek@gmail.com>
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #include "cd_image.h"
 #include "cd_subchannel_replacement.h"
@@ -26,6 +26,7 @@ public:
 
   bool ReadSubChannelQ(SubChannelQ* subq, const Index& index, LBA lba_in_index) override;
   bool HasNonStandardSubchannel() const override;
+  bool LoadSubchannelReplacementFile(std::string_view path) override;
 
   bool IsPrecached() const override;
 
@@ -133,6 +134,11 @@ bool CDImageMemory::ReadSubChannelQ(SubChannelQ* subq, const Index& index, LBA l
     return true;
 
   return CDImage::ReadSubChannelQ(subq, index, lba_in_index);
+}
+
+bool CDImageMemory::LoadSubchannelReplacementFile(std::string_view path)
+{
+  return m_sbi.LoadFromFile(path);
 }
 
 bool CDImageMemory::HasNonStandardSubchannel() const

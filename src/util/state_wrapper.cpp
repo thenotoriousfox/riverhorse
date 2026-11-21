@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2019-2022 Connor McLaughlin <stenzek@gmail.com>
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #include "state_wrapper.h"
 #include "common/log.h"
@@ -109,6 +109,12 @@ bool StateWrapper::DoMarker(const char* marker)
 
   ERROR_LOG("Marker mismatch at offset {}: found '{}' expected '{}'", m_pos, file_value, marker);
   return false;
+}
+
+bool StateWrapper::CheckReadCount(u32 count)
+{
+  m_error = (m_error || count > (m_size - m_pos));
+  return !m_error;
 }
 
 bool StateWrapper::ReadData(void* buf, size_t size)

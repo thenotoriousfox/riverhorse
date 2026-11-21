@@ -12,7 +12,7 @@ fi
 
 HASH=$(git rev-parse HEAD)
 BRANCH=$(git rev-parse --abbrev-ref HEAD | tr -d '\r\n')
-TAG=$(git describe --dirty | tr -d '\r\n')
+TAG=$(git describe --tags --exclude latest --dirty | tr -d '\r\n')
 DATE=$(git log -1 --date=iso8601-strict --format=%cd)
 
 cd $CURDIR

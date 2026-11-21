@@ -56,6 +56,8 @@ add_library(core
   gpu_sw.cpp
   gpu_sw.h
   gpu_sw_backend.cpp
+  gpu_sw_psxgpu_backend.cpp
+  gpu_sw_psxgpu_backend.h
   gpu_sw_backend.h
   gpu_types.h
   guncon.cpp
@@ -86,6 +88,9 @@ add_library(core
   multitap.h
   negcon.cpp
   negcon.h
+  netplay.cpp
+  netplay.h
+  netplay_packets.h
   negcon_rumble.cpp
   negcon_rumble.h
   pad.cpp
@@ -136,7 +141,7 @@ target_precompile_headers(core PRIVATE "pch.h")
 target_include_directories(core PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/..")
 target_include_directories(core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/..")
 target_link_libraries(core PUBLIC Threads::Threads common util)
-target_link_libraries(core PRIVATE xxhash imgui rapidyaml rcheevos cpuinfo::cpuinfo ZLIB::ZLIB Zstd::Zstd)
+target_link_libraries(core PRIVATE xxhash imgui rapidyaml rcheevos cpuinfo::cpuinfo ZLIB::ZLIB Zstd::Zstd psx_gpu enet ggpo-x)
 
 if(CPU_ARCH_X64)
   target_compile_definitions(core PUBLIC "ENABLE_RECOMPILER=1" "ENABLE_NEWREC=1" "ENABLE_MMAP_FASTMEM=1")

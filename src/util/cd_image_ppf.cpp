@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2019-2024 Connor McLaughlin <stenzek@gmail.com>
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #include "cd_image.h"
 #include "cd_subchannel_replacement.h"
@@ -34,6 +34,7 @@ public:
 
   bool ReadSubChannelQ(SubChannelQ* subq, const Index& index, LBA lba_in_index) override;
   bool HasNonStandardSubchannel() const override;
+  bool LoadSubchannelReplacementFile(std::string_view path) override;
   s64 GetSizeOnDisk() const override;
 
   std::string GetMetadata(std::string_view type) const override;
@@ -414,6 +415,11 @@ bool CDImagePPF::AddPatch(u64 offset, const u8* patch, u32 patch_size)
 bool CDImagePPF::ReadSubChannelQ(SubChannelQ* subq, const Index& index, LBA lba_in_index)
 {
   return m_parent_image->ReadSubChannelQ(subq, index, lba_in_index);
+}
+
+bool CDImagePPF::LoadSubchannelReplacementFile(std::string_view path)
+{
+  return m_parent_image->LoadSubchannelReplacementFile(path);
 }
 
 bool CDImagePPF::HasNonStandardSubchannel() const

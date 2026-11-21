@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2019-2024 Connor McLaughlin <stenzek@gmail.com>
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #define IMGUI_DEFINE_MATH_OPERATORS
 
@@ -70,6 +70,7 @@ float g_layout_scale = 1.0f;
 float g_rcp_layout_scale = 1.0f;
 float g_layout_padding_left = 0.0f;
 float g_layout_padding_top = 0.0f;
+static float s_layout_scale_multiplier = 1.0f;
 
 ImVec4 UIBackgroundColor;
 ImVec4 UIBackgroundTextColor;
@@ -89,9 +90,9 @@ ImVec4 UISecondaryStrongColor;
 ImVec4 UISecondaryTextColor;
 
 static u32 s_menu_button_index = 0;
+static float s_horizontal_menu_item_width = 0.0f;
 static u32 s_close_button_state = 0;
 static FocusResetType s_focus_reset_queued = FocusResetType::None;
-static bool s_light_theme = false;
 
 static LRUCache<std::string, std::shared_ptr<GPUTexture>> s_texture_cache(128, true);
 static std::shared_ptr<GPUTexture> s_placeholder_texture;
@@ -285,12 +286,14 @@ const std::shared_ptr<GPUTexture>& ImGuiFullscreen::GetPlaceholderTexture()
 
 std::unique_ptr<GPUTexture> ImGuiFullscreen::CreateTextureFromImage(const RGBA8Image& image)
 {
-  std::unique_ptr<GPUTexture> ret =
-    g_gpu_device->CreateTexture(image.GetWidth(), image.GetHeight(), 1, 1, 1, GPUTexture::Type::Texture,
-                                GPUTexture::Format::RGBA8, image.GetPixels(), image.GetPitch());
-  if (!ret) [[unlikely]]
-    ERROR_LOG("Failed to upload {}x{} RGBA8Image to GPU", image.GetWidth(), image.GetHeight());
-  return ret;
+  return GPUDevice::CallOnDeviceThread([&]() -> std::unique_ptr<GPUTexture> {
+    std::unique_ptr<GPUTexture> ret =
+      g_gpu_device->CreateTexture(image.GetWidth(), image.GetHeight(), 1, 1, 1, GPUTexture::Type::Texture,
+                                  GPUTexture::Format::RGBA8, image.GetPixels(), image.GetPitch());
+    if (!ret) [[unlikely]]
+      ERROR_LOG("Failed to upload {}x{} RGBA8Image to GPU", image.GetWidth(), image.GetHeight());
+    return ret;
+  });
 }
 
 std::optional<RGBA8Image> ImGuiFullscreen::LoadTextureImage(std::string_view path)
@@ -395,7 +398,7 @@ GPUTexture* ImGuiFullscreen::GetCachedTextureAsync(std::string_view name)
 
 bool ImGuiFullscreen::InvalidateCachedTexture(const std::string& path)
 {
-  return s_texture_cache.Remove(path);
+  return GPUDevice::CallOnDeviceThread([&]() -> bool { return s_texture_cache.Remove(path); });
 }
 
 void ImGuiFullscreen::UploadAsyncTextures()
@@ -458,24 +461,19 @@ bool ImGuiFullscreen::UpdateLayoutScale()
   const float screen_ratio = screen_width / screen_height;
   const float old_scale = g_layout_scale;
 
-  if (screen_ratio > LAYOUT_RATIO)
-  {
-    // screen is wider, use height, pad width
-    g_layout_scale = std::max(screen_height / LAYOUT_SCREEN_HEIGHT, 0.1f);
-    g_layout_padding_top = 0.0f;
-    g_layout_padding_left = (screen_width - (LAYOUT_SCREEN_WIDTH * g_layout_scale)) / 2.0f;
-  }
-  else
-  {
-    // screen is taller, use width, pad height
-    g_layout_scale = std::max(screen_width / LAYOUT_SCREEN_WIDTH, 0.1f);
-    g_layout_padding_top = (screen_height - (LAYOUT_SCREEN_HEIGHT * g_layout_scale)) / 2.0f;
-    g_layout_padding_left = 0.0f;
-  }
-
+  const float fit_scale = (screen_ratio > LAYOUT_RATIO) ? (screen_height / LAYOUT_SCREEN_HEIGHT) :
+                                                           (screen_width / LAYOUT_SCREEN_WIDTH);
+  g_layout_scale = std::max(fit_scale, 0.1f) * s_layout_scale_multiplier;
+  g_layout_padding_left = std::max((screen_width - (LAYOUT_SCREEN_WIDTH * g_layout_scale)) / 2.0f, 0.0f);
+  g_layout_padding_top = std::max((screen_height - (LAYOUT_SCREEN_HEIGHT * g_layout_scale)) / 2.0f, 0.0f);
   g_rcp_layout_scale = 1.0f / g_layout_scale;
 
   return g_layout_scale != old_scale;
+}
+
+void ImGuiFullscreen::SetLayoutScaleMultiplier(float multiplier)
+{
+  s_layout_scale_multiplier = multiplier;
 }
 
 ImRect ImGuiFullscreen::CenterImage(const ImVec2& fit_size, const ImVec2& image_size)
@@ -1750,11 +1748,17 @@ bool ImGuiFullscreen::EnumChoiceButtonImpl(const char* title, const char* summar
   return changed;
 }
 
+static bool IsLightColor(const ImVec4& color)
+{
+  return ((color.x * 0.299f) + (color.y * 0.587f) + (color.z * 0.114f)) > 0.5f;
+}
+
 void ImGuiFullscreen::DrawShadowedText(ImDrawList* dl, ImFont* font, const ImVec2& pos, u32 col, const char* text,
                                        const char* text_end /*= nullptr*/, float wrap_width /*= 0.0f*/)
 {
   dl->AddText(font, font->FontSize, pos + LayoutScale(1.0f, 1.0f),
-              s_light_theme ? IM_COL32(255, 255, 255, 100) : IM_COL32(0, 0, 0, 100), text, text_end, wrap_width);
+              IsLightColor(UIBackgroundColor) ? IM_COL32(255, 255, 255, 100) : IM_COL32(0, 0, 0, 100), text, text_end,
+              wrap_width);
   dl->AddText(font, font->FontSize, pos, col, text, text_end, wrap_width);
 }
 
@@ -1972,8 +1976,11 @@ bool ImGuiFullscreen::BeginHorizontalMenu(const char* name, const ImVec2& positi
   s_menu_button_index = 0;
 
   const float item_padding = LayoutScale(LAYOUT_HORIZONTAL_MENU_PADDING);
-  const float item_width = LayoutScale(LAYOUT_HORIZONTAL_MENU_ITEM_WIDTH);
   const float item_spacing = LayoutScale(30.0f);
+  const float item_width =
+    std::min(LayoutScale(LAYOUT_HORIZONTAL_MENU_ITEM_WIDTH),
+             (size.x - item_spacing * static_cast<float>(num_items + 1)) / static_cast<float>(std::max(num_items, 1u)));
+  s_horizontal_menu_item_width = item_width;
   const float menu_width = static_cast<float>(num_items) * (item_width + item_spacing) - item_spacing;
   const float menu_height = LayoutScale(LAYOUT_HORIZONTAL_MENU_HEIGHT);
 
@@ -2004,7 +2011,7 @@ bool ImGuiFullscreen::HorizontalMenuItem(GPUTexture* icon, const char* title, co
     return false;
 
   const ImVec2 pos = window->DC.CursorPos;
-  const ImVec2 size = LayoutScale(LAYOUT_HORIZONTAL_MENU_ITEM_WIDTH, LAYOUT_HORIZONTAL_MENU_HEIGHT);
+  const ImVec2 size(s_horizontal_menu_item_width, LayoutScale(LAYOUT_HORIZONTAL_MENU_HEIGHT));
   ImRect bb = ImRect(pos, pos + size);
 
   const ImGuiID id = window->GetID(title);
@@ -2409,8 +2416,10 @@ bool ImGuiFullscreen::IsInputDialogOpen()
 }
 
 void ImGuiFullscreen::OpenInputStringDialog(std::string title, std::string message, std::string caption,
-                                            std::string ok_button_text, InputStringDialogCallback callback)
+                                            std::string ok_button_text, InputStringDialogCallback callback,
+                                            std::string initial_value)
 {
+  s_input_dialog_text = std::move(initial_value);
   s_input_dialog_open = true;
   s_input_dialog_title = std::move(title);
   s_input_dialog_message = std::move(message);
@@ -2444,7 +2453,7 @@ void ImGuiFullscreen::DrawInputDialog()
                              ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize |
                                ImGuiWindowFlags_NoMove))
   {
-    ResetFocusHere();
+    const bool just_opened = ResetFocusHere();
     ImGui::TextWrapped("%s", s_input_dialog_message.c_str());
 
     BeginMenuButtons();
@@ -2461,6 +2470,8 @@ void ImGuiFullscreen::DrawInputDialog()
     {
       ImGui::SetNextItemWidth(ImGui::GetCurrentWindow()->WorkRect.GetWidth());
     }
+    if (just_opened && !IsGamepadInputSource())
+      ImGui::SetKeyboardFocusHere();
     ImGui::InputText("##input", &s_input_dialog_text);
 
     ImGui::SetCursorPosY(ImGui::GetCursorPosY() + LayoutScale(10.0f));
@@ -2878,10 +2889,10 @@ void ImGuiFullscreen::DrawNotifications(ImVec2& position, float spacing)
   ImFont* const title_font = ImGuiFullscreen::g_large_font;
   ImFont* const text_font = ImGuiFullscreen::g_medium_font;
 
-  const u32 toast_background_color = s_light_theme ? IM_COL32(241, 241, 241, 255) : IM_COL32(0x21, 0x21, 0x21, 255);
-  const u32 toast_border_color = s_light_theme ? IM_COL32(0x88, 0x88, 0x88, 255) : IM_COL32(0x48, 0x48, 0x48, 255);
-  const u32 toast_title_color = s_light_theme ? IM_COL32(1, 1, 1, 255) : IM_COL32(0xff, 0xff, 0xff, 255);
-  const u32 toast_text_color = s_light_theme ? IM_COL32(0, 0, 0, 255) : IM_COL32(0xff, 0xff, 0xff, 255);
+  const u32 toast_background_color = ImGui::GetColorU32(ModAlpha(UIPopupBackgroundColor, 1.0f));
+  const u32 toast_border_color = ImGui::GetColorU32(UIBackgroundLineColor);
+  const u32 toast_title_color = ImGui::GetColorU32(UIBackgroundTextColor);
+  const u32 toast_text_color = ImGui::GetColorU32(UIBackgroundTextColor);
 
   for (u32 index = 0; index < static_cast<u32>(s_notifications.size());)
   {
@@ -3055,48 +3066,80 @@ void ImGuiFullscreen::DrawToast()
   }
 }
 
-void ImGuiFullscreen::SetTheme(bool light)
-{
-  s_light_theme = light;
+namespace ImGuiFullscreen {
+static constexpr std::array<std::pair<const char*, ImVec4*>, 16> s_theme_colors = {{
+  {"Background", &UIBackgroundColor},
+  {"BackgroundText", &UIBackgroundTextColor},
+  {"BackgroundLine", &UIBackgroundLineColor},
+  {"BackgroundHighlight", &UIBackgroundHighlightColor},
+  {"PopupBackground", &UIPopupBackgroundColor},
+  {"Primary", &UIPrimaryColor},
+  {"PrimaryLight", &UIPrimaryLightColor},
+  {"PrimaryDark", &UIPrimaryDarkColor},
+  {"PrimaryText", &UIPrimaryTextColor},
+  {"Disabled", &UIDisabledColor},
+  {"TextHighlight", &UITextHighlightColor},
+  {"PrimaryLine", &UIPrimaryLineColor},
+  {"Secondary", &UISecondaryColor},
+  {"SecondaryStrong", &UISecondaryStrongColor},
+  {"SecondaryWeak", &UISecondaryWeakColor},
+  {"SecondaryText", &UISecondaryTextColor},
+}};
 
-  if (!light)
+static std::optional<std::string_view> FindThemeValue(std::string_view theme_ini, std::string_view key);
+static std::optional<ImVec4> ParseThemeColor(std::string_view value);
+} // namespace ImGuiFullscreen
+
+std::optional<std::string_view> ImGuiFullscreen::FindThemeValue(std::string_view theme_ini, std::string_view key)
+{
+  for (std::string_view line : StringUtil::SplitString(theme_ini, '\n'))
   {
-    // dark
-    UIBackgroundColor = HEX_TO_IMVEC4(0x212121, 0xff);
-    UIBackgroundTextColor = HEX_TO_IMVEC4(0xffffff, 0xff);
-    UIBackgroundLineColor = HEX_TO_IMVEC4(0xf0f0f0, 0xff);
-    UIBackgroundHighlightColor = HEX_TO_IMVEC4(0x4b4b4b, 0xff);
-    UIPopupBackgroundColor = HEX_TO_IMVEC4(0x212121, 0xf2);
-    UIPrimaryColor = HEX_TO_IMVEC4(0x2e2e2e, 0xff);
-    UIPrimaryLightColor = HEX_TO_IMVEC4(0x484848, 0xff);
-    UIPrimaryDarkColor = HEX_TO_IMVEC4(0x000000, 0xff);
-    UIPrimaryTextColor = HEX_TO_IMVEC4(0xffffff, 0xff);
-    UIDisabledColor = HEX_TO_IMVEC4(0xaaaaaa, 0xff);
-    UITextHighlightColor = HEX_TO_IMVEC4(0x90caf9, 0xff);
-    UIPrimaryLineColor = HEX_TO_IMVEC4(0xffffff, 0xff);
-    UISecondaryColor = HEX_TO_IMVEC4(0x0d47a1, 0xff);
-    UISecondaryStrongColor = HEX_TO_IMVEC4(0x63a4ff, 0xff);
-    UISecondaryWeakColor = HEX_TO_IMVEC4(0x002171, 0xff);
-    UISecondaryTextColor = HEX_TO_IMVEC4(0xffffff, 0xff);
+    line = StringUtil::StripWhitespace(line);
+    const std::string_view::size_type equals = line.find('=');
+    if (line.empty() || line[0] == ';' || line[0] == '[' || equals == std::string_view::npos)
+      continue;
+
+    if (StringUtil::StripWhitespace(line.substr(0, equals)) == key)
+      return StringUtil::StripWhitespace(line.substr(equals + 1));
   }
-  else
+
+  return std::nullopt;
+}
+
+std::optional<ImVec4> ImGuiFullscreen::ParseThemeColor(std::string_view value)
+{
+  if (value.empty() || value[0] != '#' || (value.length() != 7 && value.length() != 9))
+    return std::nullopt;
+
+  const std::optional<u32> rgb = StringUtil::FromChars<u32>(value.substr(1, 6), 16);
+  const std::optional<u32> alpha =
+    (value.length() == 9) ? StringUtil::FromChars<u32>(value.substr(7, 2), 16) : std::optional<u32>(0xff);
+  if (!rgb.has_value() || !alpha.has_value())
+    return std::nullopt;
+
+  return ImVec4(static_cast<float>((rgb.value() >> 16) & 0xff) / 255.0f,
+                static_cast<float>((rgb.value() >> 8) & 0xff) / 255.0f, static_cast<float>(rgb.value() & 0xff) / 255.0f,
+                static_cast<float>(alpha.value()) / 255.0f);
+}
+
+bool ImGuiFullscreen::ApplyTheme(std::string_view theme_ini)
+{
+  std::array<ImVec4, s_theme_colors.size()> colors;
+  for (size_t i = 0; i < s_theme_colors.size(); i++)
   {
-    // light
-    UIBackgroundColor = HEX_TO_IMVEC4(0xc8c8c8, 0xff);
-    UIBackgroundTextColor = HEX_TO_IMVEC4(0x000000, 0xff);
-    UIBackgroundLineColor = HEX_TO_IMVEC4(0xe1e2e1, 0xff);
-    UIBackgroundHighlightColor = HEX_TO_IMVEC4(0xe1e2e1, 0xff);
-    UIPopupBackgroundColor = HEX_TO_IMVEC4(0xd8d8d8, 0xf2);
-    UIPrimaryColor = HEX_TO_IMVEC4(0x2a3e78, 0xff);
-    UIPrimaryLightColor = HEX_TO_IMVEC4(0x235cd9, 0xff);
-    UIPrimaryDarkColor = HEX_TO_IMVEC4(0x1d2953, 0xff);
-    UIPrimaryTextColor = HEX_TO_IMVEC4(0xffffff, 0xff);
-    UIDisabledColor = HEX_TO_IMVEC4(0x999999, 0xff);
-    UITextHighlightColor = HEX_TO_IMVEC4(0x8e8e8e, 0xff);
-    UIPrimaryLineColor = HEX_TO_IMVEC4(0x000000, 0xff);
-    UISecondaryColor = HEX_TO_IMVEC4(0x2a3e78, 0xff);
-    UISecondaryStrongColor = HEX_TO_IMVEC4(0x464db1, 0xff);
-    UISecondaryWeakColor = HEX_TO_IMVEC4(0xc0cfff, 0xff);
-    UISecondaryTextColor = HEX_TO_IMVEC4(0x000000, 0xff);
+    const std::optional<std::string_view> value = FindThemeValue(theme_ini, s_theme_colors[i].first);
+    const std::optional<ImVec4> color = value.has_value() ? ParseThemeColor(value.value()) : std::nullopt;
+    if (!color.has_value())
+      return false;
+    colors[i] = color.value();
   }
+
+  for (size_t i = 0; i < s_theme_colors.size(); i++)
+    *s_theme_colors[i].second = colors[i];
+  return true;
+}
+
+std::string ImGuiFullscreen::GetThemeName(std::string_view theme_ini)
+{
+  return std::string(FindThemeValue(theme_ini, "Name").value_or(std::string_view()));
 }

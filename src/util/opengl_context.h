@@ -7,6 +7,7 @@
 
 #include "common/types.h"
 
+#include <functional>
 #include <memory>
 #include <span>
 
@@ -50,6 +51,9 @@ public:
   virtual std::unique_ptr<OpenGLContext> CreateSharedContext(const WindowInfo& wi, Error* error) = 0;
 
   static std::unique_ptr<OpenGLContext> Create(const WindowInfo& wi, Error* error);
+
+  using HostContextFactory = std::function<std::unique_ptr<OpenGLContext>(const WindowInfo& wi, Error* error)>;
+  static void SetHostContextFactory(HostContextFactory factory);
 
 protected:
   WindowInfo m_wi;

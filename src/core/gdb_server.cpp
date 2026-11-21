@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2019-2024 Connor McLaughlin <stenzek@gmail.com> and contributors.
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #include "gdb_server.h"
 #include "bus.h"
@@ -197,7 +197,7 @@ static std::optional<std::string> Cmd$m(std::string_view data)
 
   if (address && length)
   {
-    PhysicalMemoryAddress phys_addr = *address & CPU::PHYSICAL_MEMORY_ADDRESS_MASK;
+    PhysicalMemoryAddress phys_addr = *address & CPU::KSEG_MASK;
     u32 phys_length = *length;
 
     u8* ptr_data = GetMemoryPointer(phys_addr, phys_length);
@@ -225,7 +225,7 @@ static std::optional<std::string> Cmd$M(std::string_view data)
 
   if (address && length && payload && (payload->size() == *length))
   {
-    u32 phys_addr = *address & CPU::PHYSICAL_MEMORY_ADDRESS_MASK;
+    u32 phys_addr = *address & CPU::KSEG_MASK;
     u32 phys_length = *length;
 
     u8* ptr_data = GetMemoryPointer(phys_addr, phys_length);

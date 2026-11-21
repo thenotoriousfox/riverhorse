@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2019-2024 Connor McLaughlin <stenzek@gmail.com>
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #include "media_capture.h"
 #include "gpu_device.h"
@@ -1931,7 +1931,7 @@ bool MediaCaptureFFmpeg::LoadFFmpeg(Error* error)
     error,
     TRANSLATE_FS(
       "MediaCapture",
-      "You may be missing one or more files, or are using the incorrect version. This build of DuckStation requires:\n"
+      "You may be missing one or more files, or are using the incorrect version. This build of Riverhorse requires:\n"
       "  libavcodec: {}\n"
       "  libavformat: {}\n"
       "  libavutil: {}\n"

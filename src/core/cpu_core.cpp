@@ -1,8 +1,9 @@
 // SPDX-FileCopyrightText: 2019-2024 Connor McLaughlin <stenzek@gmail.com>
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #include "cpu_core.h"
 #include "bus.h"
+#include "cheats.h"
 #include "cpu_code_cache_private.h"
 #include "cpu_core_private.h"
 #include "cpu_disasm.h"
@@ -30,6 +31,7 @@ namespace CPU {
 static bool ShouldUseInterpreter();
 static void UpdateLoadDelay();
 static void Branch(u32 target);
+static void ExecuteCopBranch(const Instruction inst);
 static void FlushLoadDelay();
 static void FlushPipeline();
 
@@ -196,6 +198,7 @@ void CPU::Reset()
   g_state.cop0_regs.BDAM = 0;
   g_state.cop0_regs.BPCM = 0;
   g_state.cop0_regs.EPC = 0;
+  g_state.cop0_regs.dcic.bits = 0;
   g_state.cop0_regs.sr.bits = 0;
   g_state.cop0_regs.cause.bits = 0;
 
@@ -208,20 +211,38 @@ void CPU::Reset()
   if (g_settings.gpu_pgxp_enable)
     PGXP::Reset();
 
+  g_state.load_delay_reg = Reg::count;
+  g_state.next_load_delay_reg = Reg::count;
+
   // This consumes cycles, so do it first.
   SetPC(RESET_VECTOR);
 
   g_state.pending_ticks = 0;
   g_state.downcount = 0;
+  g_state.muldiv_completion_tick = 0;
 }
 
 bool CPU::DoState(StateWrapper& sw)
 {
   sw.Do(&g_state.pending_ticks);
   sw.Do(&g_state.downcount);
+  sw.DoEx(&g_state.muldiv_completion_tick, 72, static_cast<TickCount>(0));
+  sw.DoEx(&g_state.gte_completion_tick, 78, static_cast<TickCount>(0));
   sw.DoArray(g_state.regs.r, static_cast<u32>(Reg::count));
   sw.Do(&g_state.pc);
-  sw.Do(&g_state.npc);
+
+  State pipeline;
+  const bool canonical_pipeline = sw.IsWriting() && !g_state.using_interpreter &&
+                                  g_settings.cpu_execution_mode != CPUExecutionMode::CachedInterpreter;
+  if (canonical_pipeline)
+  {
+    pipeline.npc = g_state.pc + sizeof(Instruction);
+    if (!SafeReadInstruction(g_state.pc, &pipeline.next_instruction.bits))
+      pipeline.next_instruction.bits = 0;
+  }
+  State& ps = canonical_pipeline ? pipeline : g_state;
+
+  sw.Do(&ps.npc);
   sw.Do(&g_state.cop0_regs.BPC);
   sw.Do(&g_state.cop0_regs.BDA);
   sw.Do(&g_state.cop0_regs.TAR);
@@ -233,13 +254,13 @@ bool CPU::DoState(StateWrapper& sw)
   sw.Do(&g_state.cop0_regs.sr.bits);
   sw.Do(&g_state.cop0_regs.cause.bits);
   sw.Do(&g_state.cop0_regs.dcic.bits);
-  sw.Do(&g_state.next_instruction.bits);
-  sw.Do(&g_state.current_instruction.bits);
-  sw.Do(&g_state.current_instruction_pc);
-  sw.Do(&g_state.current_instruction_in_branch_delay_slot);
-  sw.Do(&g_state.current_instruction_was_branch_taken);
-  sw.Do(&g_state.next_instruction_is_branch_delay_slot);
-  sw.Do(&g_state.branch_was_taken);
+  sw.Do(&ps.next_instruction.bits);
+  sw.Do(&ps.current_instruction.bits);
+  sw.Do(&ps.current_instruction_pc);
+  sw.Do(&ps.current_instruction_in_branch_delay_slot);
+  sw.Do(&ps.current_instruction_was_branch_taken);
+  sw.Do(&ps.next_instruction_is_branch_delay_slot);
+  sw.Do(&ps.branch_was_taken);
   sw.Do(&g_state.exception_raised);
   sw.DoEx(&g_state.bus_error, 61, false);
   if (sw.GetVersion() < 59) [[unlikely]]
@@ -247,10 +268,17 @@ bool CPU::DoState(StateWrapper& sw)
     bool interrupt_delay;
     sw.Do(&interrupt_delay);
   }
+  u32 load_delay_value = (g_state.load_delay_reg == Reg::count) ? 0 : g_state.load_delay_value;
+  u32 next_load_delay_value = (g_state.next_load_delay_reg == Reg::count) ? 0 : g_state.next_load_delay_value;
   sw.Do(&g_state.load_delay_reg);
-  sw.Do(&g_state.load_delay_value);
+  sw.Do(&load_delay_value);
   sw.Do(&g_state.next_load_delay_reg);
-  sw.Do(&g_state.next_load_delay_value);
+  sw.Do(&next_load_delay_value);
+  if (sw.IsReading())
+  {
+    g_state.load_delay_value = load_delay_value;
+    g_state.next_load_delay_value = next_load_delay_value;
+  }
 
   // Compatibility with old states.
   if (sw.GetVersion() < 59) [[unlikely]]
@@ -258,7 +286,15 @@ bool CPU::DoState(StateWrapper& sw)
     g_state.load_delay_reg =
       static_cast<Reg>(std::min(static_cast<u8>(g_state.load_delay_reg), static_cast<u8>(Reg::count)));
     g_state.next_load_delay_reg =
-      static_cast<Reg>(std::min(static_cast<u8>(g_state.load_delay_reg), static_cast<u8>(Reg::count)));
+      static_cast<Reg>(std::min(static_cast<u8>(g_state.next_load_delay_reg), static_cast<u8>(Reg::count)));
+  }
+
+  if (sw.IsReading() &&
+      (g_state.load_delay_reg > Reg::count || g_state.next_load_delay_reg > Reg::count ||
+       !Common::IsAlignedPow2(g_state.pc, 4) || !Common::IsAlignedPow2(g_state.npc, 4) || g_state.pending_ticks < 0 ||
+       g_state.pending_ticks > static_cast<TickCount>(System::MASTER_CLOCK)))
+  {
+    return false;
   }
 
   sw.Do(&g_state.cache_control.bits);
@@ -293,7 +329,6 @@ bool CPU::DoState(StateWrapper& sw)
     }
 
     UpdateMemoryPointers();
-    g_state.gte_completion_tick = 0;
   }
 
   return !sw.HasError();
@@ -310,6 +345,19 @@ void CPU::SetPC(u32 new_pc)
   DebugAssert(Common::IsAlignedPow2(new_pc, 4));
   g_state.npc = new_pc;
   FlushPipeline();
+}
+
+void CPU::ExecuteCopBranch(const Instruction inst)
+{
+  if (!((g_state.cop0_regs.sr.bits >> (28 + inst.cop.cop_n)) & 1u))
+  {
+    RaiseException(Exception::CpU);
+    return;
+  }
+
+  g_state.next_instruction_is_branch_delay_slot = true;
+  if (!(static_cast<u8>(inst.i.rt.GetValue()) & 1u))
+    Branch(g_state.pc + (inst.i.imm_sext32() << 2));
 }
 
 ALWAYS_INLINE_RELEASE void CPU::Branch(u32 target)
@@ -1026,7 +1074,7 @@ restart_instruction:
           const u32 shamt = ReadReg(inst.r.rs) & UINT32_C(0x1F);
           const u32 rdVal = rtVal << shamt;
           if constexpr (pgxp_mode >= PGXPMode::CPU)
-            PGXP::CPU_SLLV(inst.bits, rtVal, shamt);
+            PGXP::CPU_SLLV(inst.bits, shamt, rtVal);
 
           WriteReg(inst.r.rd, rdVal);
         }
@@ -1040,7 +1088,7 @@ restart_instruction:
           WriteReg(inst.r.rd, rdVal);
 
           if constexpr (pgxp_mode >= PGXPMode::CPU)
-            PGXP::CPU_SRLV(inst.bits, rtVal, shamt);
+            PGXP::CPU_SRLV(inst.bits, shamt, rtVal);
         }
         break;
 
@@ -1052,7 +1100,7 @@ restart_instruction:
           WriteReg(inst.r.rd, rdVal);
 
           if constexpr (pgxp_mode >= PGXPMode::CPU)
-            PGXP::CPU_SRAV(inst.bits, rtVal, shamt);
+            PGXP::CPU_SRAV(inst.bits, shamt, rtVal);
         }
         break;
 
@@ -1198,6 +1246,7 @@ restart_instruction:
 
         case InstructionFunct::mfhi:
         {
+          StallUntilMulDivComplete();
           const u32 value = g_state.regs.hi;
           WriteReg(inst.r.rd, value);
 
@@ -1208,6 +1257,7 @@ restart_instruction:
 
         case InstructionFunct::mthi:
         {
+          StallUntilMulDivComplete();
           const u32 value = ReadReg(inst.r.rs);
           g_state.regs.hi = value;
 
@@ -1218,6 +1268,7 @@ restart_instruction:
 
         case InstructionFunct::mflo:
         {
+          StallUntilMulDivComplete();
           const u32 value = g_state.regs.lo;
           WriteReg(inst.r.rd, value);
 
@@ -1228,6 +1279,7 @@ restart_instruction:
 
         case InstructionFunct::mtlo:
         {
+          StallUntilMulDivComplete();
           const u32 value = ReadReg(inst.r.rs);
           g_state.regs.lo = value;
 
@@ -1242,6 +1294,7 @@ restart_instruction:
           const u32 rhs = ReadReg(inst.r.rt);
           const u64 result =
             static_cast<u64>(static_cast<s64>(SignExtend64(lhs)) * static_cast<s64>(SignExtend64(rhs)));
+          StartMulDiv(GetSignedMultTicks(static_cast<s32>(lhs)));
 
           g_state.regs.hi = Truncate32(result >> 32);
           g_state.regs.lo = Truncate32(result);
@@ -1256,6 +1309,7 @@ restart_instruction:
           const u32 lhs = ReadReg(inst.r.rs);
           const u32 rhs = ReadReg(inst.r.rt);
           const u64 result = ZeroExtend64(lhs) * ZeroExtend64(rhs);
+          StartMulDiv(GetMultTicks(lhs));
 
           g_state.regs.hi = Truncate32(result >> 32);
           g_state.regs.lo = Truncate32(result);
@@ -1269,6 +1323,7 @@ restart_instruction:
         {
           const s32 num = static_cast<s32>(ReadReg(inst.r.rs));
           const s32 denom = static_cast<s32>(ReadReg(inst.r.rt));
+          StartMulDiv(DIV_TICKS);
 
           if (denom == 0)
           {
@@ -1297,6 +1352,7 @@ restart_instruction:
         {
           const u32 num = ReadReg(inst.r.rs);
           const u32 denom = ReadReg(inst.r.rt);
+          StartMulDiv(DIV_TICKS);
 
           if (denom == 0)
           {
@@ -1387,7 +1443,7 @@ restart_instruction:
       if constexpr (pgxp_mode >= PGXPMode::CPU)
         PGXP::CPU_ORI(inst.bits, rsVal);
       else if constexpr (pgxp_mode >= PGXPMode::Memory)
-        PGXP::TryMoveImm(inst.r.rd, inst.r.rs, imm);
+        PGXP::TryMoveImm(inst.i.rt, inst.i.rs, imm);
     }
     break;
 
@@ -1401,7 +1457,7 @@ restart_instruction:
       if constexpr (pgxp_mode >= PGXPMode::CPU)
         PGXP::CPU_XORI(inst.bits, rsVal);
       else if constexpr (pgxp_mode >= PGXPMode::Memory)
-        PGXP::TryMoveImm(inst.r.rd, inst.r.rs, imm);
+        PGXP::TryMoveImm(inst.i.rt, inst.i.rs, imm);
     }
     break;
 
@@ -1421,7 +1477,7 @@ restart_instruction:
       if constexpr (pgxp_mode >= PGXPMode::CPU)
         PGXP::CPU_ADDI(inst.bits, rsVal);
       else if constexpr (pgxp_mode >= PGXPMode::Memory)
-        PGXP::TryMoveImm(inst.r.rd, inst.r.rs, imm);
+        PGXP::TryMoveImm(inst.i.rt, inst.i.rs, imm);
     }
     break;
 
@@ -1435,7 +1491,7 @@ restart_instruction:
       if constexpr (pgxp_mode >= PGXPMode::CPU)
         PGXP::CPU_ADDI(inst.bits, rsVal);
       else if constexpr (pgxp_mode >= PGXPMode::Memory)
-        PGXP::TryMoveImm(inst.r.rd, inst.r.rs, imm);
+        PGXP::TryMoveImm(inst.i.rt, inst.i.rs, imm);
     }
     break;
 
@@ -1598,7 +1654,7 @@ restart_instruction:
       WriteRegDelayed(inst.i.rt, new_value);
 
       if constexpr (pgxp_mode >= PGXPMode::Memory)
-        PGXP::CPU_LW(inst.bits, addr, new_value);
+        PGXP::CPU_LWx(inst.bits, addr, new_value);
     }
     break;
 
@@ -1685,7 +1741,7 @@ restart_instruction:
       WriteMemoryWord(aligned_addr, new_value);
 
       if constexpr (pgxp_mode >= PGXPMode::Memory)
-        PGXP::CPU_SW(inst.bits, aligned_addr, new_value);
+        PGXP::CPU_SWx(inst.bits, addr, new_value);
     }
     break;
 
@@ -1789,9 +1845,13 @@ restart_instruction:
             WriteCop0Reg(static_cast<Cop0Reg>(inst.r.rd.GetValue()), rtVal);
 
             if constexpr (pgxp_mode == PGXPMode::CPU)
-              PGXP::CPU_MTC0(inst.bits, ReadCop0Reg(static_cast<Cop0Reg>(inst.r.rd.GetValue())), rtVal);
+              PGXP::CPU_MTC0(inst.bits, rtVal);
           }
           break;
+
+          case CopCommonInstruction::bcnc:
+            ExecuteCopBranch(inst);
+            break;
 
           default:
             [[unlikely]] ERROR_LOG("Unhandled instruction at {:08X}: {:08X}", g_state.current_instruction_pc,
@@ -1884,6 +1944,10 @@ restart_instruction:
           }
           break;
 
+          case CopCommonInstruction::bcnc:
+            ExecuteCopBranch(inst);
+            break;
+
           default:
             [[unlikely]] ERROR_LOG("Unhandled instruction at {:08X}: {:08X}", g_state.current_instruction_pc,
                                    inst.bits);
@@ -1939,9 +2003,14 @@ restart_instruction:
     }
     break;
 
-      // swc0/lwc0/cop1/cop3 are essentially no-ops
     case InstructionOp::cop1:
     case InstructionOp::cop3:
+    {
+      if (IsCoprocessorBranchInstruction(inst))
+        ExecuteCopBranch(inst);
+    }
+    break;
+
     case InstructionOp::lwc0:
     case InstructionOp::lwc1:
     case InstructionOp::lwc3:
@@ -2608,7 +2677,7 @@ ALWAYS_INLINE_RELEASE bool CPU::DoInstructionRead(PhysicalMemoryAddress address,
 {
   using namespace Bus;
 
-  address &= PHYSICAL_MEMORY_ADDRESS_MASK;
+  address &= KSEG_MASK;
 
   if (address < RAM_MIRROR_END)
   {
@@ -2629,7 +2698,7 @@ ALWAYS_INLINE_RELEASE bool CPU::DoInstructionRead(PhysicalMemoryAddress address,
   else
   {
     if (raise_exceptions)
-      CPU::RaiseException(address, Cop0Registers::CAUSE::MakeValueForException(Exception::IBE, false, false, 0));
+      CPU::RaiseException(Cop0Registers::CAUSE::MakeValueForException(Exception::IBE, false, false, 0), address);
 
     std::memset(data, 0, sizeof(u32) * word_count);
     return false;
@@ -2640,7 +2709,7 @@ TickCount CPU::GetInstructionReadTicks(VirtualMemoryAddress address)
 {
   using namespace Bus;
 
-  address &= PHYSICAL_MEMORY_ADDRESS_MASK;
+  address &= KSEG_MASK;
 
   if (address < RAM_MIRROR_END)
   {
@@ -2660,7 +2729,7 @@ TickCount CPU::GetICacheFillTicks(VirtualMemoryAddress address)
 {
   using namespace Bus;
 
-  address &= PHYSICAL_MEMORY_ADDRESS_MASK;
+  address &= KSEG_MASK;
 
   if (address < RAM_MIRROR_END)
   {
@@ -2790,6 +2859,9 @@ ALWAYS_INLINE_RELEASE bool CPU::FetchInstruction()
     }
   }
 
+  if (CheatInstructionPatches::g_any_active) [[unlikely]]
+    g_state.next_instruction.bits = CheatInstructionPatches::Apply(address, g_state.next_instruction.bits);
+
   g_state.pc = g_state.npc;
   g_state.npc += sizeof(g_state.next_instruction.bits);
   return true;
@@ -2797,7 +2869,12 @@ ALWAYS_INLINE_RELEASE bool CPU::FetchInstruction()
 
 bool CPU::FetchInstructionForInterpreterFallback()
 {
-  DebugAssert(Common::IsAlignedPow2(g_state.npc, 4));
+  if (!Common::IsAlignedPow2(g_state.npc, 4)) [[unlikely]]
+  {
+    g_state.cop0_regs.BadVaddr = g_state.npc;
+    CPU::RaiseException(Cop0Registers::CAUSE::MakeValueForException(Exception::AdEL, false, false, 0), g_state.npc);
+    return false;
+  }
 
   const PhysicalMemoryAddress address = g_state.npc;
   switch (address >> 29)
@@ -2826,6 +2903,9 @@ bool CPU::FetchInstructionForInterpreterFallback()
       return false;
     }
   }
+
+  if (CheatInstructionPatches::g_any_active) [[unlikely]]
+    g_state.next_instruction.bits = CheatInstructionPatches::Apply(address, g_state.next_instruction.bits);
 
   g_state.pc = g_state.npc;
   g_state.npc += sizeof(g_state.next_instruction.bits);
@@ -2906,7 +2986,7 @@ ALWAYS_INLINE bool CPU::DoSafeMemoryAccess(VirtualMemoryAddress address, u32& va
         return true;
       }
 
-      address &= PHYSICAL_MEMORY_ADDRESS_MASK;
+      address &= KSEG_MASK;
     }
     break;
 
@@ -2922,7 +3002,7 @@ ALWAYS_INLINE bool CPU::DoSafeMemoryAccess(VirtualMemoryAddress address, u32& va
 
     case 0x05: // KSEG1 - physical memory uncached
     {
-      address &= PHYSICAL_MEMORY_ADDRESS_MASK;
+      address &= KSEG_MASK;
     }
     break;
   }
@@ -3107,7 +3187,7 @@ bool CPU::SafeReadMemoryBytes(VirtualMemoryAddress addr, void* data, u32 length)
   using namespace Bus;
 
   const u32 seg = (addr >> 29);
-  if ((seg != 0 && seg != 4 && seg != 5) || (((addr + length) & PHYSICAL_MEMORY_ADDRESS_MASK) >= RAM_MIRROR_END) ||
+  if ((seg != 0 && seg != 4 && seg != 5) || (((addr + length) & KSEG_MASK) >= RAM_MIRROR_END) ||
       (((addr & g_ram_mask) + length) > g_ram_size))
   {
     u8* ptr = static_cast<u8*>(data);
@@ -3131,7 +3211,7 @@ bool CPU::SafeWriteMemoryBytes(VirtualMemoryAddress addr, const void* data, u32 
   using namespace Bus;
 
   const u32 seg = (addr >> 29);
-  if ((seg != 0 && seg != 4 && seg != 5) || (((addr + length) & PHYSICAL_MEMORY_ADDRESS_MASK) >= RAM_MIRROR_END) ||
+  if ((seg != 0 && seg != 4 && seg != 5) || (((addr + length) & KSEG_MASK) >= RAM_MIRROR_END) ||
       (((addr & g_ram_mask) + length) > g_ram_size))
   {
     const u8* ptr = static_cast<const u8*>(data);
@@ -3158,7 +3238,7 @@ void* CPU::GetDirectReadMemoryPointer(VirtualMemoryAddress address, MemoryAccess
   if (seg != 0 && seg != 4 && seg != 5)
     return nullptr;
 
-  const PhysicalMemoryAddress paddr = address & PHYSICAL_MEMORY_ADDRESS_MASK;
+  const PhysicalMemoryAddress paddr = address & KSEG_MASK;
   if (paddr < RAM_MIRROR_END)
   {
     if (read_ticks)
@@ -3194,7 +3274,7 @@ void* CPU::GetDirectWriteMemoryPointer(VirtualMemoryAddress address, MemoryAcces
   if (seg != 0 && seg != 4 && seg != 5)
     return nullptr;
 
-  const PhysicalMemoryAddress paddr = address & PHYSICAL_MEMORY_ADDRESS_MASK;
+  const PhysicalMemoryAddress paddr = address & KSEG_MASK;
 
   if (paddr < RAM_MIRROR_END)
     return &g_ram[paddr & g_ram_mask];

@@ -30,6 +30,7 @@ public:
 protected:
   virtual EGLDisplay GetPlatformDisplay(Error* error);
   virtual EGLSurface CreatePlatformSurface(EGLConfig config, void* win, Error* error);
+  virtual bool IsConfigCompatibleWithWindow(EGLConfig config);
 
   EGLDisplay TryGetPlatformDisplay(EGLenum platform, const char* platform_ext);
   EGLSurface TryCreatePlatformSurface(EGLConfig config, void* window, Error* error);

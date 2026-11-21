@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2019-2024 Connor McLaughlin <stenzek@gmail.com>
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #pragma once
 
@@ -8,7 +8,7 @@
 
 #include <array>
 
-class GPU_SW_Backend final : public GPUBackend
+class GPU_SW_Backend : public GPUBackend
 {
 public:
   GPU_SW_Backend();

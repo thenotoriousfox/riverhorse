@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2019-2024 Connor McLaughlin <stenzek@gmail.com>
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #pragma once
 
@@ -15,12 +15,14 @@
 
 #include <cstring>
 #include <deque>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <span>
 #include <string>
 #include <string_view>
 #include <tuple>
+#include <type_traits>
 #include <vector>
 
 class Error;
@@ -41,6 +43,7 @@ enum class GPUVSyncMode : u8
   Disabled,
   FIFO,
   Mailbox,
+  FIFORelaxed,
   Count
 };
 
@@ -453,6 +456,8 @@ protected:
   u32 m_current_position = 0;
 };
 
+struct ImDrawData;
+
 class GPUDevice
 {
 public:
@@ -540,6 +545,8 @@ public:
 
   /// Returns the default/preferred API for the system.
   static RenderAPI GetPreferredAPI();
+
+  static void SetPreferredAPI(RenderAPI api);
 
   /// Returns a string representing the specified API.
   static const char* RenderAPIToString(RenderAPI api);
@@ -706,11 +713,38 @@ public:
   virtual void SubmitPresent() = 0;
 
   /// Renders ImGui screen elements. Call before EndPresent().
-  void RenderImGui();
+  void RenderImGui(const ImDrawData* draw_data);
 
   ALWAYS_INLINE GPUVSyncMode GetVSyncMode() const { return m_vsync_mode; }
-  ALWAYS_INLINE bool IsVSyncModeBlocking() const { return (m_vsync_mode == GPUVSyncMode::FIFO); }
+  ALWAYS_INLINE bool IsVSyncModeBlocking() const
+  {
+    return (m_vsync_mode == GPUVSyncMode::FIFO || m_vsync_mode == GPUVSyncMode::FIFORelaxed);
+  }
   virtual void SetVSyncMode(GPUVSyncMode mode, bool allow_present_throttle) = 0;
+
+  virtual void ReleaseThread();
+  virtual bool AcquireThread();
+
+  using DeviceThreadRunner = std::function<void(std::function<void()>, bool wait)>;
+  static void SetDeviceThreadRunner(DeviceThreadRunner runner);
+  static bool HasDeviceThread();
+  static void RunOnDeviceThread(std::function<void()> func);
+  static void QueueOnDeviceThread(std::function<void()> func);
+
+  template<typename F>
+  static auto CallOnDeviceThread(F&& func) -> decltype(func())
+  {
+    if constexpr (std::is_void_v<decltype(func())>)
+    {
+      RunOnDeviceThread(std::forward<F>(func));
+    }
+    else
+    {
+      decltype(func()) result{};
+      RunOnDeviceThread([&func, &result]() { result = func(); });
+      return result;
+    }
+  }
 
   ALWAYS_INLINE bool IsDebugDevice() const { return m_debug_device; }
   ALWAYS_INLINE size_t GetVRAMUsage() const { return s_total_vram_usage; }

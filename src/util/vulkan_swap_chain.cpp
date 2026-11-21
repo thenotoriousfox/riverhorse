@@ -217,7 +217,10 @@ std::unique_ptr<VulkanSwapChain> VulkanSwapChain::Create(const WindowInfo& wi, V
   std::unique_ptr<VulkanSwapChain> swap_chain =
     std::unique_ptr<VulkanSwapChain>(new VulkanSwapChain(wi, surface, present_mode, exclusive_fullscreen_control));
   if (!swap_chain->CreateSwapChain())
+  {
+    swap_chain->m_surface = VK_NULL_HANDLE;
     return nullptr;
+  }
 
   return swap_chain;
 }
@@ -313,6 +316,21 @@ bool VulkanSwapChain::SelectPresentMode(VkSurfaceKHR surface, GPUVSyncMode* vsyn
     {
       // FIFO is always available.
       *present_mode = VK_PRESENT_MODE_FIFO_KHR;
+    }
+    break;
+
+    case GPUVSyncMode::FIFORelaxed:
+    {
+      if (CheckForMode(VK_PRESENT_MODE_FIFO_RELAXED_KHR))
+      {
+        *present_mode = VK_PRESENT_MODE_FIFO_RELAXED_KHR;
+      }
+      else
+      {
+        WARNING_LOG("Relaxed FIFO not supported, using FIFO.");
+        *present_mode = VK_PRESENT_MODE_FIFO_KHR;
+        *vsync_mode = GPUVSyncMode::FIFO;
+      }
     }
     break;
 

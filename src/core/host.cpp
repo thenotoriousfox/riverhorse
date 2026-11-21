@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2019-2024 Connor McLaughlin <stenzek@gmail.com>
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #include "host.h"
 #include "fullscreen_ui.h"
@@ -245,9 +245,15 @@ void Host::Internal::SetInputSettingsLayer(SettingsInterface* sif, std::unique_l
   s_layered_settings_interface.SetLayer(LayeredSettingsInterface::LAYER_INPUT, sif);
 }
 
+void Host::Internal::SetNetplaySettingsLayer(SettingsInterface* sif)
+{
+  auto lock = Host::GetSettingsLock();
+  s_layered_settings_interface.SetLayer(LayeredSettingsInterface::LAYER_NETPLAY, sif);
+}
+
 std::string Host::GetHTTPUserAgent()
 {
-  return fmt::format("DuckStation for {} ({}) {}", TARGET_OS_STR, CPU_ARCH_STR, g_scm_tag_str);
+  return fmt::format("Riverhorse for {} ({}) {}", TARGET_OS_STR, CPU_ARCH_STR, g_scm_tag_str);
 }
 
 bool Host::CreateGPUDevice(RenderAPI api, Error* error)
@@ -316,13 +322,17 @@ void Host::UpdateDisplayWindow()
   if (!g_gpu_device)
     return;
 
-  if (!g_gpu_device->UpdateWindow())
+  bool updated = false;
+  GPUDevice::RunOnDeviceThread([&updated]() {
+    updated = g_gpu_device->UpdateWindow();
+    if (updated)
+      ImGuiManager::WindowResized();
+  });
+  if (!updated)
   {
     Host::ReportErrorAsync("Error", "Failed to change window after update. The log may contain more information.");
     return;
   }
-
-  ImGuiManager::WindowResized();
 
   if (System::IsValid())
   {
@@ -342,8 +352,10 @@ void Host::ResizeDisplayWindow(s32 width, s32 height, float scale)
 
   DEV_LOG("Display window resized to {}x{}", width, height);
 
-  g_gpu_device->ResizeWindow(width, height, scale);
-  ImGuiManager::WindowResized();
+  GPUDevice::RunOnDeviceThread([width, height, scale]() {
+    g_gpu_device->ResizeWindow(width, height, scale);
+    ImGuiManager::WindowResized();
+  });
 
   // If we're paused, re-present the current frame at the new window size.
   if (System::IsValid())
