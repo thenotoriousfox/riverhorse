@@ -45,8 +45,6 @@ jobs:
       shell: cmd
       run: |
         echo #define SCM_RELEASE_ASSET "riverhorse-windows-x64-release.zip" >> src/scmversion/tag.h
-        echo #define SCM_RELEASE_TAGS {"latest"} >> src/scmversion/tag.h
-        echo #define SCM_RELEASE_TAG "latest" >> src/scmversion/tag.h
 
     - name: Update RC version fields
       shell: cmd
@@ -125,8 +123,6 @@ jobs:
       shell: cmd
       run: |
         echo #define SCM_RELEASE_ASSET "riverhorse-windows-arm64-release.zip" >> src/scmversion/tag.h
-        echo #define SCM_RELEASE_TAGS {"latest"} >> src/scmversion/tag.h
-        echo #define SCM_RELEASE_TAG "latest" >> src/scmversion/tag.h
 
     - name: Update RC version fields
       shell: cmd
@@ -215,8 +211,6 @@ jobs:
     - name: Tag as release build
       run: |
         echo '#define SCM_RELEASE_ASSET "Riverhorse-${{ matrix.arch }}.AppImage"' >> src/scmversion/tag.h
-        echo '#define SCM_RELEASE_TAGS {"latest"}' >> src/scmversion/tag.h
-        echo '#define SCM_RELEASE_TAG "latest"' >> src/scmversion/tag.h
 
 
     - name: Compile build
@@ -392,8 +386,6 @@ jobs:
     - name: Tag as release build
       run: |
         echo '#define SCM_RELEASE_ASSET "riverhorse-mac-release.zip"' >> src/scmversion/tag.h
-        echo '#define SCM_RELEASE_TAGS {"latest"}' >> src/scmversion/tag.h
-        echo '#define SCM_RELEASE_TAG "latest"' >> src/scmversion/tag.h
 
     - name: Compile and zip .app
       shell: bash
@@ -446,24 +438,3 @@ jobs:
             ./artifacts/linux-x64-flatpak/riverhorse-x64.flatpak
             ./artifacts/linux-arm64-flatpak/riverhorse-arm64.flatpak
             ./artifacts/macos/riverhorse-mac-release.zip
-
-      - name: Update auto-updater release
-        uses: "marvinpinto/action-automatic-releases@latest"
-        with:
-          repo_token: "${{ secrets.GITHUB_TOKEN }}"
-          automatic_release_tag: "latest"
-          prerelease: false
-          title: "Latest Release"
-          files: |
-            ./artifacts/windows/riverhorse-windows-x64-release.zip
-            ./artifacts/windows/riverhorse-windows-x64-release-symbols.zip
-            ./artifacts/windows-arm64/riverhorse-windows-arm64-release.zip
-            ./artifacts/windows-arm64/riverhorse-windows-arm64-release-symbols.zip
-            ./artifacts/linux-x64-appimage-qt/Riverhorse-x64.AppImage
-            ./artifacts/linux-arm64-appimage-qt/Riverhorse-arm64.AppImage
-            ./artifacts/linux-x64-libretro/riverhorse_libretro-linux-x64.zip
-            ./artifacts/linux-arm64-libretro/riverhorse_libretro-linux-arm64.zip
-            ./artifacts/linux-x64-flatpak/riverhorse-x64.flatpak
-            ./artifacts/linux-arm64-flatpak/riverhorse-arm64.flatpak
-            ./artifacts/macos/riverhorse-mac-release.zip
-

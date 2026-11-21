@@ -90,7 +90,7 @@ strings are collected by `scripts/generate_fullscreen_ui_translation_strings.py`
 ## Releases
 
 Builds run only when a tag is pushed (the daily Contributors workflow only
-regenerates the README images). Push a tag such as `v0.2`
-to build every platform, publish a release under that tag and refresh the
-`latest` release the built-in updater checks. Pull requests and branch
-pushes are not built; build and test them locally.
+regenerates the README images). Push a tag such as `v1.0.1` to build every
+platform and publish a release under that tag; the built-in updater offers
+the newest release. Pull requests and branch pushes are not built; build and
+test them locally.

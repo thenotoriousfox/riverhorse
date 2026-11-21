@@ -117,10 +117,6 @@ InterfaceSettingsWidget::InterfaceSettingsWidget(SettingsWindow* dialog, QWidget
                                tr("Automatically checks for updates to the program on startup. Updates can be deferred "
                                   "until later or skipped entirely."));
 
-    m_ui.autoUpdateTag->addItems(AutoUpdaterDialog::getTagList());
-    SettingWidgetBinder::BindWidgetToStringSetting(sif, m_ui.autoUpdateTag, "AutoUpdater", "UpdateTag",
-                                                   AutoUpdaterDialog::getDefaultTag());
-
     m_ui.autoUpdateCurrentVersion->setText(tr("%1 (%2)").arg(g_scm_tag_str).arg(g_scm_date_str));
     connect(m_ui.checkForUpdates, &QPushButton::clicked, []() { g_main_window->checkForUpdates(true); });
   }

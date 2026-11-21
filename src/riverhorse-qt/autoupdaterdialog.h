@@ -30,8 +30,6 @@ public:
   ~AutoUpdaterDialog();
 
   static bool isSupported();
-  static QStringList getTagList();
-  static std::string getDefaultTag();
   static void cleanupAfterUpdate();
 
 Q_SIGNALS:
@@ -39,7 +37,6 @@ Q_SIGNALS:
 
 public Q_SLOTS:
   void queueUpdateCheck(bool display_message);
-  void queueGetLatestRelease();
 
 private Q_SLOTS:
   void httpPollTimerPoll();
@@ -54,9 +51,7 @@ private:
   bool ensureHttpReady();
 
   bool updateNeeded() const;
-  std::string getCurrentUpdateTag() const;
 
-  void getLatestTagComplete(s32 status_code, std::vector<u8> response);
   void getLatestReleaseComplete(s32 status_code, std::vector<u8> response);
 
   void queueGetChanges();
@@ -74,7 +69,7 @@ private:
 
   std::unique_ptr<HTTPDownloader> m_http;
   QTimer* m_http_poll_timer = nullptr;
-  QString m_latest_sha;
+  QString m_latest_version;
   QString m_download_url;
   int m_download_size = 0;
 

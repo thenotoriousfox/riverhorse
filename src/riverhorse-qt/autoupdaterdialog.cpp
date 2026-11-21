@@ -46,19 +46,16 @@ static constexpr u32 HTTP_POLL_INTERVAL = 10;
 // Requires that the channel be defined by the buildbot.
 #if __has_include("scmversion/tag.h")
 #include "scmversion/tag.h"
-#ifdef SCM_RELEASE_TAGS
+#ifdef SCM_RELEASE_ASSET
 #define AUTO_UPDATER_SUPPORTED
 #endif
 #endif
 
 #ifdef AUTO_UPDATER_SUPPORTED
 
-static const char* LATEST_TAG_URL = "https://api.github.com/repos/thenotoriousfox/riverhorse/tags";
-static const char* LATEST_RELEASE_URL = "https://api.github.com/repos/thenotoriousfox/riverhorse/releases/tags/{}";
+static const char* LATEST_RELEASE_URL = "https://api.github.com/repos/thenotoriousfox/riverhorse/releases/latest";
 static const char* CHANGES_URL = "https://api.github.com/repos/thenotoriousfox/riverhorse/compare/{}...{}";
 static const char* UPDATE_ASSET_FILENAME = SCM_RELEASE_ASSET;
-static const char* UPDATE_TAGS[] = SCM_RELEASE_TAGS;
-static const char* THIS_RELEASE_TAG = SCM_RELEASE_TAG;
 
 #endif
 
@@ -99,33 +96,6 @@ bool AutoUpdaterDialog::isSupported()
 #endif
 #else
   return false;
-#endif
-}
-
-QStringList AutoUpdaterDialog::getTagList()
-{
-#ifdef AUTO_UPDATER_SUPPORTED
-  return QStringList(std::begin(UPDATE_TAGS), std::end(UPDATE_TAGS));
-#else
-  return QStringList();
-#endif
-}
-
-std::string AutoUpdaterDialog::getDefaultTag()
-{
-#ifdef AUTO_UPDATER_SUPPORTED
-  return THIS_RELEASE_TAG;
-#else
-  return {};
-#endif
-}
-
-std::string AutoUpdaterDialog::getCurrentUpdateTag() const
-{
-#ifdef AUTO_UPDATER_SUPPORTED
-  return Host::GetBaseStringSettingValue("AutoUpdater", "UpdateTag", THIS_RELEASE_TAG);
-#else
-  return {};
 #endif
 }
 
@@ -178,84 +148,9 @@ void AutoUpdaterDialog::queueUpdateCheck(bool display_message)
     return;
   }
 
-  m_http->CreateRequest(LATEST_TAG_URL, std::bind(&AutoUpdaterDialog::getLatestTagComplete, this, std::placeholders::_1,
-                                                  std::placeholders::_3));
+  m_http->CreateRequest(LATEST_RELEASE_URL, std::bind(&AutoUpdaterDialog::getLatestReleaseComplete, this,
+                                                      std::placeholders::_1, std::placeholders::_3));
 #else
-  emit updateCheckCompleted();
-#endif
-}
-
-void AutoUpdaterDialog::queueGetLatestRelease()
-{
-#ifdef AUTO_UPDATER_SUPPORTED
-  if (!ensureHttpReady())
-  {
-    emit updateCheckCompleted();
-    return;
-  }
-
-  std::string url = fmt::format(fmt::runtime(LATEST_RELEASE_URL), getCurrentUpdateTag());
-  m_http->CreateRequest(std::move(url), std::bind(&AutoUpdaterDialog::getLatestReleaseComplete, this,
-                                                  std::placeholders::_1, std::placeholders::_3));
-#endif
-}
-
-void AutoUpdaterDialog::getLatestTagComplete(s32 status_code, std::vector<u8> response)
-{
-#ifdef AUTO_UPDATER_SUPPORTED
-  const std::string selected_tag(getCurrentUpdateTag());
-  const QString selected_tag_qstr = QString::fromStdString(selected_tag);
-
-  if (status_code == HTTPDownloader::HTTP_STATUS_OK)
-  {
-    QJsonParseError parse_error;
-    const QJsonDocument doc = QJsonDocument::fromJson(
-      QByteArray(reinterpret_cast<const char*>(response.data()), response.size()), &parse_error);
-    if (doc.isArray())
-    {
-      const QJsonArray doc_array(doc.array());
-      for (const QJsonValue& val : doc_array)
-      {
-        if (!val.isObject())
-          continue;
-
-        if (val["name"].toString() != selected_tag_qstr)
-          continue;
-
-        m_latest_sha = val["commit"].toObject()["sha"].toString();
-        if (m_latest_sha.isEmpty())
-          continue;
-
-        if (updateNeeded())
-        {
-          queueGetLatestRelease();
-          return;
-        }
-        else
-        {
-          if (m_display_messages)
-            QMessageBox::information(this, tr("Automatic Updater"),
-                                     tr("No updates are currently available. Please try again later."));
-          emit updateCheckCompleted();
-          return;
-        }
-      }
-
-      if (m_display_messages)
-        reportError(fmt::format("{} release not found in JSON", selected_tag));
-    }
-    else
-    {
-      if (m_display_messages)
-        reportError("JSON is not an array");
-    }
-  }
-  else
-  {
-    if (m_display_messages)
-      reportError(fmt::format("Failed to download latest tag info: HTTP {}", status_code));
-  }
-
   emit updateCheckCompleted();
 #endif
 }
@@ -271,8 +166,23 @@ void AutoUpdaterDialog::getLatestReleaseComplete(s32 status_code, std::vector<u8
     if (doc.isObject())
     {
       const QJsonObject doc_object(doc.object());
+      m_latest_version = doc_object["tag_name"].toString();
+      if (m_latest_version.isEmpty())
+      {
+        reportError("Latest release has no tag");
+        emit updateCheckCompleted();
+        return;
+      }
 
-      // search for the correct file
+      if (!updateNeeded())
+      {
+        if (m_display_messages)
+          QMessageBox::information(this, tr("Automatic Updater"),
+                                   tr("No updates are currently available. Please try again later."));
+        emit updateCheckCompleted();
+        return;
+      }
+
       const QJsonArray assets(doc_object["assets"].toArray());
       const QString asset_filename(UPDATE_ASSET_FILENAME);
       for (const QJsonValue& asset : assets)
@@ -284,9 +194,9 @@ void AutoUpdaterDialog::getLatestReleaseComplete(s32 status_code, std::vector<u8
           if (!m_download_url.isEmpty())
           {
             m_download_size = asset_obj["size"].toInt();
-            m_ui.currentVersion->setText(tr("Current Version: %1 (%2)").arg(g_scm_hash_str).arg(g_scm_date_str));
+            m_ui.currentVersion->setText(tr("Current Version: %1 (%2)").arg(g_scm_tag_str).arg(g_scm_date_str));
             m_ui.newVersion->setText(
-              tr("New Version: %1 (%2)").arg(m_latest_sha).arg(doc_object["published_at"].toString()));
+              tr("New Version: %1 (%2)").arg(m_latest_version).arg(doc_object["published_at"].toString()));
             m_ui.updateNotes->setText(tr("Loading..."));
             m_ui.downloadAndInstall->setEnabled(true);
             queueGetChanges();
@@ -324,7 +234,7 @@ void AutoUpdaterDialog::queueGetChanges()
   if (!ensureHttpReady())
     return;
 
-  std::string url = fmt::format(fmt::runtime(CHANGES_URL), g_scm_hash_str, getCurrentUpdateTag());
+  std::string url = fmt::format(fmt::runtime(CHANGES_URL), g_scm_hash_str, m_latest_version.toStdString());
   m_http->CreateRequest(std::move(url), std::bind(&AutoUpdaterDialog::getChangesComplete, this, std::placeholders::_1,
                                                   std::placeholders::_3));
 #endif
@@ -411,7 +321,7 @@ void AutoUpdaterDialog::downloadUpdateClicked()
   std::optional<bool> download_result;
   QtModalProgressCallback progress(this);
   progress.SetTitle(tr("Automatic Updater").toUtf8().constData());
-  progress.SetStatusText(tr("Downloading %1...").arg(m_latest_sha).toUtf8().constData());
+  progress.SetStatusText(tr("Downloading %1...").arg(m_latest_version).toUtf8().constData());
   progress.GetDialog().setWindowIcon(windowIcon());
   progress.SetCancellable(true);
 
@@ -460,12 +370,12 @@ void AutoUpdaterDialog::downloadUpdateClicked()
 
 bool AutoUpdaterDialog::updateNeeded() const
 {
-  QString last_checked_sha = QString::fromStdString(Host::GetBaseStringSettingValue("AutoUpdater", "LastVersion"));
+  const QString skipped_version = QString::fromStdString(Host::GetBaseStringSettingValue("AutoUpdater", "LastVersion"));
 
-  INFO_LOG("Current SHA: {}", g_scm_hash_str);
-  INFO_LOG("Latest SHA: {}", m_latest_sha.toUtf8().constData());
-  INFO_LOG("Last Checked SHA: {}", last_checked_sha.toUtf8().constData());
-  if (m_latest_sha == g_scm_hash_str || m_latest_sha == last_checked_sha)
+  INFO_LOG("Current version: {}", g_scm_tag_str);
+  INFO_LOG("Latest version: {}", m_latest_version.toUtf8().constData());
+  INFO_LOG("Skipped version: {}", skipped_version.toUtf8().constData());
+  if (m_latest_version == QString::fromUtf8(g_scm_tag_str) || m_latest_version == skipped_version)
   {
     INFO_LOG("No update needed.");
     return false;
@@ -477,7 +387,7 @@ bool AutoUpdaterDialog::updateNeeded() const
 
 void AutoUpdaterDialog::skipThisUpdateClicked()
 {
-  Host::SetBaseStringSettingValue("AutoUpdater", "LastVersion", m_latest_sha.toUtf8().constData());
+  Host::SetBaseStringSettingValue("AutoUpdater", "LastVersion", m_latest_version.toUtf8().constData());
   Host::CommitBaseSettingChanges();
   done(0);
 }
