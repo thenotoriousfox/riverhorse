@@ -412,7 +412,14 @@ jobs:
     runs-on: ubuntu-22.04
     permissions:
       contents: write
+    env:
+      DISCORD_WEBHOOK: ${{ secrets.RIVERHORSE_DISCORD_WEBHOOK }}
     steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: CHANGELOG.md
+          sparse-checkout-cone-mode: false
+
       - name: Download Artifacts
         uses: actions/download-artifact@v4
         with:
@@ -438,3 +445,29 @@ jobs:
             ./artifacts/linux-x64-flatpak/riverhorse-x64.flatpak
             ./artifacts/linux-arm64-flatpak/riverhorse-arm64.flatpak
             ./artifacts/macos/riverhorse-mac-release.zip
+
+      - name: Release notes from CHANGELOG.md
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          awk -v v="$version" '
+            /^## / { if (found) exit; if ($2 == v) { found = 1; next } }
+            found' CHANGELOG.md > release-notes.md
+          if [ ! -s release-notes.md ]; then
+            echo "::warning::CHANGELOG.md has no section for $version"
+            exit 0
+          fi
+          gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --notes-file release-notes.md
+
+      - name: Announce on Discord
+        if: env.DISCORD_WEBHOOK != ''
+        run: |
+          url="https://github.com/$GITHUB_REPOSITORY/releases/tag/$GITHUB_REF_NAME"
+          [ -s release-notes.md ] || echo "See the release page for details." > release-notes.md
+          jq -n --arg title "🦛  Riverhorse ${GITHUB_REF_NAME#v}" --arg url "$url" --rawfile notes release-notes.md '
+            ($notes | if length > 3800 then .[:3800] + "…" else . end) as $body
+            | {username: "Riverhorse",
+               embeds: [{title: $title, url: $url, color: 8076770,
+                         description: ($body + "\n\n**[Download](" + $url + ")**")}]}' > discord.json
+          curl -fsS -H "Content-Type: application/json" --data @discord.json "$DISCORD_WEBHOOK"
