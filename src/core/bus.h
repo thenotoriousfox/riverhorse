@@ -101,8 +101,9 @@ enum : u32
   MEMORY_LUT_PAGE_SIZE = 4096,
   MEMORY_LUT_PAGE_SHIFT = 12,
   MEMORY_LUT_PAGE_MASK = MEMORY_LUT_PAGE_SIZE - 1,
-  MEMORY_LUT_SIZE = 0x100000,                 // 0x100000000 >> 12
-  MEMORY_LUT_SLOTS = MEMORY_LUT_SIZE * 3 * 2, // [size][read_write]
+  MEMORY_LUT_BLOCK_SHIFT = 22,
+  MEMORY_LUT_BLOCK_PAGES = 1u << (MEMORY_LUT_BLOCK_SHIFT - MEMORY_LUT_PAGE_SHIFT),
+  MEMORY_LUT_BLOCKS = 0x400, // 0x100000000 >> 22
 
   FASTMEM_LUT_PAGE_SIZE = 4096,
   FASTMEM_LUT_PAGE_MASK = FASTMEM_LUT_PAGE_SIZE - 1,
@@ -135,13 +136,22 @@ bool DoState(StateWrapper& sw);
 using MemoryReadHandler = u32 (*)(VirtualMemoryAddress address);
 using MemoryWriteHandler = void (*)(VirtualMemoryAddress, u32);
 
-void** GetMemoryHandlers(bool isolate_cache, bool swap_caches);
+/// Handler for each 4 KB page of the address space, [size][read_write], in blocks of MEMORY_LUT_BLOCK_PAGES pages.
+/// Blocks with nothing mapped share one block of unmapped handlers.
+struct MemoryHandlerTable
+{
+  std::array<void**, MEMORY_LUT_BLOCKS> blocks[3][2];
+};
+
+const MemoryHandlerTable* GetMemoryHandlers(bool isolate_cache, bool swap_caches);
 
 template<typename FP>
-ALWAYS_INLINE_RELEASE static FP* OffsetHandlerArray(void** handlers, MemoryAccessSize size, MemoryAccessType type)
+ALWAYS_INLINE_RELEASE static FP GetMemoryHandler(const MemoryHandlerTable* table, VirtualMemoryAddress address,
+                                                 MemoryAccessSize size, MemoryAccessType type)
 {
-  return reinterpret_cast<FP*>(handlers +
-                               (((static_cast<size_t>(size) * 2) + static_cast<size_t>(type)) * MEMORY_LUT_SIZE));
+  void* const* block =
+    table->blocks[static_cast<size_t>(size)][static_cast<size_t>(type)][address >> MEMORY_LUT_BLOCK_SHIFT];
+  return reinterpret_cast<FP>(block[(address >> MEMORY_LUT_PAGE_SHIFT) & (MEMORY_LUT_BLOCK_PAGES - 1)]);
 }
 
 CPUFastmemMode GetFastmemMode();

@@ -2620,17 +2620,13 @@ bool CPU::Recompiler::Thunks::InterpretInstructionPGXP()
 ALWAYS_INLINE_RELEASE Bus::MemoryReadHandler CPU::GetMemoryReadHandler(VirtualMemoryAddress address,
                                                                        MemoryAccessSize size)
 {
-  Bus::MemoryReadHandler* base =
-    Bus::OffsetHandlerArray<Bus::MemoryReadHandler>(g_state.memory_handlers, size, MemoryAccessType::Read);
-  return base[address >> Bus::MEMORY_LUT_PAGE_SHIFT];
+  return Bus::GetMemoryHandler<Bus::MemoryReadHandler>(g_state.memory_handlers, address, size, MemoryAccessType::Read);
 }
 
 ALWAYS_INLINE_RELEASE Bus::MemoryWriteHandler CPU::GetMemoryWriteHandler(VirtualMemoryAddress address,
                                                                          MemoryAccessSize size)
 {
-  Bus::MemoryWriteHandler* base =
-    Bus::OffsetHandlerArray<Bus::MemoryWriteHandler>(g_state.memory_handlers, size, MemoryAccessType::Write);
-  return base[address >> Bus::MEMORY_LUT_PAGE_SHIFT];
+  return Bus::GetMemoryHandler<Bus::MemoryWriteHandler>(g_state.memory_handlers, address, size, MemoryAccessType::Write);
 }
 
 void CPU::UpdateMemoryPointers()

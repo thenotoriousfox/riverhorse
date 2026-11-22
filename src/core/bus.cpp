@@ -35,9 +35,12 @@
 #include "common/memmap.h"
 #include "common/path.h"
 
+#include <algorithm>
 #include <cstdio>
+#include <memory>
 #include <tuple>
 #include <utility>
+#include <vector>
 
 Log_SetChannel(Bus);
 
@@ -128,8 +131,6 @@ u32 g_ram_size = 0;
 u32 g_ram_mapped_size = 0;
 u32 g_ram_mask = 0;
 u8* g_bios = nullptr;
-void** g_memory_handlers = nullptr;
-void** g_memory_handlers_isc = nullptr;
 
 std::array<TickCount, 3> g_exp1_access_time = {};
 std::array<TickCount, 3> g_exp2_access_time = {};
@@ -169,9 +170,6 @@ static bool SideloadEXE(const std::string& path, Error* error);
 
 static void SetHandlers();
 static void UpdateMappedRAMSize();
-
-template<typename FP>
-static FP* OffsetHandlerArray(void** handlers, MemoryAccessSize size, MemoryAccessType type);
 } // namespace Bus
 
 namespace MemoryMap {
@@ -179,10 +177,17 @@ static constexpr size_t RAM_OFFSET = 0;
 static constexpr size_t RAM_SIZE = Bus::RAM_8MB_SIZE;
 static constexpr size_t BIOS_OFFSET = RAM_OFFSET + RAM_SIZE;
 static constexpr size_t BIOS_SIZE = Bus::BIOS_SIZE;
-static constexpr size_t LUT_OFFSET = BIOS_OFFSET + BIOS_SIZE;
-static constexpr size_t LUT_SIZE = (sizeof(void*) * Bus::MEMORY_LUT_SLOTS) * 2; // normal and isolated
-static constexpr size_t TOTAL_SIZE = LUT_OFFSET + LUT_SIZE;
+static constexpr size_t TOTAL_SIZE = BIOS_OFFSET + BIOS_SIZE;
 } // namespace MemoryMap
+
+namespace Bus {
+using MemoryHandlerBlock = std::array<void*, MEMORY_LUT_BLOCK_PAGES>;
+
+static MemoryHandlerTable s_memory_handlers;
+static MemoryHandlerTable s_memory_handlers_isc;
+static MemoryHandlerBlock s_unmapped_handler_blocks[3][2];
+static std::vector<std::unique_ptr<MemoryHandlerBlock>> s_memory_handler_blocks;
+} // namespace Bus
 
 #define FIXUP_HALFWORD_OFFSET(size, offset) ((size >= MemoryAccessSize::HalfWord) ? (offset) : ((offset) & ~1u))
 #define FIXUP_HALFWORD_READ_VALUE(size, offset, value)                                                                 \
@@ -240,17 +245,6 @@ bool Bus::AllocateMemoryMap(bool export_shared_memory, Error* error)
 
   VERBOSE_LOG("BIOS is mapped at {}.", static_cast<void*>(g_bios));
 
-  g_memory_handlers = static_cast<void**>(MemMap::MapSharedMemory(s_shmem_handle, MemoryMap::LUT_OFFSET, nullptr,
-                                                                  MemoryMap::LUT_SIZE, PageProtect::ReadWrite));
-  if (!g_memory_handlers)
-  {
-    Error::SetStringView(error, "Failed to map memory for LUTs");
-    ReleaseMemoryMap();
-    return false;
-  }
-
-  VERBOSE_LOG("LUTs are mapped at {}.", static_cast<void*>(g_memory_handlers));
-  g_memory_handlers_isc = g_memory_handlers + MEMORY_LUT_SLOTS;
   SetHandlers();
 
 #ifndef __ANDROID__
@@ -267,13 +261,6 @@ void Bus::ReleaseMemoryMap()
   Exports::RAM_SIZE = 0;
   Exports::RAM_MASK = 0;
 #endif
-
-  g_memory_handlers_isc = nullptr;
-  if (g_memory_handlers)
-  {
-    MemMap::UnmapSharedMemory(g_memory_handlers, MemoryMap::LUT_SIZE);
-    g_memory_handlers = nullptr;
-  }
 
   if (g_bios)
   {
@@ -1059,8 +1046,9 @@ bool Bus::SideloadEXE(const std::string& path, Error* error)
 
 // TODO: Move handlers to own files for better inlining.
 namespace Bus {
-static void ClearHandlers(void** handlers);
-static void SetHandlerForRegion(void** handlers, VirtualMemoryAddress address, u32 size,
+static void ClearHandlers(MemoryHandlerTable& table);
+static void** CopyHandlerBlock(void* const* block);
+static void SetHandlerForRegion(MemoryHandlerTable& table, VirtualMemoryAddress address, u32 size,
                                 MemoryReadHandler read_byte_handler, MemoryReadHandler read_halfword_handler,
                                 MemoryReadHandler read_word_handler, MemoryWriteHandler write_byte_handler,
                                 MemoryWriteHandler write_halfword_handler, MemoryWriteHandler write_word_handler);
@@ -1912,8 +1900,9 @@ static constexpr u32 KSEG2 = 0xC0000000U;
 
 void Bus::SetHandlers()
 {
-  ClearHandlers(g_memory_handlers);
-  ClearHandlers(g_memory_handlers_isc);
+  s_memory_handler_blocks.clear();
+  ClearHandlers(s_memory_handlers);
+  ClearHandlers(s_memory_handlers_isc);
 
 #define SET(table, start, size, read_handler, write_handler)                                                           \
   SetHandlerForRegion(table, start, size, read_handler<MemoryAccessSize::Byte>,                                        \
@@ -1921,31 +1910,31 @@ void Bus::SetHandlers()
                       write_handler<MemoryAccessSize::Byte>, write_handler<MemoryAccessSize::HalfWord>,                \
                       write_handler<MemoryAccessSize::Word>)
 #define SETUC(start, size, read_handler, write_handler)                                                                \
-  SET(g_memory_handlers, start, size, read_handler, write_handler);                                                    \
-  SET(g_memory_handlers_isc, start, size, read_handler, write_handler)
+  SET(s_memory_handlers, start, size, read_handler, write_handler);                                                    \
+  SET(s_memory_handlers_isc, start, size, read_handler, write_handler)
 
   // KUSEG - Cached
   // Cache isolated appears to affect KUSEG+KSEG0.
-  SET(g_memory_handlers, KUSEG | RAM_BASE, RAM_MIRROR_SIZE, RAMReadHandler, RAMWriteHandler);
-  SET(g_memory_handlers, KUSEG | CPU::SCRATCHPAD_ADDR, 0x1000, ScratchpadReadHandler, ScratchpadWriteHandler);
-  SET(g_memory_handlers, KUSEG | BIOS_BASE, BIOS_MIRROR_SIZE, BIOSReadHandler, IgnoreWriteHandler);
-  SET(g_memory_handlers, KUSEG | EXP1_BASE, EXP1_SIZE, EXP1ReadHandler, EXP1WriteHandler);
-  SET(g_memory_handlers, KUSEG | HW_BASE, HW_SIZE, HardwareReadHandler, HardwareWriteHandler);
-  SET(g_memory_handlers, KUSEG | EXP2_BASE, EXP2_SIZE, EXP2ReadHandler, EXP2WriteHandler);
-  SET(g_memory_handlers, KUSEG | EXP3_BASE, EXP3_SIZE, EXP3ReadHandler, EXP3WriteHandler);
-  SET(g_memory_handlers, KUSEG | SIO2_BASE, SIO2_SIZE, SIO2ReadHandler, SIO2WriteHandler);
-  SET(g_memory_handlers_isc, KUSEG, 0x80000000, ICacheReadHandler, ICacheWriteHandler);
+  SET(s_memory_handlers, KUSEG | RAM_BASE, RAM_MIRROR_SIZE, RAMReadHandler, RAMWriteHandler);
+  SET(s_memory_handlers, KUSEG | CPU::SCRATCHPAD_ADDR, 0x1000, ScratchpadReadHandler, ScratchpadWriteHandler);
+  SET(s_memory_handlers, KUSEG | BIOS_BASE, BIOS_MIRROR_SIZE, BIOSReadHandler, IgnoreWriteHandler);
+  SET(s_memory_handlers, KUSEG | EXP1_BASE, EXP1_SIZE, EXP1ReadHandler, EXP1WriteHandler);
+  SET(s_memory_handlers, KUSEG | HW_BASE, HW_SIZE, HardwareReadHandler, HardwareWriteHandler);
+  SET(s_memory_handlers, KUSEG | EXP2_BASE, EXP2_SIZE, EXP2ReadHandler, EXP2WriteHandler);
+  SET(s_memory_handlers, KUSEG | EXP3_BASE, EXP3_SIZE, EXP3ReadHandler, EXP3WriteHandler);
+  SET(s_memory_handlers, KUSEG | SIO2_BASE, SIO2_SIZE, SIO2ReadHandler, SIO2WriteHandler);
+  SET(s_memory_handlers_isc, KUSEG, 0x80000000, ICacheReadHandler, ICacheWriteHandler);
 
   // KSEG0 - Cached
-  SET(g_memory_handlers, KSEG0 | RAM_BASE, RAM_MIRROR_SIZE, RAMReadHandler, RAMWriteHandler);
-  SET(g_memory_handlers, KSEG0 | CPU::SCRATCHPAD_ADDR, 0x1000, ScratchpadReadHandler, ScratchpadWriteHandler);
-  SET(g_memory_handlers, KSEG0 | BIOS_BASE, BIOS_MIRROR_SIZE, BIOSReadHandler, IgnoreWriteHandler);
-  SET(g_memory_handlers, KSEG0 | EXP1_BASE, EXP1_SIZE, EXP1ReadHandler, EXP1WriteHandler);
-  SET(g_memory_handlers, KSEG0 | HW_BASE, HW_SIZE, HardwareReadHandler, HardwareWriteHandler);
-  SET(g_memory_handlers, KSEG0 | EXP2_BASE, EXP2_SIZE, EXP2ReadHandler, EXP2WriteHandler);
-  SET(g_memory_handlers, KSEG0 | EXP3_BASE, EXP3_SIZE, EXP3ReadHandler, EXP3WriteHandler);
-  SET(g_memory_handlers, KSEG0 | SIO2_BASE, SIO2_SIZE, SIO2ReadHandler, SIO2WriteHandler);
-  SET(g_memory_handlers_isc, KSEG0, 0x20000000, ICacheReadHandler, ICacheWriteHandler);
+  SET(s_memory_handlers, KSEG0 | RAM_BASE, RAM_MIRROR_SIZE, RAMReadHandler, RAMWriteHandler);
+  SET(s_memory_handlers, KSEG0 | CPU::SCRATCHPAD_ADDR, 0x1000, ScratchpadReadHandler, ScratchpadWriteHandler);
+  SET(s_memory_handlers, KSEG0 | BIOS_BASE, BIOS_MIRROR_SIZE, BIOSReadHandler, IgnoreWriteHandler);
+  SET(s_memory_handlers, KSEG0 | EXP1_BASE, EXP1_SIZE, EXP1ReadHandler, EXP1WriteHandler);
+  SET(s_memory_handlers, KSEG0 | HW_BASE, HW_SIZE, HardwareReadHandler, HardwareWriteHandler);
+  SET(s_memory_handlers, KSEG0 | EXP2_BASE, EXP2_SIZE, EXP2ReadHandler, EXP2WriteHandler);
+  SET(s_memory_handlers, KSEG0 | EXP3_BASE, EXP3_SIZE, EXP3ReadHandler, EXP3WriteHandler);
+  SET(s_memory_handlers, KSEG0 | SIO2_BASE, SIO2_SIZE, SIO2ReadHandler, SIO2WriteHandler);
+  SET(s_memory_handlers_isc, KSEG0, 0x20000000, ICacheReadHandler, ICacheWriteHandler);
 
   // KSEG1 - Uncached
   SETUC(KSEG1 | RAM_BASE, RAM_MIRROR_SIZE, RAMReadHandler, RAMWriteHandler);
@@ -1971,9 +1960,9 @@ void Bus::UpdateMappedRAMSize()
       constexpr u32 MAPPED_SIZE = RAM_2MB_SIZE;
       constexpr u32 UNMAPPED_START = RAM_BASE + MAPPED_SIZE;
       constexpr u32 UNMAPPED_SIZE = RAM_MIRROR_SIZE - MAPPED_SIZE;
-      SET(g_memory_handlers, KUSEG | UNMAPPED_START, UNMAPPED_SIZE, UnmappedReadHandler, UnmappedWriteHandler);
-      SET(g_memory_handlers, KSEG0 | UNMAPPED_START, UNMAPPED_SIZE, UnmappedReadHandler, UnmappedWriteHandler);
-      SET(g_memory_handlers, KSEG1 | UNMAPPED_START, UNMAPPED_SIZE, UnmappedReadHandler, UnmappedWriteHandler);
+      SET(s_memory_handlers, KUSEG | UNMAPPED_START, UNMAPPED_SIZE, UnmappedReadHandler, UnmappedWriteHandler);
+      SET(s_memory_handlers, KSEG0 | UNMAPPED_START, UNMAPPED_SIZE, UnmappedReadHandler, UnmappedWriteHandler);
+      SET(s_memory_handlers, KSEG1 | UNMAPPED_START, UNMAPPED_SIZE, UnmappedReadHandler, UnmappedWriteHandler);
       g_ram_mapped_size = MAPPED_SIZE;
     }
     break;
@@ -1997,9 +1986,9 @@ void Bus::UpdateMappedRAMSize()
       // We only unmap the upper 6MB above, so we only need to remap this as well.
       constexpr u32 REMAP_START = RAM_BASE + RAM_2MB_SIZE;
       constexpr u32 REMAP_SIZE = RAM_MIRROR_SIZE - RAM_2MB_SIZE;
-      SET(g_memory_handlers, KUSEG | REMAP_START, REMAP_SIZE, RAMReadHandler, RAMWriteHandler);
-      SET(g_memory_handlers, KSEG0 | REMAP_START, REMAP_SIZE, RAMReadHandler, RAMWriteHandler);
-      SET(g_memory_handlers, KSEG1 | REMAP_START, REMAP_SIZE, RAMReadHandler, RAMWriteHandler);
+      SET(s_memory_handlers, KUSEG | REMAP_START, REMAP_SIZE, RAMReadHandler, RAMWriteHandler);
+      SET(s_memory_handlers, KSEG0 | REMAP_START, REMAP_SIZE, RAMReadHandler, RAMWriteHandler);
+      SET(s_memory_handlers, KSEG1 | REMAP_START, REMAP_SIZE, RAMReadHandler, RAMWriteHandler);
       g_ram_mapped_size = RAM_8MB_SIZE;
     }
     break;
@@ -2009,29 +1998,36 @@ void Bus::UpdateMappedRAMSize()
 #undef SET
 #undef SETUC
 
-void Bus::ClearHandlers(void** handlers)
+void Bus::ClearHandlers(MemoryHandlerTable& table)
 {
+  static constexpr MemoryReadHandler unmapped_read[3] = {UnmappedReadHandler<MemoryAccessSize::Byte>,
+                                                          UnmappedReadHandler<MemoryAccessSize::HalfWord>,
+                                                          UnmappedReadHandler<MemoryAccessSize::Word>};
+  static constexpr MemoryWriteHandler unmapped_write[3] = {UnmappedWriteHandler<MemoryAccessSize::Byte>,
+                                                            UnmappedWriteHandler<MemoryAccessSize::HalfWord>,
+                                                            UnmappedWriteHandler<MemoryAccessSize::Word>};
+
   for (u32 size = 0; size < 3; size++)
   {
-    MemoryReadHandler* read_handlers =
-      OffsetHandlerArray<MemoryReadHandler>(handlers, static_cast<MemoryAccessSize>(size), MemoryAccessType::Read);
-    const MemoryReadHandler read_handler =
-      (size == 0) ?
-        UnmappedReadHandler<MemoryAccessSize::Byte> :
-        ((size == 1) ? UnmappedReadHandler<MemoryAccessSize::HalfWord> : UnmappedReadHandler<MemoryAccessSize::Word>);
-    MemsetPtrs(read_handlers, read_handler, MEMORY_LUT_SIZE);
+    MemoryHandlerBlock& read_block = s_unmapped_handler_blocks[size][static_cast<u32>(MemoryAccessType::Read)];
+    read_block.fill(reinterpret_cast<void*>(unmapped_read[size]));
+    table.blocks[size][static_cast<u32>(MemoryAccessType::Read)].fill(read_block.data());
 
-    MemoryWriteHandler* write_handlers =
-      OffsetHandlerArray<MemoryWriteHandler>(handlers, static_cast<MemoryAccessSize>(size), MemoryAccessType::Write);
-    const MemoryWriteHandler write_handler =
-      (size == 0) ?
-        UnmappedWriteHandler<MemoryAccessSize::Byte> :
-        ((size == 1) ? UnmappedWriteHandler<MemoryAccessSize::HalfWord> : UnmappedWriteHandler<MemoryAccessSize::Word>);
-    MemsetPtrs(write_handlers, write_handler, MEMORY_LUT_SIZE);
+    MemoryHandlerBlock& write_block = s_unmapped_handler_blocks[size][static_cast<u32>(MemoryAccessType::Write)];
+    write_block.fill(reinterpret_cast<void*>(unmapped_write[size]));
+    table.blocks[size][static_cast<u32>(MemoryAccessType::Write)].fill(write_block.data());
   }
 }
 
-void Bus::SetHandlerForRegion(void** handlers, VirtualMemoryAddress address, u32 size,
+void** Bus::CopyHandlerBlock(void* const* block)
+{
+  std::unique_ptr<MemoryHandlerBlock>& copy =
+    s_memory_handler_blocks.emplace_back(std::make_unique<MemoryHandlerBlock>());
+  std::copy_n(block, MEMORY_LUT_BLOCK_PAGES, copy->begin());
+  return copy->data();
+}
+
+void Bus::SetHandlerForRegion(MemoryHandlerTable& table, VirtualMemoryAddress address, u32 size,
                               MemoryReadHandler read_byte_handler, MemoryReadHandler read_halfword_handler,
                               MemoryReadHandler read_word_handler, MemoryWriteHandler write_byte_handler,
                               MemoryWriteHandler write_halfword_handler, MemoryWriteHandler write_word_handler)
@@ -2041,56 +2037,37 @@ void Bus::SetHandlerForRegion(void** handlers, VirtualMemoryAddress address, u32
 
   const u32 start_page = (address / MEMORY_LUT_PAGE_SIZE);
   const u32 num_pages = ((size + (MEMORY_LUT_PAGE_SIZE - 1)) / MEMORY_LUT_PAGE_SIZE);
+  const MemoryReadHandler read_handlers[3] = {read_byte_handler, read_halfword_handler, read_word_handler};
+  const MemoryWriteHandler write_handlers[3] = {write_byte_handler, write_halfword_handler, write_word_handler};
 
   for (u32 acc_size = 0; acc_size < 3; acc_size++)
   {
-    MemoryReadHandler* read_handlers =
-      OffsetHandlerArray<MemoryReadHandler>(handlers, static_cast<MemoryAccessSize>(acc_size), MemoryAccessType::Read) +
-      start_page;
-    const MemoryReadHandler read_handler =
-      (acc_size == 0) ? read_byte_handler : ((acc_size == 1) ? read_halfword_handler : read_word_handler);
-#if 0
-    for (u32 i = 0; i < num_pages; i++)
+    for (u32 type = 0; type < 2; type++)
     {
-      DebugAssert((acc_size == 0 && read_handlers[i] == UnmappedReadHandler<MemoryAccessSize::Byte>) ||
-                  (acc_size == 1 && read_handlers[i] == UnmappedReadHandler<MemoryAccessSize::HalfWord>) ||
-                  (acc_size == 2 && read_handlers[i] == UnmappedReadHandler<MemoryAccessSize::Word>));
-
-      read_handlers[i] = read_handler;
+      void* const handler = (type == static_cast<u32>(MemoryAccessType::Read)) ?
+                              reinterpret_cast<void*>(read_handlers[acc_size]) :
+                              reinterpret_cast<void*>(write_handlers[acc_size]);
+      const void* const unmapped_block = s_unmapped_handler_blocks[acc_size][type].data();
+      for (u32 page = start_page; page < (start_page + num_pages); page++)
+      {
+        void**& block = table.blocks[acc_size][type][page / MEMORY_LUT_BLOCK_PAGES];
+        if (block == unmapped_block)
+          block = CopyHandlerBlock(block);
+        block[page % MEMORY_LUT_BLOCK_PAGES] = handler;
+      }
     }
-#else
-    MemsetPtrs(read_handlers, read_handler, num_pages);
-#endif
-
-    MemoryWriteHandler* write_handlers = OffsetHandlerArray<MemoryWriteHandler>(
-                                           handlers, static_cast<MemoryAccessSize>(acc_size), MemoryAccessType::Write) +
-                                         start_page;
-    const MemoryWriteHandler write_handler =
-      (acc_size == 0) ? write_byte_handler : ((acc_size == 1) ? write_halfword_handler : write_word_handler);
-#if 0
-    for (u32 i = 0; i < num_pages; i++)
-    {
-      DebugAssert((acc_size == 0 && write_handlers[i] == UnmappedWriteHandler<MemoryAccessSize::Byte>) ||
-                  (acc_size == 1 && write_handlers[i] == UnmappedWriteHandler<MemoryAccessSize::HalfWord>) ||
-                  (acc_size == 2 && write_handlers[i] == UnmappedWriteHandler<MemoryAccessSize::Word>));
-
-      write_handlers[i] = write_handler;
-    }
-#else
-    MemsetPtrs(write_handlers, write_handler, num_pages);
-#endif
   }
 }
 
-void** Bus::GetMemoryHandlers(bool isolate_cache, bool swap_caches)
+const Bus::MemoryHandlerTable* Bus::GetMemoryHandlers(bool isolate_cache, bool swap_caches)
 {
   if (!isolate_cache)
-    return g_memory_handlers;
+    return &s_memory_handlers;
 
 #ifdef _DEBUG
   if (swap_caches)
     WARNING_LOG("Cache isolated and swapped, icache will be written instead of scratchpad?");
 #endif
 
-  return g_memory_handlers_isc;
+  return &s_memory_handlers_isc;
 }

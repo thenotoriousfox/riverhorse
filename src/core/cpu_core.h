@@ -16,6 +16,10 @@
 
 class StateWrapper;
 
+namespace Bus {
+struct MemoryHandlerTable;
+}
+
 namespace CPU {
 
 enum : VirtualMemoryAddress
@@ -116,7 +120,7 @@ struct State
   bool using_debug_dispatcher = false;
 
   void* fastmem_base = nullptr;
-  void** memory_handlers = nullptr;
+  const Bus::MemoryHandlerTable* memory_handlers = nullptr;
 
   PGXP_value pgxp_gpr[static_cast<u8>(Reg::count)] = {};
   PGXP_value pgxp_cop0[32] = {};

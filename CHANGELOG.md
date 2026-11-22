@@ -28,6 +28,9 @@ Changes since the DuckStation `v0.1-7371` base. Releases are tagged
   gone. Copies of 1.0.0 still find this release through `latest`.
 - The recompiler's lookup tables take about 17 MB instead of 200 MB, which
   matters on 1 GB handhelds.
+- About 120 MB less memory while a game runs: the memory handler table
+  takes about 2 MB instead of 96 MB, and only the part of the recompiler's
+  code buffer in use takes memory, instead of all 48 MB.
 - Code in the parallel port area is now fetched (open bus with no device)
   instead of raising a bus error, and parallel port accesses take the time
   set in the memory control registers.
