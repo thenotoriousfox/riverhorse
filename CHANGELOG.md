@@ -3,7 +3,7 @@
 Changes since the DuckStation `v0.1-7371` base. Releases are tagged
 `vMAJOR.MINOR.PATCH`.
 
-## Unreleased
+## 1.1.0 (2026-11-22)
 
 ### New
 - Riverhorse Dark and Riverhorse Light themes for the desktop window
@@ -16,8 +16,21 @@ Changes since the DuckStation `v0.1-7371` base. Releases are tagged
   folder.
 - Cover column with box-art thumbnails in the game list, shown by default
   when cover fetching is on.
+- Xplorer/Xploder cheat cartridge on the parallel port (Settings > BIOS >
+  Parallel Port, also in Big Picture): loads a flash dump, emulates its
+  flash chip, SRAM, bank switching and I/O ports, and writes changes back
+  to the dump when "Allow Image Writes" is on. Tested with Unirom flashed
+  and booted from the emulated cartridge.
 
 ### Changes
+- The updater offers the newest release and compares version tags, instead
+  of following a fixed `latest` release; the update channel setting is
+  gone. Copies of 1.0.0 still find this release through `latest`.
+- The recompiler's lookup tables take about 17 MB instead of 200 MB, which
+  matters on 1 GB handhelds.
+- Code in the parallel port area is now fetched (open bus with no device)
+  instead of raising a bus error, and parallel port accesses take the time
+  set in the memory control registers.
 - The toolbar is shown by default, and new windows open large enough for
   all of it.
 - A multi-disc game is listed once: discs named in an `.m3u` playlist are

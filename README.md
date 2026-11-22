@@ -27,7 +27,7 @@ It is based on [DuckStation](https://github.com/stenzek/duckstation) `v0.1-7371`
 
 ## 🚧 Status
 
-Riverhorse 1.0.0 is the first release; downloads are on the [Releases](https://github.com/thenotoriousfox/riverhorse/releases) page. Releases are tagged `vMAJOR.MINOR.PATCH`; the upstream tag `v0.1-7371` marks the base. Settings files use the same format and keys as the base. See [CHANGELOG.md](CHANGELOG.md) for everything changed since.
+The current release is 1.1.0; downloads are on the [Releases](https://github.com/thenotoriousfox/riverhorse/releases) page. Releases are tagged `vMAJOR.MINOR.PATCH`; the upstream tag `v0.1-7371` marks the base. Settings files use the same format and keys as the base. See [CHANGELOG.md](CHANGELOG.md) for everything changed since.
 
 | Platform | Build |
 |---|---|
