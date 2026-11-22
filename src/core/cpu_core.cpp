@@ -11,6 +11,7 @@
 #include "cpu_recompiler_thunks.h"
 #include "gte.h"
 #include "host.h"
+#include "parallel_port.h"
 #include "pcdrv.h"
 #include "settings.h"
 #include "system.h"
@@ -2695,6 +2696,14 @@ ALWAYS_INLINE_RELEASE bool CPU::DoInstructionRead(PhysicalMemoryAddress address,
 
     return true;
   }
+  else if (address >= EXP1_BASE && address < (EXP1_BASE + EXP1_SIZE))
+  {
+    ParallelPort::ReadCode(address & EXP1_MASK, static_cast<u32*>(data), word_count);
+    if constexpr (add_ticks)
+      g_state.pending_ticks += g_exp1_access_time[static_cast<u32>(MemoryAccessSize::Word)] * word_count;
+
+    return true;
+  }
   else
   {
     if (raise_exceptions)
@@ -2719,6 +2728,10 @@ TickCount CPU::GetInstructionReadTicks(VirtualMemoryAddress address)
   {
     return g_bios_access_time[static_cast<u32>(MemoryAccessSize::Word)];
   }
+  else if (address >= EXP1_BASE && address < (EXP1_BASE + EXP1_SIZE))
+  {
+    return g_exp1_access_time[static_cast<u32>(MemoryAccessSize::Word)];
+  }
   else
   {
     return 0;
@@ -2738,6 +2751,11 @@ TickCount CPU::GetICacheFillTicks(VirtualMemoryAddress address)
   else if (address >= BIOS_BASE && address < (BIOS_BASE + BIOS_MIRROR_SIZE))
   {
     return g_bios_access_time[static_cast<u32>(MemoryAccessSize::Word)] *
+           ((ICACHE_LINE_SIZE - (address & (ICACHE_LINE_SIZE - 1))) / sizeof(u32));
+  }
+  else if (address >= EXP1_BASE && address < (EXP1_BASE + EXP1_SIZE))
+  {
+    return g_exp1_access_time[static_cast<u32>(MemoryAccessSize::Word)] *
            ((ICACHE_LINE_SIZE - (address & (ICACHE_LINE_SIZE - 1))) / sizeof(u32));
   }
   else

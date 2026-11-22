@@ -283,6 +283,11 @@ struct Settings
 
   MultitapMode multitap_mode = DEFAULT_MULTITAP_MODE;
 
+  ParallelPortDevice parallel_port_device = DEFAULT_PARALLEL_PORT_DEVICE;
+  std::string parallel_port_image_path;
+  bool parallel_port_image_writes = false;
+  bool parallel_port_switch_on = true;
+
   std::string pcdrv_root;
   bool pcdrv_enable_writes = false;
 
@@ -466,6 +471,10 @@ struct Settings
   static const char* GetMultitapModeName(MultitapMode mode);
   static const char* GetMultitapModeDisplayName(MultitapMode mode);
 
+  static std::optional<ParallelPortDevice> ParseParallelPortDeviceName(const char* str);
+  static const char* GetParallelPortDeviceName(ParallelPortDevice device);
+  static const char* GetParallelPortDeviceDisplayName(ParallelPortDevice device);
+
   static std::optional<CDROMMechaconVersion> ParseCDROMMechVersionName(const char* str);
   static const char* GetCDROMMechVersionName(CDROMMechaconVersion mode);
   static const char* GetCDROMMechVersionDisplayName(CDROMMechaconVersion mode);
@@ -525,6 +534,7 @@ struct Settings
   static constexpr MemoryCardType DEFAULT_MEMORY_CARD_1_TYPE = MemoryCardType::PerGameTitle;
   static constexpr MemoryCardType DEFAULT_MEMORY_CARD_2_TYPE = MemoryCardType::None;
   static constexpr MultitapMode DEFAULT_MULTITAP_MODE = MultitapMode::Disabled;
+  static constexpr ParallelPortDevice DEFAULT_PARALLEL_PORT_DEVICE = ParallelPortDevice::None;
 
   static constexpr s32 DEFAULT_ACHIEVEMENT_NOTIFICATION_TIME = 5;
   static constexpr s32 DEFAULT_LEADERBOARD_NOTIFICATION_TIME = 10;

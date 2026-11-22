@@ -27,6 +27,7 @@
 #include "multitap.h"
 #include "netplay.h"
 #include "pad.h"
+#include "parallel_port.h"
 #include "pcdrv.h"
 #include "psf_loader.h"
 #include "save_state_version.h"
@@ -1811,11 +1812,15 @@ bool System::Initialize(bool force_software_renderer, Error* error)
 
   TimingEvents::Initialize();
 
+  if (!ParallelPort::Initialize(error))
+    return false;
+
   CPU::Initialize();
 
   if (!Bus::Initialize())
   {
     CPU::Shutdown();
+    ParallelPort::Shutdown();
     return false;
   }
 
@@ -1825,6 +1830,7 @@ bool System::Initialize(bool force_software_renderer, Error* error)
   {
     Bus::Shutdown();
     CPU::Shutdown();
+    ParallelPort::Shutdown();
     return false;
   }
 
@@ -1846,6 +1852,7 @@ bool System::Initialize(bool force_software_renderer, Error* error)
       CPU::PGXP::Shutdown();
     CPU::Shutdown();
     Bus::Shutdown();
+    ParallelPort::Shutdown();
     return false;
   }
 
@@ -1917,6 +1924,7 @@ void System::DestroySystem()
   CPU::CodeCache::Shutdown();
   Bus::Shutdown();
   CPU::Shutdown();
+  ParallelPort::Shutdown();
   TimingEvents::Shutdown();
   ClearRunningGame();
 
@@ -2513,6 +2521,12 @@ bool System::DoState(StateWrapper& sw, GPUTexture** host_texture, bool update_di
     return false;
   }
 
+  if (sw.GetVersion() >= 93 && (!sw.DoMarker("ParallelPort") || !ParallelPort::DoState(sw)))
+  {
+    ERROR_LOG("Failed to load parallel port state.");
+    return false;
+  }
+
   if (!sw.DoMarker("Events") || !TimingEvents::DoState(sw))
   {
     ERROR_LOG("Failed to load Events state.");
@@ -2603,6 +2617,7 @@ void System::InternalReset()
   MDEC::Reset();
   SIO::Reset();
   PCDrv::Reset();
+  ParallelPort::Reset();
   Achievements::ResetClient();
   s_frame_number = 1;
   s_internal_frame_number = 0;
@@ -2649,7 +2664,7 @@ size_t System::GetMaxSaveStateSize()
   static constexpr u32 MAX_2MB_SAVE_STATE_SIZE = 5 * 1024 * 1024;
   static constexpr u32 MAX_8MB_SAVE_STATE_SIZE = 11 * 1024 * 1024;
   const bool is_8mb_ram = (System::IsValid() ? (Bus::g_ram_size > Bus::RAM_2MB_SIZE) : g_settings.enable_8mb_ram);
-  return is_8mb_ram ? MAX_8MB_SAVE_STATE_SIZE : MAX_2MB_SAVE_STATE_SIZE;
+  return (is_8mb_ram ? MAX_8MB_SAVE_STATE_SIZE : MAX_2MB_SAVE_STATE_SIZE) + ParallelPort::GetMaxStateSize();
 }
 
 bool System::SaveStateToMemory(std::span<u8> buffer, Error* error, size_t* written)
@@ -3709,39 +3724,6 @@ void System::DoToggleCheats()
     Host::OSD_QUICK_DURATION);
 }
 
-#if 0
-// currently not used until EXP1 is implemented
-
-bool SetExpansionROM(const char* filename)
-{
-  std::FILE* fp = FileSystem::OpenCFile(filename, "rb");
-  if (!fp)
-  {
-    ERROR_LOG("Failed to open '{}'", Path::GetFileName(filename));
-    return false;
-  }
-
-  std::fseek(fp, 0, SEEK_END);
-  const u32 size = static_cast<u32>(std::ftell(fp));
-  std::fseek(fp, 0, SEEK_SET);
-
-  std::vector<u8> data(size);
-  if (std::fread(data.data(), size, 1, fp) != 1)
-  {
-    ERROR_LOG("Failed to read ROM data from '{}'", Path::GetFileName(filename))
-    std::fclose(fp);
-    return false;
-  }
-
-  std::fclose(fp);
-
-  INFO_LOG("Loaded expansion ROM from '{}': {} bytes", Path::GetFileName(filename), size);
-  Bus::SetExpansionROM(std::move(data));
-  return true;
-}
-
-#endif
-
 Controller* System::GetController(u32 slot)
 {
   return Pad::GetController(slot);
@@ -4732,6 +4714,14 @@ void System::CheckForSettingsChanges(const Settings& old_settings)
 
   if (g_settings.multitap_mode != old_settings.multitap_mode)
     UpdateMultitaps();
+
+  if (IsValid() && (g_settings.parallel_port_device != old_settings.parallel_port_device ||
+                    g_settings.parallel_port_image_path != old_settings.parallel_port_image_path ||
+                    g_settings.parallel_port_image_writes != old_settings.parallel_port_image_writes ||
+                    g_settings.parallel_port_switch_on != old_settings.parallel_port_switch_on))
+  {
+    ParallelPort::UpdateSettings(old_settings);
+  }
 
   Achievements::UpdateSettings(old_settings);
 

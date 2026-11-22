@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2019-2022 Connor McLaughlin <stenzek@gmail.com>
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #pragma once
 #include "common/types.h"
@@ -226,6 +226,13 @@ enum class MultitapMode
   Port1Only,
   Port2Only,
   BothPorts,
+  Count
+};
+
+enum class ParallelPortDevice : u8
+{
+  None,
+  XplorerCartridge,
   Count
 };
 

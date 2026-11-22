@@ -95,6 +95,8 @@ add_library(core
   negcon_rumble.h
   pad.cpp
   pad.h
+  parallel_port.cpp
+  parallel_port.h
   pcdrv.cpp
   pcdrv.h
   pine_server.cpp

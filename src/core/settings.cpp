@@ -367,6 +367,14 @@ void Settings::Load(SettingsInterface& si)
   pcdrv_enable_writes = si.GetBoolValue("PCDrv", "EnableWrites", false);
   pcdrv_root = si.GetStringValue("PCDrv", "Root");
 
+  parallel_port_device =
+    ParseParallelPortDeviceName(
+      si.GetStringValue("PIO", "DeviceType", GetParallelPortDeviceName(DEFAULT_PARALLEL_PORT_DEVICE)).c_str())
+      .value_or(DEFAULT_PARALLEL_PORT_DEVICE);
+  parallel_port_image_path = si.GetStringValue("PIO", "FlashImagePath");
+  parallel_port_image_writes = si.GetBoolValue("PIO", "FlashImageWriteEnable", false);
+  parallel_port_switch_on = si.GetBoolValue("PIO", "SwitchActive", true);
+
   dma_max_slice_ticks = si.GetIntValue("Hacks", "DMAMaxSliceTicks", DEFAULT_DMA_MAX_SLICE_TICKS);
   dma_halt_ticks = si.GetIntValue("Hacks", "DMAHaltTicks", DEFAULT_DMA_HALT_TICKS);
   gpu_max_run_ahead = si.GetIntValue("Hacks", "GPUMaxRunAhead", DEFAULT_GPU_MAX_RUN_AHEAD);
@@ -645,6 +653,11 @@ void Settings::Save(SettingsInterface& si, bool ignore_base) const
   si.SetBoolValue("PCDrv", "EnableWrites", pcdrv_enable_writes);
   si.SetStringValue("PCDrv", "Root", pcdrv_root.c_str());
 
+  si.SetStringValue("PIO", "DeviceType", GetParallelPortDeviceName(parallel_port_device));
+  si.SetStringValue("PIO", "FlashImagePath", parallel_port_image_path.c_str());
+  si.SetBoolValue("PIO", "FlashImageWriteEnable", parallel_port_image_writes);
+  si.SetBoolValue("PIO", "SwitchActive", parallel_port_switch_on);
+
   si.SetBoolValue("BIOS", "TTYLogging", bios_tty_logging);
   si.SetBoolValue("BIOS", "PatchFastBoot", bios_patch_fast_boot);
 
@@ -729,6 +742,7 @@ void Settings::Clear(SettingsInterface& si)
   si.ClearSection("Audio");
   si.ClearSection("Hacks");
   si.ClearSection("PCDrv");
+  si.ClearSection("PIO");
   si.ClearSection("BIOS");
 
   for (u32 i = 0; i < NUM_CONTROLLER_AND_CARD_PORTS; i++)
@@ -774,6 +788,7 @@ void Settings::FixIncompatibleSettings(bool display_osd_messages)
     g_settings.texture_replacements.enable_vram_write_replacements = false;
     g_settings.use_old_mdec_routines = false;
     g_settings.pcdrv_enable = false;
+    g_settings.parallel_port_device = ParallelPortDevice::None;
     g_settings.bios_patch_fast_boot = false;
   }
 
@@ -1765,6 +1780,34 @@ const char* Settings::GetMultitapModeName(MultitapMode mode)
 const char* Settings::GetMultitapModeDisplayName(MultitapMode mode)
 {
   return Host::TranslateToCString("MultitapMode", s_multitap_enable_mode_display_names[static_cast<size_t>(mode)]);
+}
+
+static constexpr const std::array s_parallel_port_device_names = {"None", "XplorerCart"};
+static constexpr const std::array s_parallel_port_device_display_names = {
+  TRANSLATE_NOOP("ParallelPortDevice", "None"), TRANSLATE_NOOP("ParallelPortDevice", "Xplorer/Xploder Cartridge")};
+static_assert(s_parallel_port_device_names.size() == static_cast<size_t>(ParallelPortDevice::Count));
+static_assert(s_parallel_port_device_display_names.size() == static_cast<size_t>(ParallelPortDevice::Count));
+
+std::optional<ParallelPortDevice> Settings::ParseParallelPortDeviceName(const char* str)
+{
+  for (size_t i = 0; i < s_parallel_port_device_names.size(); i++)
+  {
+    if (StringUtil::Strcasecmp(s_parallel_port_device_names[i], str) == 0)
+      return static_cast<ParallelPortDevice>(i);
+  }
+
+  return std::nullopt;
+}
+
+const char* Settings::GetParallelPortDeviceName(ParallelPortDevice device)
+{
+  return s_parallel_port_device_names[static_cast<size_t>(device)];
+}
+
+const char* Settings::GetParallelPortDeviceDisplayName(ParallelPortDevice device)
+{
+  return Host::TranslateToCString("ParallelPortDevice",
+                                  s_parallel_port_device_display_names[static_cast<size_t>(device)]);
 }
 
 static constexpr const std::array s_mechacon_version_names = {"VC0A", "VC0B", "VC1A", "VC1B", "VD1",  "VC2", "VC1",

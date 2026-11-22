@@ -171,6 +171,64 @@
     </widget>
    </item>
    <item>
+    <widget class="QGroupBox" name="parallelPortGroupBox">
+     <property name="title">
+      <string>Parallel Port</string>
+     </property>
+     <layout class="QFormLayout" name="parallelPortLayout">
+      <item row="0" column="0">
+       <widget class="QLabel" name="parallelPortDeviceLabel">
+        <property name="text">
+         <string>Device:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="1">
+       <widget class="QComboBox" name="parallelPortDevice"/>
+      </item>
+      <item row="1" column="0">
+       <widget class="QLabel" name="parallelPortImagePathLabel">
+        <property name="text">
+         <string>Image Path:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="1">
+       <layout class="QHBoxLayout" name="parallelPortImagePathLayout">
+        <item>
+         <widget class="QLineEdit" name="parallelPortImagePath"/>
+        </item>
+        <item>
+         <widget class="QPushButton" name="parallelPortImagePathBrowse">
+          <property name="text">
+           <string>Browse...</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+      <item row="2" column="0" colspan="2">
+       <layout class="QHBoxLayout" name="parallelPortOptionsLayout">
+        <item>
+         <widget class="QCheckBox" name="parallelPortSwitchOn">
+          <property name="text">
+           <string>Cartridge Switch On</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QCheckBox" name="parallelPortImageWrites">
+          <property name="text">
+           <string>Allow Image Writes</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
     <spacer name="verticalSpacer">
      <property name="orientation">
       <enum>Qt::Vertical</enum>

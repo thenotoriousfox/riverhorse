@@ -3803,6 +3803,52 @@ void FullscreenUI::DrawBIOSSettingsPage()
                     FSUI_CSTR("Logs BIOS calls to printf(). Not all games contain debugging messages."), "BIOS",
                     "TTYLogging", false);
 
+  MenuHeading(FSUI_CSTR("Parallel Port"));
+
+  DrawEnumSetting(bsi, FSUI_CSTR("Device"),
+                  FSUI_CSTR("Plugs a device into the console's parallel port. The Xplorer/Xploder cheat cartridge "
+                            "needs a dump of its flash memory."),
+                  "PIO", "DeviceType", Settings::DEFAULT_PARALLEL_PORT_DEVICE, &Settings::ParseParallelPortDeviceName,
+                  &Settings::GetParallelPortDeviceName, &Settings::GetParallelPortDeviceDisplayName,
+                  ParallelPortDevice::Count);
+
+  const bool is_cartridge =
+    (Settings::ParseParallelPortDeviceName(
+       GetEffectiveTinyStringSetting(bsi, "PIO", "DeviceType",
+                                     Settings::GetParallelPortDeviceName(Settings::DEFAULT_PARALLEL_PORT_DEVICE))
+         .c_str())
+       .value_or(Settings::DEFAULT_PARALLEL_PORT_DEVICE) == ParallelPortDevice::XplorerCartridge);
+
+  const std::optional<SmallString> image_path(
+    bsi->GetOptionalSmallStringValue("PIO", "FlashImagePath", game_settings ? std::nullopt : std::optional<const char*>("")));
+  const SmallString image_name(image_path.has_value() ?
+                                 (image_path->empty() ? std::string_view(FSUI_CSTR("None")) :
+                                                        Path::GetFileName(image_path->view())) :
+                                 std::string_view(FSUI_CSTR("Use Global Setting")));
+  if (MenuButtonWithValue(FSUI_CSTR("Image Path"), FSUI_CSTR("The cartridge flash dump to load."), image_name.c_str(),
+                          is_cartridge))
+  {
+    OpenFileSelector(FSUI_CSTR("Image Path"), false, [game_settings](const std::string& path) {
+      if (path.empty())
+        return;
+
+      auto lock = Host::GetSettingsLock();
+      SettingsInterface* bsi = GetEditingSettingsInterface(game_settings);
+      bsi->SetStringValue("PIO", "FlashImagePath", path.c_str());
+      SetSettingsChanged(bsi);
+      CloseFileSelector();
+    });
+  }
+
+  DrawToggleSetting(bsi, FSUI_CSTR("Cartridge Switch On"),
+                    FSUI_CSTR("Position of the switch on the cartridge. Most cartridge firmware only starts when the "
+                              "switch is on."),
+                    "PIO", "SwitchActive", true, is_cartridge);
+  DrawToggleSetting(bsi, FSUI_CSTR("Allow Image Writes"),
+                    FSUI_CSTR("Saves changes the cartridge makes to its flash memory back to the image file. This "
+                              "overwrites your dump, so keep a backup."),
+                    "PIO", "FlashImageWriteEnable", false, is_cartridge);
+
   EndMenuButtons();
 }
 

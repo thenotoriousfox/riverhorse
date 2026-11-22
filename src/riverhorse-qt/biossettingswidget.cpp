@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2019-2023 Connor McLaughlin <stenzek@gmail.com>
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #include "biossettingswidget.h"
 #include "qthost.h"
@@ -10,6 +10,7 @@
 #include "core/bios.h"
 #include "core/settings.h"
 
+#include <QtCore/QDir>
 #include <QtWidgets/QFileDialog>
 #include <algorithm>
 
@@ -27,6 +28,37 @@ BIOSSettingsWidget::BIOSSettingsWidget(SettingsWindow* dialog, QWidget* parent) 
                                 "but usually safe to enable."));
   dialog->registerWidgetHelp(m_ui.enableTTYLogging, tr("Enable TTY Logging"), tr("Unchecked"),
                              tr("Logs BIOS calls to printf(). Not all games contain debugging messages."));
+
+  for (u32 i = 0; i < static_cast<u32>(ParallelPortDevice::Count); i++)
+  {
+    m_ui.parallelPortDevice->addItem(
+      QString::fromUtf8(Settings::GetParallelPortDeviceDisplayName(static_cast<ParallelPortDevice>(i))));
+  }
+  SettingWidgetBinder::BindWidgetToEnumSetting(sif, m_ui.parallelPortDevice, "PIO", "DeviceType",
+                                               &Settings::ParseParallelPortDeviceName,
+                                               &Settings::GetParallelPortDeviceName,
+                                               Settings::DEFAULT_PARALLEL_PORT_DEVICE);
+  SettingWidgetBinder::BindWidgetToStringSetting(sif, m_ui.parallelPortImagePath, "PIO", "FlashImagePath");
+  SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.parallelPortSwitchOn, "PIO", "SwitchActive", true);
+  SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.parallelPortImageWrites, "PIO", "FlashImageWriteEnable",
+                                               false);
+  connect(m_ui.parallelPortDevice, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
+          &BIOSSettingsWidget::onParallelPortDeviceChanged);
+  connect(m_ui.parallelPortImagePathBrowse, &QPushButton::clicked, this,
+          &BIOSSettingsWidget::onParallelPortImagePathBrowseClicked);
+  onParallelPortDeviceChanged();
+
+  dialog->registerWidgetHelp(m_ui.parallelPortDevice, tr("Device"), tr("None"),
+                             tr("Plugs a device into the console's parallel port. The Xplorer/Xploder cheat cartridge "
+                                "needs a dump of its flash memory."));
+  dialog->registerWidgetHelp(m_ui.parallelPortImagePath, tr("Image Path"), tr("Empty"),
+                             tr("The cartridge flash dump to load."));
+  dialog->registerWidgetHelp(m_ui.parallelPortSwitchOn, tr("Cartridge Switch On"), tr("Checked"),
+                             tr("Position of the switch on the cartridge. Most cartridge firmware only starts when the "
+                                "switch is on."));
+  dialog->registerWidgetHelp(m_ui.parallelPortImageWrites, tr("Allow Image Writes"), tr("Unchecked"),
+                             tr("Saves changes the cartridge makes to its flash memory back to the image file. "
+                                "<strong>This overwrites your dump</strong>, so keep a backup."));
 
   connect(m_ui.imageNTSCJ, QOverload<int>::of(&QComboBox::currentIndexChanged), [this](int index) {
     if (m_dialog->isPerGameSettings() && index == 0)
@@ -159,4 +191,31 @@ void BIOSSettingsWidget::setDropDownValue(QComboBox* cb, const std::optional<std
 
   cb->addItem(qname, QVariant(qname));
   cb->setCurrentIndex(cb->count() - 1);
+}
+
+void BIOSSettingsWidget::onParallelPortDeviceChanged()
+{
+  const ParallelPortDevice device =
+    Settings::ParseParallelPortDeviceName(
+      m_dialog
+        ->getEffectiveStringValue("PIO", "DeviceType",
+                                  Settings::GetParallelPortDeviceName(Settings::DEFAULT_PARALLEL_PORT_DEVICE))
+        .c_str())
+      .value_or(Settings::DEFAULT_PARALLEL_PORT_DEVICE);
+  const bool is_cartridge = (device == ParallelPortDevice::XplorerCartridge);
+  m_ui.parallelPortImagePathLabel->setEnabled(is_cartridge);
+  m_ui.parallelPortImagePath->setEnabled(is_cartridge);
+  m_ui.parallelPortImagePathBrowse->setEnabled(is_cartridge);
+  m_ui.parallelPortSwitchOn->setEnabled(is_cartridge);
+  m_ui.parallelPortImageWrites->setEnabled(is_cartridge);
+}
+
+void BIOSSettingsWidget::onParallelPortImagePathBrowseClicked()
+{
+  const QString path = QDir::toNativeSeparators(QFileDialog::getOpenFileName(
+    QtUtils::GetRootWidget(this), tr("Select Cartridge Image"), m_ui.parallelPortImagePath->text()));
+  if (path.isEmpty())
+    return;
+
+  m_ui.parallelPortImagePath->setText(path);
 }

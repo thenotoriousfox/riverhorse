@@ -149,7 +149,6 @@ void* GetFastmemBase(bool isc);
 void UpdateFastmemViews(CPUFastmemMode mode);
 bool CanUseFastmemForAddress(VirtualMemoryAddress address);
 
-void SetExpansionROM(std::vector<u8> data);
 
 bool HasKernelInitialized();
 

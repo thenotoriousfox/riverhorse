@@ -1971,6 +1971,7 @@ void Netplay::SetSettings(std::string_view host_settings)
   si.SetBoolValue("CDROM", "LoadImagePatches", false);
   si.SetBoolValue("Console", "EnableCheats", false);
   si.SetBoolValue("PCDrv", "Enabled", false);
+  si.SetStringValue("PIO", "DeviceType", Settings::GetParallelPortDeviceName(ParallelPortDevice::None));
   si.SetBoolValue("TextureReplacements", "EnableVRAMWriteReplacements", false);
   si.SetBoolValue("Cheevos", "Enabled", false);
   SetRollbackSettings(si);

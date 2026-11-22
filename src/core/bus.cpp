@@ -14,6 +14,7 @@
 #include "interrupt_controller.h"
 #include "mdec.h"
 #include "pad.h"
+#include "parallel_port.h"
 #include "psf_loader.h"
 #include "settings.h"
 #include "sio.h"
@@ -135,8 +136,6 @@ std::array<TickCount, 3> g_exp2_access_time = {};
 std::array<TickCount, 3> g_bios_access_time = {};
 std::array<TickCount, 3> g_cdrom_access_time = {};
 std::array<TickCount, 3> g_spu_access_time = {};
-
-static std::vector<u8> s_exp1_rom;
 
 static MEMCTRL s_MEMCTRL = {};
 static RAM_SIZE_REG s_RAM_SIZE = {};
@@ -514,6 +513,8 @@ void Bus::RecalculateMemoryTimings()
     CalculateMemoryTiming(s_MEMCTRL.cdrom_delay_size, s_MEMCTRL.common_delay);
   std::tie(g_spu_access_time[0], g_spu_access_time[1], g_spu_access_time[2]) =
     CalculateMemoryTiming(s_MEMCTRL.spu_delay_size, s_MEMCTRL.common_delay);
+  std::tie(g_exp1_access_time[0], g_exp1_access_time[1], g_exp1_access_time[2]) =
+    CalculateMemoryTiming(s_MEMCTRL.exp1_delay_size, s_MEMCTRL.common_delay);
 
   TRACE_LOG("BIOS Memory Timing: {} bit bus, byte={}, halfword={}, word={}",
             s_MEMCTRL.bios_delay_size.data_bus_16bit ? 16 : 8, g_bios_access_time[0] + 1, g_bios_access_time[1] + 1,
@@ -524,6 +525,9 @@ void Bus::RecalculateMemoryTimings()
   TRACE_LOG("SPU Memory Timing: {} bit bus, byte={}, halfword={}, word={}",
             s_MEMCTRL.spu_delay_size.data_bus_16bit ? 16 : 8, g_spu_access_time[0] + 1, g_spu_access_time[1] + 1,
             g_spu_access_time[2] + 1);
+  TRACE_LOG("EXP1 Memory Timing: {} bit bus, byte={}, halfword={}, word={}",
+            s_MEMCTRL.exp1_delay_size.data_bus_16bit ? 16 : 8, g_exp1_access_time[0] + 1, g_exp1_access_time[1] + 1,
+            g_exp1_access_time[2] + 1);
 }
 
 CPUFastmemMode Bus::GetFastmemMode()
@@ -773,9 +777,10 @@ bool Bus::HasCodePagesInRange(PhysicalMemoryAddress start_address, u32 size)
 
 const TickCount* Bus::GetMemoryAccessTimePtr(PhysicalMemoryAddress address, MemoryAccessSize size)
 {
-  // Currently only BIOS, but could be EXP1 as well.
   if (address >= BIOS_BASE && address < (BIOS_BASE + BIOS_MIRROR_SIZE))
     return &g_bios_access_time[static_cast<size_t>(size)];
+  else if (address >= EXP1_BASE && address < (EXP1_BASE + EXP1_SIZE))
+    return &g_exp1_access_time[static_cast<size_t>(size)];
 
   return nullptr;
 }
@@ -903,11 +908,6 @@ std::optional<PhysicalMemoryAddress> Bus::SearchMemory(PhysicalMemoryAddress sta
   }
 
   return std::nullopt;
-}
-
-void Bus::SetExpansionROM(std::vector<u8> data)
-{
-  s_exp1_rom = std::move(data);
 }
 
 void Bus::AddTTYCharacter(char ch)
@@ -1301,44 +1301,9 @@ u32 Bus::EXP1ReadHandler(VirtualMemoryAddress address)
   BUS_CYCLES(g_exp1_access_time[static_cast<u32>(size)]);
 
   const u32 offset = address & EXP1_MASK;
-  u32 value;
-  if (s_exp1_rom.empty())
-  {
-    // EXP1 not present.
-    value = UINT32_C(0xFFFFFFFF);
-  }
-  else if (offset == 0x20018)
-  {
-    // Bit 0 - Action Replay On/Off
-    value = UINT32_C(1);
-  }
-  else
-  {
-    const u32 transfer_size = u32(1) << static_cast<u32>(size);
-    if ((offset + transfer_size) > s_exp1_rom.size())
-    {
-      value = UINT32_C(0);
-    }
-    else
-    {
-      if constexpr (size == MemoryAccessSize::Byte)
-      {
-        value = ZeroExtend32(s_exp1_rom[offset]);
-      }
-      else if constexpr (size == MemoryAccessSize::HalfWord)
-      {
-        u16 halfword;
-        std::memcpy(&halfword, &s_exp1_rom[offset], sizeof(halfword));
-        value = ZeroExtend32(halfword);
-      }
-      else
-      {
-        std::memcpy(&value, &s_exp1_rom[offset], sizeof(value));
-      }
-
-      // Log_DevPrintf("EXP1 read: 0x%08X -> 0x%08X", address, value);
-    }
-  }
+  u32 value = 0;
+  for (u32 i = 0; i < (1u << static_cast<u32>(size)); i++)
+    value |= ZeroExtend32(ParallelPort::ReadByte(offset + i)) << (i * 8);
 
   return value;
 }
@@ -1346,7 +1311,9 @@ u32 Bus::EXP1ReadHandler(VirtualMemoryAddress address)
 template<MemoryAccessSize size>
 void Bus::EXP1WriteHandler(VirtualMemoryAddress address, u32 value)
 {
-  WARNING_LOG("EXP1 write: 0x{:08X} <- 0x{:08X}", address, value);
+  const u32 offset = address & EXP1_MASK;
+  for (u32 i = 0; i < (1u << static_cast<u32>(size)); i++)
+    ParallelPort::WriteByte(offset + i, Truncate8(value >> (i * 8)));
 }
 
 template<MemoryAccessSize size>
