@@ -44,7 +44,7 @@ Log_SetChannel(CPU::CodeCache);
 
 namespace CPU::CodeCache {
 
-using LUTRangeList = std::array<std::pair<VirtualMemoryAddress, VirtualMemoryAddress>, 9>;
+using LUTRangeList = std::array<std::pair<VirtualMemoryAddress, VirtualMemoryAddress>, 6>;
 using PageProtectionArray = std::array<PageProtectionInfo, Bus::RAM_8MB_CODE_PAGE_COUNT>;
 using BlockInstructionInfoPair = std::pair<Instruction, InstructionInfo>;
 using BlockInstructionList = std::vector<BlockInstructionInfoPair>;
@@ -64,6 +64,8 @@ static CodeLUT OffsetCodeLUTPointer(CodeLUT fake_ptr, u32 pc);
 
 static void AllocateLUTs();
 static void DeallocateLUTs();
+static void AssignLUTTables();
+static void DetachRAMMirrorLUTTables();
 static void ResetCodeLUT();
 static void SetCodeLUT(u32 pc, const void* function);
 static void InvalidateBlock(Block* block, BlockState new_state);
@@ -92,8 +94,12 @@ template<PGXPMode pgxp_mode>
 // Function pointers are offset so that you don't need to subtract
 CodeLUTArray g_code_lut;
 static BlockLUTArray s_block_lut;
-static std::unique_ptr<const void*[]> s_lut_code_pointers;
-static std::unique_ptr<Block*[]> s_lut_block_pointers;
+struct FreeDeleter
+{
+  void operator()(void* ptr) const { std::free(ptr); }
+};
+static std::unique_ptr<const void*[], FreeDeleter> s_lut_code_pointers;
+static std::unique_ptr<Block*[], FreeDeleter> s_lut_block_pointers;
 static PageProtectionArray s_page_protection = {};
 static std::vector<Block*> s_blocks;
 
@@ -281,15 +287,12 @@ static constexpr LUTRangeList GetLUTRanges()
 {
   const LUTRangeList ranges = {{
     {0x00000000, 0x00800000}, // RAM
-    {0x1F000000, 0x1F800000}, // EXP1
     {0x1FC00000, 0x1FC80000}, // BIOS
 
     {0x80000000, 0x80800000}, // RAM
-    {0x9F000000, 0x9F800000}, // EXP1
     {0x9FC00000, 0x9FC80000}, // BIOS
 
     {0xA0000000, 0xA0800000}, // RAM
-    {0xBF000000, 0xBF800000}, // EXP1
     {0xBFC00000, 0xBFC80000}  // BIOS
   }};
   return ranges;
@@ -336,19 +339,20 @@ void CPU::CodeCache::AllocateLUTs()
   constexpr u32 num_block_slots = GetLUTSlotCount(false);
 
   Assert(!s_lut_code_pointers && !s_lut_block_pointers);
-  s_lut_code_pointers = std::make_unique<const void*[]>(num_code_slots);
-  s_lut_block_pointers = std::make_unique<Block*[]>(num_block_slots);
-  std::memset(s_lut_block_pointers.get(), 0, sizeof(Block*) * num_block_slots);
+  s_lut_code_pointers.reset(static_cast<const void**>(std::calloc(num_code_slots, sizeof(const void*))));
+  s_lut_block_pointers.reset(static_cast<Block**>(std::calloc(num_block_slots, sizeof(Block*))));
+  Assert(s_lut_code_pointers && s_lut_block_pointers);
 
+  AssignLUTTables();
+}
+
+void CPU::CodeCache::AssignLUTTables()
+{
   CodeLUT code_table_ptr = s_lut_code_pointers.get();
   Block** block_table_ptr = s_lut_block_pointers.get();
-  CodeLUT const code_table_ptr_end = code_table_ptr + num_code_slots;
-  Block** const block_table_ptr_end = block_table_ptr + num_block_slots;
+  CodeLUT const code_table_ptr_end = code_table_ptr + GetLUTSlotCount(true);
+  Block** const block_table_ptr_end = block_table_ptr + GetLUTSlotCount(false);
 
-  // Make the unreachable table jump to the invalid code callback.
-  MemsetPtrs(code_table_ptr, static_cast<const void*>(nullptr), LUT_TABLE_COUNT);
-
-  // Mark everything as unreachable to begin with.
   for (u32 i = 0; i < LUT_TABLE_COUNT; i++)
   {
     g_code_lut[i] = EncodeCodeLUTPointer(i, code_table_ptr);
@@ -356,7 +360,6 @@ void CPU::CodeCache::AllocateLUTs()
   }
   code_table_ptr += LUT_TABLE_SIZE;
 
-  // Allocate ranges.
   for (const auto& [start, end] : GetLUTRanges())
   {
     const u32 start_slot = start >> LUT_TABLE_SHIFT;
@@ -377,6 +380,20 @@ void CPU::CodeCache::AllocateLUTs()
   Assert(block_table_ptr == block_table_ptr_end);
 }
 
+void CPU::CodeCache::DetachRAMMirrorLUTTables()
+{
+  for (const u32 segment_base : {0x00000000u, 0x80000000u, 0xA0000000u})
+  {
+    for (u32 address = segment_base + Bus::g_ram_size; address < segment_base + Bus::RAM_8MB_SIZE;
+         address += (1u << LUT_TABLE_SHIFT))
+    {
+      const u32 slot = address >> LUT_TABLE_SHIFT;
+      g_code_lut[slot] = EncodeCodeLUTPointer(slot, s_lut_code_pointers.get());
+      s_block_lut[slot] = nullptr;
+    }
+  }
+}
+
 void CPU::CodeCache::DeallocateLUTs()
 {
   s_lut_block_pointers.reset();
@@ -387,6 +404,9 @@ void CPU::CodeCache::ResetCodeLUT()
 {
   if (!s_lut_code_pointers)
     return;
+
+  AssignLUTTables();
+  DetachRAMMirrorLUTTables();
 
   // Make the unreachable table jump to the invalid code callback.
   MemsetPtrs(s_lut_code_pointers.get(), g_interpret_block, LUT_TABLE_COUNT);
@@ -756,12 +776,13 @@ void CPU::CodeCache::ClearBlocks()
 
   for (Block* block : s_blocks)
   {
+    if (Block** const table = s_block_lut[block->pc >> LUT_TABLE_SHIFT])
+      table[(block->pc & 0xFFFF) >> 2] = nullptr;
+
     block->~Block();
     Common::AlignedFree(block);
   }
   s_blocks.clear();
-
-  std::memset(s_lut_block_pointers.get(), 0, sizeof(Block*) * GetLUTSlotCount(false));
 }
 
 PageFaultHandler::HandlerResult PageFaultHandler::HandlePageFault(void* exception_pc, void* fault_address,
