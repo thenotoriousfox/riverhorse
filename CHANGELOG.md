@@ -32,6 +32,8 @@ Changes since the DuckStation `v0.1-7371` base. Releases are tagged
   Font Awesome, Remix Icon).
 
 ### Fixes
+- COP0 data breakpoints never triggered, so cheat cartridge firmware that
+  boots through one (such as Unirom on an Xplorer) fell through to the BIOS.
 - On KDE, a single click or a right-click on a game started it.
 - The window and taskbar icon was missing on Wayland.
 - Help menu icons and About box links were hard to read in dark themes.

@@ -2067,8 +2067,9 @@ bool CPU::UpdateDebugDispatcherFlag()
   const bool has_any_breakpoints = HasAnyBreakpoints() || s_single_step;
 
   const auto& dcic = g_state.cop0_regs.dcic;
-  const bool has_cop0_breakpoints = dcic.super_master_enable_1 && dcic.super_master_enable_2 &&
-                                    dcic.execution_breakpoint_enable && IsCop0ExecutionBreakpointUnmasked();
+  const bool has_cop0_breakpoints =
+    (dcic.ExecutionBreakpointsEnabled() && IsCop0ExecutionBreakpointUnmasked()) ||
+    dcic.DataReadBreakpointsEnabled() || dcic.DataWriteBreakpointsEnabled();
 
   const bool use_debug_dispatcher =
     has_any_breakpoints || has_cop0_breakpoints || s_trace_to_log ||
