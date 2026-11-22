@@ -22,12 +22,18 @@
 #include "common/log.h"
 #include "common/path.h"
 #include "common/progress_callback.h"
+#include "common/scoped_guard.h"
 #include "common/string_util.h"
 #include "common/timer.h"
+
+#include "ryml.hpp"
 
 #include <algorithm>
 #include <array>
 #include <ctime>
+#include <mutex>
+#include <semaphore>
+#include <span>
 #include <string_view>
 #include <type_traits>
 #include <unordered_map>
@@ -105,6 +111,7 @@ static bool LoadOrInitializeCache(std::FILE* fp, bool invalidate_cache);
 static bool LoadEntriesFromCache(BinaryFileReader& reader);
 static bool WriteEntryToCache(const Entry* entry, BinaryFileWriter& writer);
 static void CreateDiscSetEntries(const PlayedTimeMap& played_time_map);
+static void MarkPlaylistMembers();
 
 static std::string GetPlayedTimeFile();
 static bool ParsePlayedTimeLine(char* line, std::string& serial, PlayedTimeEntry& entry);
@@ -824,6 +831,7 @@ void GameList::Refresh(bool invalidate_cache, bool only_cache, ProgressCallback*
 
   // merge multi-disc games
   CreateDiscSetEntries(played_time);
+  MarkPlaylistMembers();
 }
 
 GameList::EntryList GameList::TakeEntryList()
@@ -934,6 +942,42 @@ void GameList::CreateDiscSetEntries(const PlayedTimeMap& played_time_map)
     // entry is done :)
     s_entries.push_back(std::move(set_entry));
   }
+}
+
+void GameList::MarkPlaylistMembers()
+{
+  std::unique_lock lock(s_mutex);
+
+  for (Entry& playlist : s_entries)
+  {
+    if (playlist.type != EntryType::Playlist)
+      continue;
+
+    std::vector<Entry*> discs;
+    for (const std::string& disc_path : CDImage::ReadM3uFilenames(playlist.path.c_str()))
+    {
+      for (Entry& entry : s_entries)
+      {
+        if (entry.type == EntryType::Disc && entry.path == disc_path)
+          discs.push_back(&entry);
+      }
+    }
+    if (discs.empty())
+      continue;
+
+    playlist.playlist_of_disc_set =
+      std::all_of(discs.begin(), discs.end(), [](const Entry* disc) { return disc->disc_set_member; });
+    for (Entry* disc : discs)
+      disc->playlist_member = true;
+  }
+}
+
+bool GameList::IsEntryListed(const Entry* entry, bool merge_disc_sets)
+{
+  if (merge_disc_sets)
+    return !entry->disc_set_member && !entry->playlist_member && !entry->playlist_of_disc_set;
+  else
+    return !entry->IsDiscSet() && !entry->playlist_member;
 }
 
 std::string GameList::GetCoverImagePathForEntry(const Entry* entry)
@@ -1491,6 +1535,244 @@ bool GameList::DownloadCovers(const std::vector<std::string>& url_templates, boo
   }
 
   return true;
+}
+
+namespace GameList {
+static constexpr const char* COVER_FETCH_URL =
+  "https://raw.githubusercontent.com/libretro-thumbnails/Sony_-_PlayStation/master/Named_Boxarts/";
+static constexpr const char* COVER_INDEX_TREE_URL =
+  "https://api.github.com/repos/libretro-thumbnails/Sony_-_PlayStation/git/trees/";
+static constexpr const char* COVER_INDEX_FOLDER = "Named_Boxarts";
+static constexpr std::time_t COVER_INDEX_MAX_AGE = 7 * 24 * 60 * 60;
+static constexpr u32 MAX_CONCURRENT_COVER_FETCHES = 4;
+static constexpr size_t MAX_COVER_LINK_LENGTH = 256;
+
+static std::string GetCoverIndexFile();
+static std::optional<std::string> DownloadText(HTTPDownloader* downloader, std::string url);
+static std::vector<std::pair<std::string, std::string>> ParseGitTree(std::string_view json);
+static bool DownloadCoverIndex(std::string* index);
+static void LoadCoverIndex();
+static std::string GetCoverIndexKey(std::string_view name);
+static std::string GetCoverFetchName(std::string_view title);
+static bool IsPNGData(std::span<const u8> data);
+
+static std::mutex s_cover_index_mutex;
+static std::unordered_map<std::string, std::string> s_cover_index;
+static bool s_cover_index_loaded = false;
+static std::counting_semaphore<MAX_CONCURRENT_COVER_FETCHES> s_cover_fetch_slots(MAX_CONCURRENT_COVER_FETCHES);
+} // namespace GameList
+
+std::string GameList::GetCoverIndexFile()
+{
+  return Path::Combine(EmuFolders::Cache, "cover_fetch_index.txt");
+}
+
+std::optional<std::string> GameList::DownloadText(HTTPDownloader* downloader, std::string url)
+{
+  std::optional<std::string> text;
+  downloader->CreateRequest(std::move(url), [&text](s32 status_code, const std::string& content_type,
+                                                    HTTPDownloader::Request::Data data) {
+    if (status_code == HTTPDownloader::HTTP_STATUS_OK)
+      text = std::string(reinterpret_cast<const char*>(data.data()), data.size());
+  });
+  downloader->WaitForAllRequests();
+  return text;
+}
+
+std::vector<std::pair<std::string, std::string>> GameList::ParseGitTree(std::string_view json)
+{
+  std::vector<std::pair<std::string, std::string>> items;
+  const ryml::Tree tree = ryml::parse_in_arena(c4::csubstr(json.data(), json.size()));
+  const ryml::ConstNodeRef tree_items = tree.rootref().find_child("tree");
+  if (!tree_items.valid() || !tree_items.is_seq())
+    return items;
+
+  for (const ryml::ConstNodeRef& item : tree_items.children())
+  {
+    const ryml::ConstNodeRef item_path = item.find_child("path");
+    const ryml::ConstNodeRef item_sha = item.find_child("sha");
+    if (!item_path.valid() || !item_sha.valid() || !item_path.has_val() || !item_sha.has_val())
+      continue;
+
+    items.emplace_back(std::string(item_path.val().str, item_path.val().len),
+                       std::string(item_sha.val().str, item_sha.val().len));
+  }
+
+  return items;
+}
+
+bool GameList::DownloadCoverIndex(std::string* index)
+{
+  std::unique_ptr<HTTPDownloader> downloader(HTTPDownloader::Create(Host::GetHTTPUserAgent()));
+  if (!downloader)
+    return false;
+
+  const std::optional<std::string> root = DownloadText(downloader.get(), fmt::format("{}master", COVER_INDEX_TREE_URL));
+  if (!root.has_value())
+    return false;
+
+  std::string folder_sha;
+  for (const auto& [name, sha] : ParseGitTree(root.value()))
+  {
+    if (name == COVER_INDEX_FOLDER)
+      folder_sha = sha;
+  }
+  if (folder_sha.empty())
+    return false;
+
+  const std::optional<std::string> folder = DownloadText(downloader.get(), fmt::format("{}{}", COVER_INDEX_TREE_URL, folder_sha));
+  if (!folder.has_value())
+    return false;
+
+  index->clear();
+  for (const auto& [name, sha] : ParseGitTree(folder.value()))
+  {
+    if (name.ends_with(".png"))
+    {
+      index->append(name, 0, name.size() - 4);
+      index->push_back('\n');
+    }
+  }
+
+  return !index->empty();
+}
+
+void GameList::LoadCoverIndex()
+{
+  const std::string index_file = GetCoverIndexFile();
+  FILESYSTEM_STAT_DATA sd;
+  const bool have_file = FileSystem::StatFile(index_file.c_str(), &sd);
+
+  std::string index;
+  if (!have_file || (std::time(nullptr) - sd.ModificationTime) > COVER_INDEX_MAX_AGE)
+  {
+    if (DownloadCoverIndex(&index))
+      FileSystem::WriteStringToFile(index_file.c_str(), index);
+    else
+      WARNING_LOG("Could not download the cover art index.");
+  }
+  if (index.empty() && have_file)
+    index = FileSystem::ReadFileToString(index_file.c_str()).value_or(std::string());
+
+  for (const std::string_view name : StringUtil::SplitString(index, '\n'))
+    s_cover_index.emplace(GetCoverIndexKey(name), name);
+}
+
+std::string GameList::GetCoverIndexKey(std::string_view name)
+{
+  std::string key(name);
+  std::transform(key.begin(), key.end(), key.begin(),
+                 [](char ch) { return (ch >= 'A' && ch <= 'Z') ? static_cast<char>(ch - 'A' + 'a') : ch; });
+  return key;
+}
+
+std::string GameList::GetCoverFetchName(std::string_view title)
+{
+  std::string name(title);
+  for (char& ch : name)
+  {
+    if (std::string_view("&*/:`<>?\\|\"").find(ch) != std::string_view::npos)
+      ch = '_';
+  }
+  return name;
+}
+
+bool GameList::IsPNGData(std::span<const u8> data)
+{
+  static constexpr std::array<u8, 8> signature = {0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n'};
+  return (data.size() > signature.size() && std::equal(signature.begin(), signature.end(), data.begin()));
+}
+
+std::string GameList::FetchCoverImage(const std::string& path)
+{
+  std::vector<std::string> titles;
+  {
+    std::unique_lock lock(s_mutex);
+    const Entry* entry = GetEntryForPath(path);
+    if (!entry)
+      return {};
+
+    titles.push_back(entry->title);
+    if (const GameDatabase::Entry* dbentry = GameDatabase::GetEntryForSerial(entry->serial);
+        dbentry && dbentry->title != entry->title)
+    {
+      titles.push_back(dbentry->title);
+    }
+  }
+
+  std::string cover_name;
+  {
+    std::unique_lock lock(s_cover_index_mutex);
+    if (!s_cover_index_loaded)
+    {
+      s_cover_index_loaded = true;
+      LoadCoverIndex();
+    }
+
+    for (const std::string& title : titles)
+    {
+      const std::string name = GetCoverFetchName(title);
+      for (const std::string& candidate : {name, name + " (Disc 1)"})
+      {
+        if (const auto it = s_cover_index.find(GetCoverIndexKey(candidate)); it != s_cover_index.end())
+        {
+          cover_name = it->second;
+          break;
+        }
+      }
+      if (!cover_name.empty())
+        break;
+    }
+  }
+  if (cover_name.empty())
+    return {};
+
+  HTTPDownloader::Request::Data image;
+  {
+    s_cover_fetch_slots.acquire();
+    const ScopedGuard release_slot([]() { s_cover_fetch_slots.release(); });
+
+    std::unique_ptr<HTTPDownloader> downloader(HTTPDownloader::Create(Host::GetHTTPUserAgent()));
+    if (!downloader)
+      return {};
+
+    std::string file_name = cover_name + ".png";
+    for (u32 attempt = 0; attempt < 2 && image.empty(); attempt++)
+    {
+      HTTPDownloader::Request::Data data;
+      downloader->CreateRequest(fmt::format("{}{}", COVER_FETCH_URL, Path::URLEncode(file_name)),
+                                [&data](s32 status_code, const std::string& content_type,
+                                        HTTPDownloader::Request::Data response) {
+                                  if (status_code == HTTPDownloader::HTTP_STATUS_OK)
+                                    data = std::move(response);
+                                });
+      downloader->WaitForAllRequests();
+
+      if (IsPNGData(data))
+        image = std::move(data);
+      else if (!data.empty() && data.size() <= MAX_COVER_LINK_LENGTH)
+        file_name.assign(reinterpret_cast<const char*>(data.data()), data.size());
+      else
+        break;
+    }
+  }
+  if (image.empty())
+    return {};
+
+  std::unique_lock lock(s_mutex);
+  const Entry* entry = GetEntryForPath(path);
+  if (!entry)
+    return {};
+
+  std::string cover_path = GetCoverImagePathForEntry(entry);
+  if (!cover_path.empty())
+    return cover_path;
+
+  cover_path = GetNewCoverImagePathForEntry(entry, "cover.png", false);
+  if (cover_path.empty() || !FileSystem::WriteBinaryFile(cover_path.c_str(), image.data(), image.size()))
+    return {};
+
+  return cover_path;
 }
 
 std::string GameList::GetCustomPropertiesFile()

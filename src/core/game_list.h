@@ -59,6 +59,8 @@ struct Entry
   u8 max_blocks = 0;
   s8 disc_set_index = -1;
   bool disc_set_member = false;
+  bool playlist_member = false;
+  bool playlist_of_disc_set = false;
   bool has_custom_title = false;
   bool has_custom_region = false;
 
@@ -116,6 +118,10 @@ TinyString FormatTimestamp(std::time_t timestamp);
 /// Formats a timespan to something human readable (e.g. 1h2m3s or 1 hour).
 TinyString FormatTimespan(std::time_t timespan, bool long_format = false);
 
+/// Returns true if the entry is listed on its own, given whether multi-disc games are merged. Discs in an m3u
+/// playlist are listed through the playlist, and a playlist whose discs all form a merged set is left out.
+bool IsEntryListed(const Entry* entry, bool merge_disc_sets);
+
 std::string GetCoverImagePathForEntry(const Entry* entry);
 std::string GetCoverImagePath(const std::string& path, const std::string& serial, const std::string& title);
 std::string GetNewCoverImagePathForEntry(const Entry* entry, const char* new_filename, bool use_serial);
@@ -130,6 +136,10 @@ GetMatchingEntriesForSerial(const std::span<const std::string> serials);
 bool DownloadCovers(const std::vector<std::string>& url_templates, bool use_serial = false,
                     ProgressCallback* progress = nullptr,
                     std::function<void(const Entry*, std::string)> save_callback = {});
+
+/// Downloads box art for the game at path from libretro-thumbnails into the covers folder, if libretro's cover list
+/// has the game. Blocks until done; returns the cover's path, or an empty string if there is none.
+std::string FetchCoverImage(const std::string& path);
 
 // Custom properties support
 void SaveCustomTitleForPath(const std::string& path, const std::string& custom_title);

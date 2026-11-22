@@ -20,6 +20,7 @@
 #include <QtCore/QStringBuilder>
 #include <QtWidgets/QDialog>
 #include <QtWidgets/QDialogButtonBox>
+#include <QtWidgets/QHeaderView>
 #include <QtWidgets/QMessageBox>
 #include <QtWidgets/QTextBrowser>
 
@@ -236,7 +237,9 @@ void GameSummaryWidget::populateTracksInfo()
     {"Audio", "Mode 1", "Mode 1/Raw", "Mode 2", "Mode 2/Form 1", "Mode 2/Form 2", "Mode 2/Mix", "Mode 2/Raw"}};
 
   m_ui.tracks->clearContents();
-  QtUtils::ResizeColumnsForTableView(m_ui.tracks, {70, 75, 95, 95, 215, 40});
+  QHeaderView* track_header = m_ui.tracks->horizontalHeader();
+  track_header->setSectionResizeMode(QHeaderView::ResizeToContents);
+  track_header->setSectionResizeMode(4, QHeaderView::Stretch);
 
   std::unique_ptr<CDImage> image = CDImage::Open(m_path.c_str(), false, nullptr);
   if (!image)

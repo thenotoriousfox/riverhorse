@@ -4,7 +4,12 @@
 #include "interfacesettingswidget.h"
 #include "qthost.h"
 
+#include "util/host.h"
+#include "util/imgui_fullscreen.h"
+
 #include "common/path.h"
+
+#include "fmt/format.h"
 
 #include <QtCore/QFile>
 #include <QtGui/QPalette>
@@ -14,6 +19,7 @@
 
 namespace QtHost {
 static void SetStyleFromSettings();
+static QPalette GetThemeFilePalette(std::string_view theme_ini);
 } // namespace QtHost
 
 static QString s_unthemed_style_name;
@@ -22,7 +28,7 @@ static bool s_unthemed_style_name_set;
 
 const char* QtHost::GetDefaultThemeName()
 {
-  return "darkfusion";
+  return "riverhorse-dark";
 }
 
 void QtHost::UpdateApplicationTheme()
@@ -262,6 +268,14 @@ void QtHost::SetStyleFromSettings()
     qApp->setPalette(darkPalette);
     qApp->setStyleSheet("QToolTip { color: #ffffff; background-color: #505a70; border: 1px solid white; }");
   }
+  else if (theme.starts_with("riverhorse-"))
+  {
+    const std::optional<std::string> theme_ini =
+      Host::ReadResourceFileToString(fmt::format("themes/{}.ini", theme), true);
+    qApp->setStyle(QStyleFactory::create("Fusion"));
+    qApp->setPalette(theme_ini.has_value() ? GetThemeFilePalette(theme_ini.value()) : s_unthemed_palette);
+    qApp->setStyleSheet(QString());
+  }
 #ifdef _WIN32
   else if (theme == "windowsvista")
   {
@@ -276,6 +290,36 @@ void QtHost::SetStyleFromSettings()
     qApp->setPalette(s_unthemed_palette);
     qApp->setStyleSheet(QString());
   }
+}
+
+QPalette QtHost::GetThemeFilePalette(std::string_view theme_ini)
+{
+  const auto color = [theme_ini](std::string_view key) {
+    return QColor(QString::fromUtf8(ImGuiFullscreen::GetThemeValue(theme_ini, key).value_or("").substr(0, 7)));
+  };
+  const QColor disabled = color("Disabled");
+
+  QPalette palette;
+  palette.setColor(QPalette::Window, color("Background"));
+  palette.setColor(QPalette::WindowText, color("BackgroundText"));
+  palette.setColor(QPalette::Base, color("PrimaryLight"));
+  palette.setColor(QPalette::AlternateBase, color("Primary"));
+  palette.setColor(QPalette::ToolTipBase, color("Primary"));
+  palette.setColor(QPalette::ToolTipText, color("PrimaryText"));
+  palette.setColor(QPalette::Text, color("PrimaryText"));
+  palette.setColor(QPalette::Button, color("BackgroundHighlight"));
+  palette.setColor(QPalette::ButtonText, color("PrimaryText"));
+  palette.setColor(QPalette::Link, color("TextHighlight"));
+  palette.setColor(QPalette::Highlight, color("Secondary"));
+  palette.setColor(QPalette::HighlightedText, color("SecondaryText"));
+  palette.setColor(QPalette::PlaceholderText, disabled);
+  palette.setColor(QPalette::Light, color("PrimaryLight"));
+  palette.setColor(QPalette::Mid, color("BackgroundLine"));
+  palette.setColor(QPalette::Dark, color("PrimaryDark"));
+  palette.setColor(QPalette::Disabled, QPalette::WindowText, disabled);
+  palette.setColor(QPalette::Disabled, QPalette::Text, disabled);
+  palette.setColor(QPalette::Disabled, QPalette::ButtonText, disabled);
+  return palette;
 }
 
 bool QtHost::IsDarkApplicationTheme()

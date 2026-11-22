@@ -42,6 +42,7 @@
 #include <atomic>
 #include <bitset>
 #include <unordered_map>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -491,6 +492,7 @@ static void SwitchToGameList();
 static void PopulateGameListEntryList();
 static GPUTexture* GetTextureForGameListEntryType(GameList::EntryType type);
 static GPUTexture* GetGameListCover(const GameList::Entry* entry);
+static void FetchCoverInBackground(std::string path);
 static GPUTexture* GetCoverForCurrentGame();
 
 // Lazily populated cover images.
@@ -1451,7 +1453,7 @@ void FullscreenUI::DrawLandingWindow()
     for (u32 i = 0; i < GameList::GetEntryCount(); i++)
     {
       const GameList::Entry* entry = GameList::GetEntryByIndex(i);
-      if (entry->disc_set_member)
+      if (!GameList::IsEntryListed(entry, true))
         continue;
       library.push_back(entry);
       if (entry->last_played_time > 0)
@@ -6778,16 +6780,8 @@ void FullscreenUI::PopulateGameListEntryList()
   for (u32 i = 0; i < count; i++)
   {
     const GameList::Entry* entry = GameList::GetEntryByIndex(i);
-    if (merge_disc_sets)
-    {
-      if (entry->disc_set_member)
-        continue;
-    }
-    else
-    {
-      if (entry->IsDiscSet())
-        continue;
-    }
+    if (!GameList::IsEntryListed(entry, merge_disc_sets))
+      continue;
 
     s_game_list_sorted_entries.push_back(entry);
   }
@@ -7603,6 +7597,19 @@ void FullscreenUI::SwitchToGameList()
   QueueResetFocus(FocusResetType::WindowChanged);
 }
 
+void FullscreenUI::FetchCoverInBackground(std::string path)
+{
+  std::thread([path = std::move(path)]() mutable {
+    std::string cover_path = GameList::FetchCoverImage(path);
+    if (cover_path.empty())
+      return;
+
+    Host::RunOnCPUThread([path = std::move(path), cover_path = std::move(cover_path)]() mutable {
+      s_cover_image_map.insert_or_assign(std::move(path), std::move(cover_path));
+    });
+  }).detach();
+}
+
 GPUTexture* FullscreenUI::GetGameListCover(const GameList::Entry* entry)
 {
   // lookup and grab cover image
@@ -7610,6 +7617,8 @@ GPUTexture* FullscreenUI::GetGameListCover(const GameList::Entry* entry)
   if (cover_it == s_cover_image_map.end())
   {
     std::string cover_path(GameList::GetCoverImagePathForEntry(entry));
+    if (cover_path.empty() && Host::GetBaseBoolSettingValue("GameList", "FetchCovers", false))
+      FetchCoverInBackground(entry->path);
     cover_it = s_cover_image_map.emplace(entry->path, std::move(cover_path)).first;
   }
 

@@ -18,6 +18,7 @@
 #include <QtGui/QGuiApplication>
 #include <QtGui/QPainter>
 #include <QtGui/QPixmap>
+#include <QtGui/QShortcut>
 #include <QtGui/QWheelEvent>
 #include <QtWidgets/QHeaderView>
 #include <QtWidgets/QMenu>
@@ -70,16 +71,8 @@ public:
     const auto lock = GameList::GetLock();
     const GameList::Entry* entry = GameList::GetEntryByIndex(source_row);
 
-    if (m_merge_disc_sets)
-    {
-      if (entry->disc_set_member)
-        return false;
-    }
-    else
-    {
-      if (entry->IsDiscSet())
-        return false;
-    }
+    if (!GameList::IsEntryListed(entry, m_merge_disc_sets))
+      return false;
 
     if (m_filter_type != GameList::EntryType::Count && entry->type != m_filter_type)
       return false;
@@ -204,7 +197,8 @@ void GameListWidget::initialize()
 
   connect(m_table_view->selectionModel(), &QItemSelectionModel::currentChanged, this,
           &GameListWidget::onSelectionModelCurrentChanged);
-  connect(m_table_view, &QTableView::activated, this, &GameListWidget::onTableViewItemActivated);
+  connect(m_table_view, &QTableView::doubleClicked, this, &GameListWidget::onTableViewItemActivated);
+  addLaunchShortcuts(m_table_view, &GameListWidget::onTableViewItemActivated);
   connect(m_table_view, &QTableView::customContextMenuRequested, this,
           &GameListWidget::onTableViewContextMenuRequested);
   connect(m_table_view->horizontalHeader(), &QHeaderView::customContextMenuRequested, this,
@@ -232,7 +226,8 @@ void GameListWidget::initialize()
           &GameListWidget::onSelectionModelCurrentChanged);
   connect(m_list_view, &GameListGridListView::zoomIn, this, &GameListWidget::gridZoomIn);
   connect(m_list_view, &GameListGridListView::zoomOut, this, &GameListWidget::gridZoomOut);
-  connect(m_list_view, &QListView::activated, this, &GameListWidget::onListViewItemActivated);
+  connect(m_list_view, &QListView::doubleClicked, this, &GameListWidget::onListViewItemActivated);
+  addLaunchShortcuts(m_list_view, &GameListWidget::onListViewItemActivated);
   connect(m_list_view, &QListView::customContextMenuRequested, this, &GameListWidget::onListViewContextMenuRequested);
   connect(m_model, &GameListModel::coverScaleChanged, this, &GameListWidget::onCoverScaleChanged);
 
@@ -363,6 +358,15 @@ void GameListWidget::onSelectionModelCurrentChanged(const QModelIndex& current, 
   emit selectionChanged();
 }
 
+void GameListWidget::addLaunchShortcuts(QAbstractItemView* view, void (GameListWidget::*launch)(const QModelIndex&))
+{
+  for (const QKeySequence key : {QKeySequence(Qt::Key_Return), QKeySequence(Qt::Key_Enter)})
+  {
+    QShortcut* shortcut = new QShortcut(key, view, nullptr, nullptr, Qt::WidgetShortcut);
+    connect(shortcut, &QShortcut::activated, this, [this, view, launch]() { (this->*launch)(view->currentIndex()); });
+  }
+}
+
 void GameListWidget::onTableViewItemActivated(const QModelIndex& index)
 {
   const QModelIndex source_index = m_sort_model->mapToSource(index);
@@ -405,6 +409,7 @@ void GameListWidget::onTableViewHeaderContextMenuRequested(const QPoint& point)
     action->setChecked(!m_table_view->isColumnHidden(column));
     connect(action, &QAction::toggled, [this, column](bool enabled) {
       m_table_view->setColumnHidden(column, !enabled);
+      updateTableViewRowHeight();
       saveTableViewColumnVisibilitySettings(column);
       resizeTableViewColumnsToFit();
     });
@@ -465,6 +470,13 @@ void GameListWidget::gridIntScale(int int_scale)
 void GameListWidget::refreshGridCovers()
 {
   m_model->refreshCovers();
+}
+
+void GameListWidget::onCoverFetchingChanged()
+{
+  loadTableViewColumnVisibilitySettings();
+  resizeTableViewColumnsToFit();
+  refreshGridCovers();
 }
 
 void GameListWidget::showGameList()
@@ -580,6 +592,7 @@ void GameListWidget::resizeTableViewColumnsToFit()
 {
   QtUtils::ResizeColumnsForTableView(m_table_view, {
                                                      45,  // type
+                                                     GameListModel::THUMBNAIL_SIZE + 8, // cover
                                                      80,  // code
                                                      -1,  // title
                                                      -1,  // file title
@@ -606,6 +619,7 @@ void GameListWidget::loadTableViewColumnVisibilitySettings()
 {
   static constexpr std::array<bool, GameListModel::Column_Count> DEFAULT_VISIBILITY = {{
     true,  // type
+    false, // cover, shown by default when cover fetching is on
     true,  // code
     true,  // title
     false, // file title
@@ -624,10 +638,24 @@ void GameListWidget::loadTableViewColumnVisibilitySettings()
 
   for (int column = 0; column < GameListModel::Column_Count; column++)
   {
+    const bool default_visible = (column == GameListModel::Column_Thumbnail) ?
+                                   Host::GetBaseBoolSettingValue("GameList", "FetchCovers", false) :
+                                   DEFAULT_VISIBILITY[column];
     const bool visible = Host::GetBaseBoolSettingValue("GameListTableView", getColumnVisibilitySettingsKeyName(column),
-                                                       DEFAULT_VISIBILITY[column]);
+                                                       default_visible);
     m_table_view->setColumnHidden(column, !visible);
   }
+
+  updateTableViewRowHeight();
+}
+
+void GameListWidget::updateTableViewRowHeight()
+{
+  QHeaderView* header = m_table_view->verticalHeader();
+  if (m_table_view->isColumnHidden(GameListModel::Column_Thumbnail))
+    header->resetDefaultSectionSize();
+  else
+    header->setDefaultSectionSize(GameListModel::THUMBNAIL_SIZE + 4);
 }
 
 void GameListWidget::saveTableViewColumnVisibilitySettings()

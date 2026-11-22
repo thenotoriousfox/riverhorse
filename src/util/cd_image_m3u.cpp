@@ -9,11 +9,11 @@
 #include "common/file_system.h"
 #include "common/log.h"
 #include "common/path.h"
+#include "common/string_util.h"
 
 #include <algorithm>
 #include <cerrno>
 #include <map>
-#include <sstream>
 
 Log_SetChannel(CDImageMemory);
 
@@ -60,6 +60,30 @@ CDImageM3u::CDImageM3u() = default;
 
 CDImageM3u::~CDImageM3u() = default;
 
+std::vector<std::string> CDImage::ParseM3uFilenames(std::string_view m3u_path, std::string_view m3u_contents)
+{
+  std::vector<std::string> filenames;
+  for (std::string_view line : StringUtil::SplitString(m3u_contents, '\n'))
+  {
+    line = StringUtil::StripWhitespace(line);
+    if (line.empty() || line[0] == '#')
+      continue;
+
+    std::string filename = Path::ToNativePath(line);
+    if (!Path::IsAbsolute(filename))
+      filename = Path::BuildRelativePath(m3u_path, filename);
+    filenames.push_back(std::move(filename));
+  }
+
+  return filenames;
+}
+
+std::vector<std::string> CDImage::ReadM3uFilenames(const char* m3u_path)
+{
+  const std::optional<std::string> m3u_file = FileSystem::ReadFileToString(m3u_path);
+  return m3u_file.has_value() ? ParseM3uFilenames(m3u_path, m3u_file.value()) : std::vector<std::string>();
+}
+
 bool CDImageM3u::Open(const char* path, bool apply_patches, Error* error)
 {
   std::FILE* fp = FileSystem::OpenSharedCFile(path, "rb", FileSystem::FileShareMode::DenyWrite, error);
@@ -74,40 +98,14 @@ bool CDImageM3u::Open(const char* path, bool apply_patches, Error* error)
     return false;
   }
 
-  std::istringstream ifs(m3u_file.value());
   m_filename = path;
   m_apply_patches = apply_patches;
 
-  std::vector<std::string> entries;
-  std::string line;
-  while (std::getline(ifs, line))
+  for (std::string& entry_filename : ParseM3uFilenames(path, m3u_file.value()))
   {
-    u32 start_offset = 0;
-    while (start_offset < line.size() && std::isspace(line[start_offset]))
-      start_offset++;
-
-    // skip comments
-    if (start_offset == line.size() || line[start_offset] == '#')
-      continue;
-
-    // strip ending whitespace
-    u32 end_offset = static_cast<u32>(line.size()) - 1;
-    while (std::isspace(line[end_offset]) && end_offset > start_offset)
-      end_offset--;
-
-    // anything?
-    if (start_offset == end_offset)
-      continue;
-
     Entry entry;
-    std::string entry_filename =
-      Path::ToNativePath(std::string_view(line.begin() + start_offset, line.begin() + end_offset + 1));
     entry.title = Path::GetFileTitle(entry_filename);
-    if (!Path::IsAbsolute(entry_filename))
-      entry.filename = Path::BuildRelativePath(path, entry_filename);
-    else
-      entry.filename = std::move(entry_filename);
-
+    entry.filename = std::move(entry_filename);
     DEV_LOG("Read path from m3u: '{}'", entry.filename);
     m_entries.push_back(std::move(entry));
   }

@@ -3,6 +3,39 @@
 Changes since the DuckStation `v0.1-7371` base. Releases are tagged
 `vMAJOR.MINOR.PATCH`.
 
+## Unreleased
+
+### New
+- Riverhorse Dark and Riverhorse Light themes for the desktop window
+  (Settings > Theme), using the same colours as the fullscreen interface.
+  Riverhorse Dark is the default for new installs.
+- Automatic cover art (Settings > Game List > Fetch Missing Cover Art, also
+  asked in the setup wizard; off by default): box art for games without a
+  cover is downloaded from the libretro-thumbnails collection when they are
+  shown in the game list, the grid or Big Picture, and saved to the covers
+  folder.
+- Cover column with box-art thumbnails in the game list, shown by default
+  when cover fetching is on.
+
+### Changes
+- The toolbar is shown by default, and new windows open large enough for
+  all of it.
+- A multi-disc game is listed once: discs named in an `.m3u` playlist are
+  hidden, and a playlist whose discs already form a merged entry is hidden.
+- Games start on double-click or Enter only.
+- Purple cover placeholder, smaller settings sidebar icons, and track
+  columns in Game Properties that fit their text.
+- Third-party notices rewritten: contents list, wrapped text, a Riverhorse
+  copyright line, and the components that were missing (ENet, GGPO, psx_gpu,
+  glad, minizip, libretro API, Vulkan Headers, libbacktrace, libwebp,
+  libcurl, Qt, RAInterface, WinPixEventRuntime, Inter, Roboto Mono,
+  Font Awesome, Remix Icon).
+
+### Fixes
+- On KDE, a single click or a right-click on a game started it.
+- The window and taskbar icon was missing on Wayland.
+- Help menu icons and About box links were hard to read in dark themes.
+
 ## 1.0.0 (2026-11-21)
 
 ### New

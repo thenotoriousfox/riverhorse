@@ -2465,6 +2465,7 @@ int main(int argc, char* argv[])
   QtHost::RegisterTypes();
 
   QApplication app(argc, argv);
+  QGuiApplication::setDesktopFileName(QStringLiteral("io.github.thenotoriousfox.Riverhorse"));
 
   if (!QtHost::PerformEarlyHardwareChecks())
     return EXIT_FAILURE;

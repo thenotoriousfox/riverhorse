@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
 
 #include "gamelistsettingswidget.h"
+#include "settingswindow.h"
+#include "settingwidgetbinder.h"
 #include "core/game_list.h"
 #include "mainwindow.h"
 #include "qthost.h"
@@ -50,6 +52,13 @@ GameListSettingsWidget::GameListSettingsWidget(SettingsWindow* dialog, QWidget* 
           &GameListSettingsWidget::onRemoveExcludedPathButtonClicked);
   connect(m_ui.excludedPaths, &QListWidget::itemSelectionChanged, this,
           &GameListSettingsWidget::onExcludedPathsSelectionChanged);
+  SettingWidgetBinder::BindWidgetToBoolSetting(nullptr, m_ui.fetchCovers, "GameList", "FetchCovers", false);
+  connect(m_ui.fetchCovers, &QCheckBox::checkStateChanged, g_main_window, &MainWindow::onCoverFetchingChanged);
+  dialog->registerWidgetHelp(
+    m_ui.fetchCovers, tr("Fetch Missing Cover Art"), tr("Unchecked"),
+    tr("Downloads box art from the libretro-thumbnails collection on GitHub for games that have no cover in the covers "
+       "folder, when they are shown in the game list, the grid or Big Picture. Covers are saved, so each one is only "
+       "downloaded once."));
   connect(m_ui.rescanAllGames, &QPushButton::clicked, this, &GameListSettingsWidget::onRescanAllGamesClicked);
   connect(m_ui.scanForNewGames, &QPushButton::clicked, this, &GameListSettingsWidget::onScanForNewGamesClicked);
 

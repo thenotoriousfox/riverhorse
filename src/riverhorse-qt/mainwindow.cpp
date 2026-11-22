@@ -1631,7 +1631,7 @@ void MainWindow::setupAdditionalUi()
   m_ui.actionViewStatusBar->setChecked(status_bar_visible);
   m_ui.statusBar->setVisible(status_bar_visible);
 
-  const bool toolbar_visible = Host::GetBaseBoolSettingValue("UI", "ShowToolbar", false);
+  const bool toolbar_visible = Host::GetBaseBoolSettingValue("UI", "ShowToolbar", true);
   m_ui.actionViewToolbar->setChecked(toolbar_visible);
   m_ui.toolBar->setVisible(toolbar_visible);
 
@@ -2636,6 +2636,11 @@ void MainWindow::refreshGameList(bool invalidate_cache)
 void MainWindow::refreshGameListModel()
 {
   m_game_list_widget->refreshModel();
+}
+
+void MainWindow::onCoverFetchingChanged()
+{
+  m_game_list_widget->onCoverFetchingChanged();
 }
 
 void MainWindow::cancelGameListRefresh()

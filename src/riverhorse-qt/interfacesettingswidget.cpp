@@ -15,6 +15,8 @@ const char* InterfaceSettingsWidget::THEME_NAMES[] = {
   QT_TRANSLATE_NOOP("MainWindow", "Classic Windows"),
 #endif
   QT_TRANSLATE_NOOP("MainWindow", "Fusion"),
+  QT_TRANSLATE_NOOP("MainWindow", "Riverhorse Dark"),
+  QT_TRANSLATE_NOOP("MainWindow", "Riverhorse Light"),
   QT_TRANSLATE_NOOP("MainWindow", "Dark Fusion (Gray)"),
   QT_TRANSLATE_NOOP("MainWindow", "Dark Fusion (Blue)"),
   QT_TRANSLATE_NOOP("MainWindow", "Cobalt Sky"),
@@ -31,6 +33,8 @@ const char* InterfaceSettingsWidget::THEME_VALUES[] = {
   "windowsvista",
 #endif
   "fusion",
+  "riverhorse-dark",
+  "riverhorse-light",
   "darkfusion",
   "darkfusionblue",
   "cobaltsky",
@@ -41,7 +45,7 @@ const char* InterfaceSettingsWidget::THEME_VALUES[] = {
   nullptr,
 };
 
-const char* InterfaceSettingsWidget::DEFAULT_THEME_NAME = "darkfusion";
+const char* InterfaceSettingsWidget::DEFAULT_THEME_NAME = "riverhorse-dark";
 
 InterfaceSettingsWidget::InterfaceSettingsWidget(SettingsWindow* dialog, QWidget* parent)
   : QWidget(parent), m_dialog(dialog)

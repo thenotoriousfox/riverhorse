@@ -123,6 +123,7 @@ bool Initialize(const char* placeholder_image_path);
 bool ApplyTheme(std::string_view theme_ini);
 void SetLayoutScaleMultiplier(float multiplier);
 std::string GetThemeName(std::string_view theme_ini);
+std::optional<std::string_view> GetThemeValue(std::string_view theme_ini, std::string_view key);
 void SetFonts(ImFont* standard_font, ImFont* medium_font, ImFont* large_font);
 bool UpdateLayoutScale();
 

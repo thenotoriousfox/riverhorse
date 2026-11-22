@@ -91,12 +91,15 @@ public Q_SLOTS:
   void gridZoomOut();
   void gridIntScale(int int_scale);
   void refreshGridCovers();
+  void onCoverFetchingChanged();
 
 protected:
   void resizeEvent(QResizeEvent* event);
 
 private:
   void loadTableViewColumnVisibilitySettings();
+  void updateTableViewRowHeight();
+  void addLaunchShortcuts(QAbstractItemView* view, void (GameListWidget::*launch)(const QModelIndex&));
   void saveTableViewColumnVisibilitySettings();
   void saveTableViewColumnVisibilitySettings(int column);
   void loadTableViewColumnSortSettings();

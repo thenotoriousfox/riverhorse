@@ -247,6 +247,8 @@ void SetupWizardDialog::setupGameListPage()
 
   connect(m_ui.searchDirectoryList, &QTableWidget::customContextMenuRequested, this,
           &SetupWizardDialog::onDirectoryListContextMenuRequested);
+
+  SettingWidgetBinder::BindWidgetToBoolSetting(nullptr, m_ui.fetchCovers, "GameList", "FetchCovers", false);
   connect(m_ui.addSearchDirectoryButton, &QPushButton::clicked, this,
           &SetupWizardDialog::onAddSearchDirectoryButtonClicked);
   connect(m_ui.removeSearchDirectoryButton, &QPushButton::clicked, this,

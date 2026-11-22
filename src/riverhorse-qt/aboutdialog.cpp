@@ -39,7 +39,7 @@ p, li { white-space: pre-wrap; }
 <p style=" margin-top:12px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"><span style=" font-weight:600;">%2</span>:</p>
 <p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;">  Connor McLaughlin &lt;stenzek@gmail.com&gt;</p>
 <p style=" margin-top:0px; margin-bottom:12px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;">  and other <a href="https://github.com/thenotoriousfox/riverhorse/blob/main/CONTRIBUTORS.md">contributors</a></p>
-<p style=" margin-top:12px; margin-bottom:12px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"><a href="https://github.com/thenotoriousfox/riverhorse/blob/main/LICENSE"><span style=" text-decoration: underline; color:#0057ae;">%3</span></a> | <a href="https://github.com/thenotoriousfox/riverhorse"><span style=" text-decoration: underline; color:#0057ae;">GitHub</span></a> | <a href="https://hippos-linux.org/discord"><span style=" text-decoration: underline; color:#0057ae;">Discord</span></a></p></body></html>
+<p style=" margin-top:12px; margin-bottom:12px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"><a href="https://github.com/thenotoriousfox/riverhorse/blob/main/LICENSE">%3</a> | <a href="https://github.com/thenotoriousfox/riverhorse">GitHub</a> | <a href="https://hippos-linux.org/discord">Discord</a></p></body></html>
 )")
                               .arg(tr("Riverhorse is a free and open-source simulator/emulator of the Sony "
                                       "PlayStation<span style=\"vertical-align:super;\">TM</span> console, focusing on "
@@ -54,6 +54,7 @@ void AboutDialog::showThirdPartyNotices(QWidget* parent)
 {
   QDialog dialog(parent);
   dialog.setMinimumSize(700, 400);
+  dialog.resize(900, 700);
   dialog.setWindowTitle(tr("Riverhorse Third-Party Notices"));
 
   QIcon icon;

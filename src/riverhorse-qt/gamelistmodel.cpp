@@ -21,7 +21,7 @@
 #include <QtGui/QPainter>
 
 static constexpr std::array<const char*, GameListModel::Column_Count> s_column_names = {
-  {"Icon", "Serial", "Title", "File Title", "Developer", "Publisher", "Genre", "Year", "Players", "Time Played",
+  {"Icon", "Thumbnail", "Serial", "Title", "File Title", "Developer", "Publisher", "Genre", "Year", "Players", "Time Played",
    "Last Played", "Size", "File Size", "Region", "Compatibility", "Cover"}};
 
 static constexpr int COVER_ART_WIDTH = 512;
@@ -120,7 +120,7 @@ const char* GameListModel::getColumnName(Column col)
 GameListModel::GameListModel(float cover_scale, bool show_cover_titles, bool show_game_icons,
                              QObject* parent /* = nullptr */)
   : QAbstractTableModel(parent), m_show_titles_for_covers(show_cover_titles), m_show_game_icons(show_game_icons),
-    m_memcard_pixmap_cache(128)
+    m_thumbnail_pixmap_cache(MIN_COVER_CACHE_SIZE), m_memcard_pixmap_cache(128)
 {
   loadCommonImages();
   setCoverScale(cover_scale);
@@ -159,6 +159,7 @@ void GameListModel::setCoverScale(float scale)
 void GameListModel::refreshCovers()
 {
   m_cover_pixmap_cache.Clear();
+  m_thumbnail_pixmap_cache.Clear();
   refresh();
 }
 
@@ -178,12 +179,22 @@ void GameListModel::reloadThemeSpecificImages()
   refresh();
 }
 
+static std::string FindOrFetchCoverImage(const std::string& path, const std::string& serial, const std::string& title,
+                                         bool fetch_covers)
+{
+  std::string cover_path = GameList::GetCoverImagePath(path, serial, title);
+  if (cover_path.empty() && fetch_covers)
+    cover_path = GameList::FetchCoverImage(path);
+  return cover_path;
+}
+
 void GameListModel::loadOrGenerateCover(const GameList::Entry* ge)
 {
-  QFuture<QPixmap> future =
-    QtConcurrent::run([this, path = ge->path, title = ge->title, serial = ge->serial]() -> QPixmap {
+  const bool fetch_covers = Host::GetBaseBoolSettingValue("GameList", "FetchCovers", false);
+  QFuture<QPixmap> future = QtConcurrent::run(
+    [this, path = ge->path, title = ge->title, serial = ge->serial, fetch_covers]() -> QPixmap {
       QPixmap image;
-      const std::string cover_path(GameList::GetCoverImagePath(path, serial, title));
+      const std::string cover_path = FindOrFetchCoverImage(path, serial, title, fetch_covers);
       if (!cover_path.empty())
       {
         const float dpr = qApp->devicePixelRatio();
@@ -204,12 +215,35 @@ void GameListModel::loadOrGenerateCover(const GameList::Entry* ge)
 
   // Context must be 'this' so we run on the UI thread.
   future.then(this, [this, path = ge->path](QPixmap pm) {
-    m_cover_pixmap_cache.Insert(std::move(path), std::move(pm));
-    invalidateCoverForPath(path);
+    m_cover_pixmap_cache.Insert(path, std::move(pm));
+    invalidateImageForPath(path, Column_Cover);
   });
 }
 
-void GameListModel::invalidateCoverForPath(const std::string& path)
+void GameListModel::loadThumbnail(const GameList::Entry* ge)
+{
+  const bool fetch_covers = Host::GetBaseBoolSettingValue("GameList", "FetchCovers", false);
+  QFuture<QPixmap> future = QtConcurrent::run(
+    [path = ge->path, title = ge->title, serial = ge->serial, fetch_covers]() -> QPixmap {
+      const std::string cover_path = FindOrFetchCoverImage(path, serial, title, fetch_covers);
+      QPixmap image;
+      if (cover_path.empty() || !image.load(QString::fromStdString(cover_path)))
+        return image;
+
+      const float dpr = qApp->devicePixelRatio();
+      const int size = static_cast<int>(static_cast<float>(THUMBNAIL_SIZE) * dpr);
+      image = image.scaled(size, size, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+      image.setDevicePixelRatio(dpr);
+      return image;
+    });
+
+  future.then(this, [this, path = ge->path](QPixmap pm) {
+    m_thumbnail_pixmap_cache.Insert(path, std::move(pm));
+    invalidateImageForPath(path, Column_Thumbnail);
+  });
+}
+
+void GameListModel::invalidateImageForPath(const std::string& path, Column column)
 {
   std::optional<u32> row;
   if (hasTakenGameList())
@@ -244,7 +278,7 @@ void GameListModel::invalidateCoverForPath(const std::string& path)
     return;
   }
 
-  const QModelIndex mi(index(static_cast<int>(row.value()), Column_Cover));
+  const QModelIndex mi(index(static_cast<int>(row.value()), column));
   emit dataChanged(mi, mi, {Qt::DecorationRole});
 }
 
@@ -480,6 +514,7 @@ QVariant GameListModel::data(const QModelIndex& index, int role, const GameList:
           return QString::fromStdString(ge->serial);
 
         case Column_Title:
+        case Column_Thumbnail:
         case Column_Cover:
           return QString::fromStdString(ge->title);
 
@@ -541,6 +576,17 @@ QVariant GameListModel::data(const QModelIndex& index, int role, const GameList:
         case Column_Compatibility:
         {
           return m_compatibility_pixmaps[static_cast<u32>(ge->compatibility)];
+        }
+
+        case Column_Thumbnail:
+        {
+          QPixmap* pm = m_thumbnail_pixmap_cache.Lookup(ge->path);
+          if (pm)
+            return *pm;
+
+          const_cast<GameListModel*>(this)->loadThumbnail(ge);
+          m_thumbnail_pixmap_cache.Insert(ge->path, QPixmap());
+          return {};
         }
 
         case Column_Cover:
@@ -659,6 +705,7 @@ bool GameListModel::lessThan(const GameList::Entry* left, const GameList::Entry*
     }
 
     case Column_Title:
+    case Column_Thumbnail:
     {
       return titlesLessThan(left, right);
     }
@@ -790,6 +837,7 @@ void GameListModel::loadCommonImages()
 void GameListModel::setColumnDisplayNames()
 {
   m_column_display_names[Column_Icon] = tr("Icon");
+  m_column_display_names[Column_Thumbnail] = tr("Cover");
   m_column_display_names[Column_Serial] = tr("Serial");
   m_column_display_names[Column_Title] = tr("Title");
   m_column_display_names[Column_FileTitle] = tr("File Title");

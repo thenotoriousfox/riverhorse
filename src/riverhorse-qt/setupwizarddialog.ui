@@ -377,6 +377,13 @@
          </column>
         </widget>
        </item>
+       <item>
+        <widget class="QCheckBox" name="fetchCovers">
+         <property name="text">
+          <string>Download missing cover art from the libretro-thumbnails collection on GitHub</string>
+         </property>
+        </widget>
+       </item>
       </layout>
      </widget>
      <widget class="QWidget" name="page_4">

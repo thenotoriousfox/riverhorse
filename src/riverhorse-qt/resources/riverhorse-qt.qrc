@@ -31,6 +31,7 @@
 		<file>icons/black/svg/arrow-left-right-line.svg</file>
 		<file>icons/black/svg/arrow-up-line.svg</file>
 		<file>icons/black/svg/artboard-2-line.svg</file>
+		<file>icons/black/svg/bug-line.svg</file>
 		<file>icons/black/svg/cheats-line.svg</file>
 		<file>icons/black/svg/checkbox-multiple-blank-line.svg</file>
 		<file>icons/black/svg/chip-2-line.svg</file>
@@ -71,6 +72,7 @@
 		<file>icons/black/svg/folder-settings-line.svg</file>
 		<file>icons/black/svg/fullscreen-line.svg</file>
 		<file>icons/black/svg/function-line.svg</file>
+		<file>icons/black/svg/github-line.svg</file>
 		<file>icons/black/svg/global-line.svg</file>
 		<file>icons/black/svg/guncon-line.svg</file>
 		<file>icons/black/svg/image-fill.svg</file>
@@ -190,14 +192,12 @@
 		<file>icons/flag-us.svg</file>
 		<file>icons/folder-open@2x.png</file>
 		<file>icons/folder-open.png</file>
-		<file>icons/github.png</file>
 		<file>icons/go-down-16@2x.png</file>
 		<file>icons/go-down-16.png</file>
 		<file>icons/go-up-16@2x.png</file>
 		<file>icons/go-up-16.png</file>
 		<file>icons/input-gaming@2x.png</file>
 		<file>icons/input-gaming.png</file>
-		<file>icons/IssueTracker.png</file>
 		<file>icons/list-add@2x.png</file>
 		<file>icons/list-add.png</file>
 		<file>icons/list-remove@2x.png</file>
@@ -262,6 +262,7 @@
 		<file>icons/white/svg/arrow-left-right-line.svg</file>
 		<file>icons/white/svg/arrow-up-line.svg</file>
 		<file>icons/white/svg/artboard-2-line.svg</file>
+		<file>icons/white/svg/bug-line.svg</file>
 		<file>icons/white/svg/cheats-line.svg</file>
 		<file>icons/white/svg/checkbox-multiple-blank-line.svg</file>
 		<file>icons/white/svg/chip-2-line.svg</file>
@@ -302,6 +303,7 @@
 		<file>icons/white/svg/folder-settings-line.svg</file>
 		<file>icons/white/svg/fullscreen-line.svg</file>
 		<file>icons/white/svg/function-line.svg</file>
+		<file>icons/white/svg/github-line.svg</file>
 		<file>icons/white/svg/global-line.svg</file>
 		<file>icons/white/svg/guncon-line.svg</file>
 		<file>icons/white/svg/image-fill.svg</file>

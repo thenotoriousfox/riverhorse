@@ -11,6 +11,7 @@
 #include <array>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <vector>
 
@@ -255,6 +256,10 @@ public:
   static std::unique_ptr<CDImage> OpenMdsImage(const char* filename, Error* error);
   static std::unique_ptr<CDImage> OpenPBPImage(const char* filename, Error* error);
   static std::unique_ptr<CDImage> OpenM3uImage(const char* filename, bool apply_patches, Error* error);
+
+  /// Returns the disc image paths listed in an m3u playlist, made absolute.
+  static std::vector<std::string> ParseM3uFilenames(std::string_view m3u_path, std::string_view m3u_contents);
+  static std::vector<std::string> ReadM3uFilenames(const char* m3u_path);
   static std::unique_ptr<CDImage> OpenDeviceImage(const char* filename, Error* error);
   static std::unique_ptr<CDImage>
   CreateMemoryImage(CDImage* image, ProgressCallback* progress = ProgressCallback::NullProgressCallback);

@@ -105,6 +105,7 @@ public Q_SLOTS:
 
   void refreshGameList(bool invalidate_cache);
   void refreshGameListModel();
+  void onCoverFetchingChanged();
   void cancelGameListRefresh();
 
   void runOnUIThread(const std::function<void()>& func);

@@ -3086,11 +3086,10 @@ static constexpr std::array<std::pair<const char*, ImVec4*>, 16> s_theme_colors 
   {"SecondaryText", &UISecondaryTextColor},
 }};
 
-static std::optional<std::string_view> FindThemeValue(std::string_view theme_ini, std::string_view key);
 static std::optional<ImVec4> ParseThemeColor(std::string_view value);
 } // namespace ImGuiFullscreen
 
-std::optional<std::string_view> ImGuiFullscreen::FindThemeValue(std::string_view theme_ini, std::string_view key)
+std::optional<std::string_view> ImGuiFullscreen::GetThemeValue(std::string_view theme_ini, std::string_view key)
 {
   for (std::string_view line : StringUtil::SplitString(theme_ini, '\n'))
   {
@@ -3127,7 +3126,7 @@ bool ImGuiFullscreen::ApplyTheme(std::string_view theme_ini)
   std::array<ImVec4, s_theme_colors.size()> colors;
   for (size_t i = 0; i < s_theme_colors.size(); i++)
   {
-    const std::optional<std::string_view> value = FindThemeValue(theme_ini, s_theme_colors[i].first);
+    const std::optional<std::string_view> value = GetThemeValue(theme_ini, s_theme_colors[i].first);
     const std::optional<ImVec4> color = value.has_value() ? ParseThemeColor(value.value()) : std::nullopt;
     if (!color.has_value())
       return false;
@@ -3141,5 +3140,5 @@ bool ImGuiFullscreen::ApplyTheme(std::string_view theme_ini)
 
 std::string ImGuiFullscreen::GetThemeName(std::string_view theme_ini)
 {
-  return std::string(FindThemeValue(theme_ini, "Name").value_or(std::string_view()));
+  return std::string(GetThemeValue(theme_ini, "Name").value_or(std::string_view()));
 }

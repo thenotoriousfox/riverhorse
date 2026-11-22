@@ -24,6 +24,7 @@ public:
   enum Column : int
   {
     Column_Icon,
+    Column_Thumbnail,
     Column_Serial,
     Column_Title,
     Column_FileTitle,
@@ -42,6 +43,8 @@ public:
 
     Column_Count
   };
+
+  static constexpr int THUMBNAIL_SIZE = 48;
 
   static std::optional<Column> getColumnIdForName(std::string_view name);
   static const char* getColumnName(Column col);
@@ -108,7 +111,8 @@ private:
   void loadThemeSpecificImages();
   void setColumnDisplayNames();
   void loadOrGenerateCover(const GameList::Entry* ge);
-  void invalidateCoverForPath(const std::string& path);
+  void loadThumbnail(const GameList::Entry* ge);
+  void invalidateImageForPath(const std::string& path, Column column);
 
   const QPixmap& getIconPixmapForEntry(const GameList::Entry* ge) const;
   static void fixIconPixmapSize(QPixmap& pm);
@@ -130,6 +134,7 @@ private:
   QPixmap m_loading_pixmap;
 
   mutable LRUCache<std::string, QPixmap> m_cover_pixmap_cache;
+  mutable LRUCache<std::string, QPixmap> m_thumbnail_pixmap_cache;
 
   mutable LRUCache<std::string, QPixmap> m_memcard_pixmap_cache;
 };
