@@ -467,6 +467,7 @@ jobs:
           jq -n --arg title "🦛  Riverhorse ${GITHUB_REF_NAME#v}" --arg url "$url" --rawfile notes release-notes.md '
             ($notes | if length > 3800 then .[:3800] + "…" else . end) as $body
             | {username: "Riverhorse",
+               avatar_url: "https://raw.githubusercontent.com/thenotoriousfox/riverhorse/main/data/resources/images/riverhorse.png",
                embeds: [{title: $title, url: $url, color: 8076770,
                          description: ($body + "\n\n**[Download](" + $url + ")**")}]}' > discord.json
           curl -fsS -H "Content-Type: application/json" --data @discord.json "$DISCORD_WEBHOOK"
