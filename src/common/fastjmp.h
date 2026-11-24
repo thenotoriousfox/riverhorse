@@ -10,7 +10,7 @@
 
 struct fastjmp_buf
 {
-#if defined(_WIN32) && defined(_M_AMD64)
+#if defined(_WIN32) && (defined(_M_AMD64) || defined(__x86_64__))
   static constexpr std::size_t BUF_SIZE = 240;
 #elif defined(_M_ARM64) || defined(__aarch64__)
   static constexpr std::size_t BUF_SIZE = 168;

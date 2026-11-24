@@ -15,12 +15,23 @@ set(LIBRETRO_RESOURCE_ASM "")
 set(LIBRETRO_RESOURCE_TABLE "")
 set(LIBRETRO_RESOURCE_DECLS "")
 set(LIBRETRO_RESOURCE_PATHS "")
+if(APPLE)
+  set(LIBRETRO_RESOURCE_SECTION "__TEXT,__const")
+  set(LIBRETRO_RESOURCE_SYMBOL_PREFIX "_")
+elseif(WIN32)
+  set(LIBRETRO_RESOURCE_SECTION ".rdata,\\\"dr\\\"")
+  set(LIBRETRO_RESOURCE_SYMBOL_PREFIX "")
+else()
+  set(LIBRETRO_RESOURCE_SECTION ".rodata")
+  set(LIBRETRO_RESOURCE_SYMBOL_PREFIX "")
+endif()
+
 set(index 0)
 foreach(name IN LISTS LIBRETRO_RESOURCES)
   set(path "${LIBRETRO_RESOURCE_DIR}/${name}")
   file(TIMESTAMP "${path}" timestamp "%s" UTC)
   string(APPEND LIBRETRO_RESOURCE_ASM
-         "  \".balign 16\\nriverhorse_resource_${index}_begin:\\n.incbin \\\"${path}\\\"\\nriverhorse_resource_${index}_end:\\n\"\n")
+         "  \".balign 16\\n${LIBRETRO_RESOURCE_SYMBOL_PREFIX}riverhorse_resource_${index}_begin:\\n.incbin \\\"${path}\\\"\\n${LIBRETRO_RESOURCE_SYMBOL_PREFIX}riverhorse_resource_${index}_end:\\n\"\n")
   string(APPEND LIBRETRO_RESOURCE_TABLE
          "  {\"${name}\", riverhorse_resource_${index}_begin, riverhorse_resource_${index}_end, ${timestamp}},\n")
   string(APPEND LIBRETRO_RESOURCE_DECLS
@@ -29,7 +40,7 @@ foreach(name IN LISTS LIBRETRO_RESOURCES)
   math(EXPR index "${index} + 1")
 endforeach()
 file(CONFIGURE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/libretro_embedded_resources.inc" CONTENT
-     "__asm__(\".section .rodata\\n\"\n${LIBRETRO_RESOURCE_ASM}  \".previous\\n\");\n${LIBRETRO_RESOURCE_DECLS}\nconstexpr EmbeddedFile s_embedded_files[] = {\n${LIBRETRO_RESOURCE_TABLE}};\n"
+     "__asm__(\".section ${LIBRETRO_RESOURCE_SECTION}\\n\"\n${LIBRETRO_RESOURCE_ASM}  \".text\\n\");\n${LIBRETRO_RESOURCE_DECLS}\nconstexpr EmbeddedFile s_embedded_files[] = {\n${LIBRETRO_RESOURCE_TABLE}};\n"
      @ONLY)
 set_source_files_properties(libretro_resources.cpp PROPERTIES OBJECT_DEPENDS "${LIBRETRO_RESOURCE_PATHS}")
 
@@ -45,6 +56,10 @@ endif()
 target_include_directories(riverhorse_libretro PRIVATE "${CMAKE_SOURCE_DIR}/dep/libretro/include" "${CMAKE_CURRENT_BINARY_DIR}")
 target_link_libraries(riverhorse_libretro PRIVATE core common scmversion)
 set_target_properties(riverhorse_libretro PROPERTIES PREFIX "" CXX_VISIBILITY_PRESET hidden VISIBILITY_INLINES_HIDDEN ON)
+
+if(MINGW)
+  target_link_options(riverhorse_libretro PRIVATE -static)
+endif()
 
 if(LINUX OR BSD)
   target_link_options(riverhorse_libretro PRIVATE "LINKER:--no-undefined"

@@ -4,7 +4,7 @@
 #pragma once
 #include "common/windows_headers.h"
 #include "input_source.h"
-#include <Xinput.h>
+#include <xinput.h>
 #include <array>
 #include <functional>
 #include <mutex>

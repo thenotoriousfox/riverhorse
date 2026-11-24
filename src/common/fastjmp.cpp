@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
 
 // Win32 uses Fastjmp.asm, because MSVC doesn't support inline asm.
-#if !defined(_WIN32) || defined(_M_ARM64)
+#if !defined(_MSC_VER) || defined(_M_ARM64)
 
 #include "fastjmp.h"
 
@@ -12,7 +12,66 @@
 #define PREFIX ""
 #endif
 
-#if defined(__x86_64__)
+#if defined(__x86_64__) && defined(_WIN32)
+
+asm("\t.global fastjmp_set\n"
+    "\t.global fastjmp_jmp\n"
+    "\t.text\n"
+    "fastjmp_set:"
+    R"(
+	movq 0(%rsp), %rax
+	movq %rsp, %rdx
+	addq $8, %rdx
+	movq %rax, 0(%rcx)
+	movq %rbx, 8(%rcx)
+	movq %rdx, 16(%rcx)
+	movq %rbp, 24(%rcx)
+	movq %rsi, 32(%rcx)
+	movq %rdi, 40(%rcx)
+	movq %r12, 48(%rcx)
+	movq %r13, 56(%rcx)
+	movq %r14, 64(%rcx)
+	movq %r15, 72(%rcx)
+	movaps %xmm6, 80(%rcx)
+	movaps %xmm7, 96(%rcx)
+	movaps %xmm8, 112(%rcx)
+	movaps %xmm9, 128(%rcx)
+	movaps %xmm10, 144(%rcx)
+	movaps %xmm11, 160(%rcx)
+	movaps %xmm12, 176(%rcx)
+	movaps %xmm13, 192(%rcx)
+	movaps %xmm14, 208(%rcx)
+	movaps %xmm15, 224(%rcx)
+	xorl %eax, %eax
+	ret
+)"
+    "fastjmp_jmp:"
+    R"(
+	movl %edx, %eax
+	movq 0(%rcx), %rdx
+	movq 8(%rcx), %rbx
+	movq 16(%rcx), %rsp
+	movq 24(%rcx), %rbp
+	movq 32(%rcx), %rsi
+	movq 40(%rcx), %rdi
+	movq 48(%rcx), %r12
+	movq 56(%rcx), %r13
+	movq 64(%rcx), %r14
+	movq 72(%rcx), %r15
+	movaps 80(%rcx), %xmm6
+	movaps 96(%rcx), %xmm7
+	movaps 112(%rcx), %xmm8
+	movaps 128(%rcx), %xmm9
+	movaps 144(%rcx), %xmm10
+	movaps 160(%rcx), %xmm11
+	movaps 176(%rcx), %xmm12
+	movaps 192(%rcx), %xmm13
+	movaps 208(%rcx), %xmm14
+	movaps 224(%rcx), %xmm15
+	jmp *%rdx
+)");
+
+#elif defined(__x86_64__)
 
 asm("\t.global " PREFIX "fastjmp_set\n"
     "\t.global " PREFIX "fastjmp_jmp\n"

@@ -1,6 +1,6 @@
 add_library(psx_gpu riverhorse_psx_gpu.c plugins/gpulib/prim.c)
 target_include_directories(psx_gpu PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
-if(WIN32)
+if(MSVC)
   target_include_directories(psx_gpu PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/win32")
 endif()
 target_compile_definitions(psx_gpu PRIVATE GPU_NEON TEXTURE_CACHE_4BPP TEXTURE_CACHE_8BPP)

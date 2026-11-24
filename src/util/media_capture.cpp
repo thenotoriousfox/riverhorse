@@ -28,10 +28,10 @@
 #include <string>
 #include <thread>
 
-#ifdef _WIN32
+#if defined(_WIN32) && defined(ENABLE_DESKTOP_INTEGRATION)
 #include "common/windows_headers.h"
 
-#include <Mferror.h>
+#include <mferror.h>
 #include <codecapi.h>
 #include <mfapi.h>
 #include <mfidl.h>
@@ -613,7 +613,7 @@ void MediaCaptureBase::DeleteOutputFile()
   }
 }
 
-#ifdef _WIN32
+#if defined(_WIN32) && defined(ENABLE_DESKTOP_INTEGRATION)
 
 class MediaCaptureMF final : public MediaCaptureBase
 {
@@ -2849,7 +2849,7 @@ MediaCapture::ContainerList MediaCapture::GetContainerList(MediaCaptureBackend b
   ContainerList ret;
   switch (backend)
   {
-#ifdef _WIN32
+#if defined(_WIN32) && defined(ENABLE_DESKTOP_INTEGRATION)
     case MediaCaptureBackend::MediaFoundation:
       ret = MediaCaptureMF::GetContainerList();
       break;
@@ -2870,7 +2870,7 @@ MediaCapture::CodecList MediaCapture::GetVideoCodecList(MediaCaptureBackend back
   CodecList ret;
   switch (backend)
   {
-#ifdef _WIN32
+#if defined(_WIN32) && defined(ENABLE_DESKTOP_INTEGRATION)
     case MediaCaptureBackend::MediaFoundation:
       ret = MediaCaptureMF::GetVideoCodecList(container);
       break;
@@ -2891,7 +2891,7 @@ MediaCapture::CodecList MediaCapture::GetAudioCodecList(MediaCaptureBackend back
   CodecList ret;
   switch (backend)
   {
-#ifdef _WIN32
+#if defined(_WIN32) && defined(ENABLE_DESKTOP_INTEGRATION)
     case MediaCaptureBackend::MediaFoundation:
       ret = MediaCaptureMF::GetAudioCodecList(container);
       break;
@@ -2911,7 +2911,7 @@ std::unique_ptr<MediaCapture> MediaCapture::Create(MediaCaptureBackend backend, 
 {
   switch (backend)
   {
-#ifdef _WIN32
+#if defined(_WIN32) && defined(ENABLE_DESKTOP_INTEGRATION)
     case MediaCaptureBackend::MediaFoundation:
       return MediaCaptureMF::Create(error);
 #endif

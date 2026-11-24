@@ -38,6 +38,10 @@ include(RiverhorseBuildOptions)
 set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -D_DEBUG")
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -D_DEBUG")
 
+if(WIN32 AND NOT MSVC)
+  add_compile_definitions(_WIN32_WINNT=0x0A00 NTDDI_VERSION=0x0A000005)
+endif()
+
 # Release build optimizations for MSVC.
 if(MSVC)
   add_definitions("/D_CRT_SECURE_NO_WARNINGS")

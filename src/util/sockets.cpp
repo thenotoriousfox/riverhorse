@@ -21,11 +21,13 @@
 
 #include "common/windows_headers.h"
 
-#include <WS2tcpip.h>
-#include <WinSock2.h>
+#include <ws2tcpip.h>
+#include <winsock2.h>
 
 #define SIZE_CAST(x) static_cast<int>(x)
+#ifdef _MSC_VER
 using ssize_t = int;
+#endif
 using nfds_t = ULONG;
 
 #else

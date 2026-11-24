@@ -9,11 +9,11 @@
 #include <cstdio>
 #include <ctime>
 
-#if defined(_WIN32)
+#if defined(_WIN32) && defined(ENABLE_DESKTOP_INTEGRATION)
 #include "windows_headers.h"
 
 #include "thirdparty/StackWalker.h"
-#include <DbgHelp.h>
+#include <dbghelp.h>
 
 namespace {
 class CrashHandlerStackWalker : public StackWalker
@@ -382,6 +382,7 @@ void CrashHandler::WriteDumpForCaller()
 {
 }
 
+#ifndef _WIN32
 void CrashHandler::CrashSignalHandler(int signal, siginfo_t* siginfo, void* ctx)
 {
   // We can't continue from here. Just bail out and dump core.
@@ -389,5 +390,6 @@ void CrashHandler::CrashSignalHandler(int signal, siginfo_t* siginfo, void* ctx)
   std::fflush(stderr);
   std::abort();
 }
+#endif
 
 #endif

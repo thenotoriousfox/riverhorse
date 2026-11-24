@@ -25,7 +25,7 @@
 
 Log_SetChannel(GPUDevice);
 
-#ifdef _WIN32
+#if defined(_WIN32) && defined(ENABLE_DESKTOP_INTEGRATION)
 #include "common/windows_headers.h"
 #include "d3d11_device.h"
 #include "d3d12_device.h"
@@ -328,7 +328,7 @@ GPUDevice::AdapterInfoList GPUDevice::GetAdapterListForAPI(RenderAPI api)
       break;
 #endif
 
-#ifdef _WIN32
+#if defined(_WIN32) && defined(ENABLE_DESKTOP_INTEGRATION)
     case RenderAPI::D3D11:
     case RenderAPI::D3D12:
       ret = D3DCommon::GetAdapterInfoList();
@@ -474,7 +474,7 @@ std::string GPUDevice::GetShaderCacheBaseName(std::string_view type) const
   std::string ret;
   switch (GetRenderAPI())
   {
-#ifdef _WIN32
+#if defined(_WIN32) && defined(ENABLE_DESKTOP_INTEGRATION)
     case RenderAPI::D3D11:
       ret = fmt::format(
         "d3d11_{}_{}{}", type,
@@ -1177,7 +1177,7 @@ std::unique_ptr<GPUDevice> GPUDevice::CreateDeviceForAPI(RenderAPI api)
       return std::make_unique<OpenGLDevice>();
 #endif
 
-#ifdef _WIN32
+#if defined(_WIN32) && defined(ENABLE_DESKTOP_INTEGRATION)
     case RenderAPI::D3D12:
       return std::make_unique<D3D12Device>();
 

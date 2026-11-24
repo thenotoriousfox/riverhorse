@@ -30,6 +30,9 @@
 #include <io.h>
 #include <malloc.h>
 #include <pathcch.h>
+#if !defined(_MSC_VER) && !defined(PATHCCH_ENSURE_IS_EXTENDED_LENGTH_PATH)
+#define PATHCCH_ENSURE_IS_EXTENDED_LENGTH_PATH 0x10
+#endif
 #include <share.h>
 #include <shlobj.h>
 #include <winioctl.h>

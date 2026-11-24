@@ -68,12 +68,15 @@ target_link_libraries(common PUBLIC fmt Threads::Threads fast_float)
 target_link_libraries(common PRIVATE "${CMAKE_DL_LIBS}")
 
 if(WIN32)
-  target_sources(common PRIVATE
-    thirdparty/StackWalker.cpp
-    thirdparty/StackWalker.h
-    windows_headers.h
-  )
-  target_link_libraries(common PRIVATE OneCore.lib)
+  target_sources(common PRIVATE windows_headers.h)
+  if(ENABLE_DESKTOP_INTEGRATION)
+    target_sources(common PRIVATE thirdparty/StackWalker.cpp thirdparty/StackWalker.h)
+  endif()
+  if(MSVC)
+    target_link_libraries(common PRIVATE OneCore.lib)
+  else()
+    target_link_libraries(common PRIVATE pathcch)
+  endif()
 endif()
 
 if(MSVC)

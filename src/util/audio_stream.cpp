@@ -120,7 +120,7 @@ std::unique_ptr<AudioStream> AudioStream::CreateStream(AudioBackend backend, u32
 
     case AudioBackend::SDL:
       return CreateSDLAudioStream(sample_rate, parameters, error);
-#elif defined(__ANDROID__)
+#elif defined(__ANDROID__) && defined(ENABLE_DESKTOP_INTEGRATION)
     case AudioBackend::AAudio:
       return CreateAAudioAudioStream(sample_rate, parameters, error);
 

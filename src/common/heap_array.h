@@ -9,6 +9,9 @@
 #include <cassert>
 #include <cstdlib>
 #include <cstring>
+#ifdef _WIN32
+#include <malloc.h>
+#endif
 #include <span>
 #include <type_traits>
 
@@ -115,7 +118,7 @@ private:
   {
     if constexpr (ALIGNMENT > 0)
     {
-#ifdef _MSC_VER
+#ifdef _WIN32
       m_data = static_cast<T*>(_aligned_malloc(SIZE * sizeof(T), ALIGNMENT));
       if (!m_data)
         Panic("Memory allocation failed.");
@@ -135,7 +138,7 @@ private:
   {
     if constexpr (ALIGNMENT > 0)
     {
-#ifdef _MSC_VER
+#ifdef _WIN32
       _aligned_free(m_data);
 #else
       std::free(m_data);
@@ -375,7 +378,7 @@ private:
   {
     if constexpr (alignment > 0)
     {
-#ifdef _MSC_VER
+#ifdef _WIN32
       m_data = static_cast<T*>(_aligned_realloc(prev_ptr, size * sizeof(T), alignment));
       if (!m_data) [[unlikely]]
         Panic("Memory allocation failed.");
@@ -403,7 +406,7 @@ private:
   {
     if constexpr (alignment > 0)
     {
-#ifdef _MSC_VER
+#ifdef _WIN32
       _aligned_free(m_data);
 #else
       std::free(m_data);

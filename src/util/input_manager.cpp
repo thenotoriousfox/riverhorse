@@ -1970,14 +1970,14 @@ void InputManager::UpdateInputSourceState(SettingsInterface& si, std::unique_loc
 
 void InputManager::ReloadSources(SettingsInterface& si, std::unique_lock<std::mutex>& settings_lock)
 {
-#ifdef _WIN32
+#if defined(_WIN32) && defined(ENABLE_DESKTOP_INTEGRATION)
   UpdateInputSourceState(si, settings_lock, InputSourceType::DInput, &InputSource::CreateDInputSource);
   UpdateInputSourceState(si, settings_lock, InputSourceType::XInput, &InputSource::CreateXInputSource);
   UpdateInputSourceState(si, settings_lock, InputSourceType::RawInput, &InputSource::CreateWin32RawInputSource);
 #endif
 #if !defined(__ANDROID__) && defined(ENABLE_DESKTOP_INTEGRATION)
   UpdateInputSourceState(si, settings_lock, InputSourceType::SDL, &InputSource::CreateSDLSource);
-#elif defined(__ANDROID__)
+#elif defined(__ANDROID__) && defined(ENABLE_DESKTOP_INTEGRATION)
   UpdateInputSourceState(si, settings_lock, InputSourceType::Android, &InputSource::CreateAndroidSource);
 #endif
 }

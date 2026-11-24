@@ -52,8 +52,8 @@ namespace Exports {
 
 extern "C" {
 #ifdef _WIN32
-_declspec(dllexport) uintptr_t RAM;
-_declspec(dllexport) u32 RAM_SIZE, RAM_MASK;
+__declspec(dllexport) uintptr_t RAM;
+__declspec(dllexport) u32 RAM_SIZE, RAM_MASK;
 #else
 __attribute__((visibility("default"), used)) uintptr_t RAM;
 __attribute__((visibility("default"), used)) u32 RAM_SIZE, RAM_MASK;

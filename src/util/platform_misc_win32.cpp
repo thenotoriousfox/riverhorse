@@ -14,8 +14,8 @@
 #include <memory>
 
 #include "common/windows_headers.h"
-#include <Psapi.h>
-#include <WinSock2.h>
+#include <psapi.h>
+#include <winsock2.h>
 #include <mmsystem.h>
 
 Log_SetChannel(PlatformMisc);

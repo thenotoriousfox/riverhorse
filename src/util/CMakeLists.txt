@@ -198,6 +198,11 @@ if(NOT ANDROID)
 endif()
 
 if(WIN32)
+  target_sources(util PRIVATE platform_misc_win32.cpp)
+  target_link_libraries(util PRIVATE winmm dwmapi ws2_32)
+endif()
+
+if(WIN32 AND ENABLE_DESKTOP_INTEGRATION)
   target_sources(util PRIVATE
     d3d_common.cpp
     d3d_common.h
@@ -225,14 +230,13 @@ if(WIN32)
     dinput_source.h
     http_downloader_winhttp.cpp
     http_downloader_winhttp.h
-    platform_misc_win32.cpp
     win32_raw_input_source.cpp
     win32_raw_input_source.h
     xinput_source.cpp
     xinput_source.h
   )
   target_link_libraries(util PRIVATE d3d12ma)
-  target_link_libraries(util PRIVATE d3d11.lib d3d12.lib d3dcompiler.lib dxgi.lib winmm.lib Dwmapi.lib winhttp.lib)
+  target_link_libraries(util PRIVATE d3d11.lib d3d12.lib d3dcompiler.lib dxgi.lib winhttp.lib)
 
   if("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
     target_link_libraries(util PRIVATE WinPixEventRuntime::WinPixEventRuntime)
@@ -258,7 +262,7 @@ elseif(APPLE)
   find_library(QUARTZCORE_LIBRARY QuartzCore)
   target_link_libraries(util PRIVATE ${METAL_LIBRARY} ${QUARTZCORE_LIBRARY} ${IOK_LIBRARY})
   set_source_files_properties(${MAC_SOURCES} PROPERTIES SKIP_PRECOMPILE_HEADERS TRUE)
-elseif(NOT ANDROID)
+elseif(NOT ANDROID AND NOT WIN32)
   target_sources(util PRIVATE
     platform_misc_unix.cpp
   )

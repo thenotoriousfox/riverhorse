@@ -15,7 +15,7 @@
 
 #if defined(_WIN32)
 #include "windows_headers.h"
-#include <Psapi.h>
+#include <psapi.h>
 #elif defined(__APPLE__)
 #ifdef __aarch64__
 #include <pthread.h> // pthread_jit_write_protect_np()
@@ -33,6 +33,20 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <unistd.h>
+#endif
+
+#if defined(_WIN32) && !defined(_MSC_VER)
+template<typename T>
+static T GetKernelBaseFunction(const char* name)
+{
+  return reinterpret_cast<T>(GetProcAddress(GetModuleHandleW(L"kernelbase.dll"), name));
+}
+static const auto s_virtual_alloc2 = GetKernelBaseFunction<decltype(&VirtualAlloc2)>("VirtualAlloc2");
+static const auto s_map_view_of_file3 = GetKernelBaseFunction<decltype(&MapViewOfFile3)>("MapViewOfFile3");
+static const auto s_unmap_view_of_file2 = GetKernelBaseFunction<decltype(&UnmapViewOfFile2)>("UnmapViewOfFile2");
+#define VirtualAlloc2 s_virtual_alloc2
+#define MapViewOfFile3 s_map_view_of_file3
+#define UnmapViewOfFile2 s_unmap_view_of_file2
 #endif
 
 #if defined(__linux__) && !defined(MAP_FIXED_NOREPLACE)

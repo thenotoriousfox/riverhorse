@@ -510,7 +510,7 @@ static GameListView s_game_list_view = GameListView::Grid;
 void FullscreenUI::TimeToPrintableString(SmallStringBase* str, time_t t)
 {
   struct tm lt = {};
-#ifdef _MSC_VER
+#ifdef _WIN32
   localtime_s(&lt, &t);
 #else
   localtime_r(&t, &lt);

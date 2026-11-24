@@ -7,7 +7,7 @@
 
 #include <cstdlib>
 
-#ifdef _MSC_VER
+#ifdef _WIN32
 #include <malloc.h>
 #endif
 
@@ -87,7 +87,7 @@ constexpr T NextPow2(T value)
 
 ALWAYS_INLINE static void* AlignedMalloc(size_t size, size_t alignment)
 {
-#ifdef _MSC_VER
+#ifdef _WIN32
   return _aligned_malloc(size, alignment);
 #else
   // Unaligned sizes are slow on macOS.
@@ -102,7 +102,7 @@ ALWAYS_INLINE static void* AlignedMalloc(size_t size, size_t alignment)
 
 ALWAYS_INLINE static void AlignedFree(void* ptr)
 {
-#ifdef _MSC_VER
+#ifdef _WIN32
   _aligned_free(ptr);
 #else
   free(ptr);

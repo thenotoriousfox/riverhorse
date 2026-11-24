@@ -550,6 +550,8 @@ void Threading::SetNameOfCurrentThread(const char* name)
   __except (EXCEPTION_EXECUTE_HANDLER)
   {
   }
+#elif defined(_WIN32)
+  (void)name;
 #elif defined(__linux__)
   // Extract of manpage: "The name can be up to 16 bytes long, and should be
   //						null-terminated if it contains fewer bytes."

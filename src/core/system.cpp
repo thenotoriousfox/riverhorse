@@ -84,7 +84,6 @@ Log_SetChannel(System);
 
 #ifdef _WIN32
 #include "common/windows_headers.h"
-#include <Objbase.h>
 #include <mmsystem.h>
 #include <objbase.h>
 #endif
