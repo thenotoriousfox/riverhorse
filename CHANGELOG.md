@@ -14,6 +14,10 @@ Changes since the DuckStation `v0.1-7371` base. Releases are tagged
   number as the relay), optionally `?version=<Riverhorse version>`, so any
   frontend can show open games; see the README. `-netplaypublic` lists a
   session started from the command line.
+- libretro core for Windows (x64), Android (arm64-v8a, x86_64), macOS (arm64,
+  x86_64) and Linux arm64 on every release, built from the bundled
+  dependencies. The core is also submitted to libretro's buildbot, so
+  RetroArch's Core Downloader can offer it once it is accepted.
 
 ### Changes
 - Hosted sessions are only listed when the host turns on "List in the
@@ -23,6 +27,13 @@ Changes since the DuckStation `v0.1-7371` base. Releases are tagged
 ### Fixes
 - Netplay started from the command line uses the Nickname setting when
   `-netplaynick` isn't given, instead of "Player".
+- libretro core: starts in RetroArch for Windows, and its recompiler no
+  longer crashes there.
+- libretro core: works with RetroArch builds that only have OpenGL ES (such
+  as on ARM handhelds) instead of rendering on the CPU, and uses its software
+  renderer when the frontend has no hardware renderer at all.
+- macOS 10.15 builds no longer need a macOS 11 feature in the cover
+  downloader.
 
 ## 1.2.0 (2026-11-24)
 
