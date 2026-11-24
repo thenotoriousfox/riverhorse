@@ -19,7 +19,7 @@ body:
       - Standalone (AppImage)
       - Standalone (Flatpak)
       - Standalone (built from source)
-      - Standalone in HippOS
+      - Packaged by a distribution or frontend (say which below)
       - libretro core in RetroArch
       - Other (say below)
   validations:
