@@ -3,7 +3,7 @@
 Changes since the DuckStation `v0.1-7371` base. Releases are tagged
 `vMAJOR.MINOR.PATCH`.
 
-## Unreleased
+## 1.2.0 (2026-11-24)
 
 ### New
 - Netplay for up to four players. Players 3 and 4 need a multitap in the
