@@ -22,6 +22,7 @@
 
 #include "IconsFontAwesome5.h"
 
+#include <algorithm>
 #include <array>
 #include <memory>
 
@@ -115,6 +116,8 @@ static void ResetDeviceTransferState();
 static bool DoStateController(StateWrapper& sw, u32 i);
 static bool DoStateMemcard(StateWrapper& sw, u32 i, bool is_memory_state);
 static void BackupMemoryCardState();
+static void BackupMemoryCardsBeforeTransfer();
+static void MarkMemoryCardTransfer();
 static void RestoreMemoryCardState();
 
 static std::array<std::unique_ptr<Controller>, NUM_CONTROLLER_AND_CARD_PORTS> s_controllers;
@@ -139,6 +142,7 @@ static bool s_transmit_buffer_full = false;
 
 static u32 s_last_memory_card_transfer_frame = 0;
 static DynamicHeapArray<u8> s_memory_card_backup;
+static bool s_memory_card_backup_current = false;
 
 } // namespace Pad
 
@@ -177,6 +181,7 @@ void Pad::Reset()
     s_multitaps[i].Reset();
 
   s_last_memory_card_transfer_frame = 0;
+  s_memory_card_backup_current = false;
 }
 
 bool Pad::ShouldAvoidSavingToState()
@@ -345,6 +350,23 @@ void Pad::BackupMemoryCardState()
     if (s_memory_cards[i])
       s_memory_cards[i]->DoState(sw);
   }
+  s_memory_card_backup_current = true;
+}
+
+void Pad::BackupMemoryCardsBeforeTransfer()
+{
+  if (!s_memory_card_backup_current && ShouldAvoidSavingToState() &&
+      (System::GetFrameNumber() - s_last_memory_card_transfer_frame) > GetMaximumRollbackFrames() &&
+      std::any_of(s_memory_cards.begin(), s_memory_cards.end(), [](const auto& card) { return card != nullptr; }))
+  {
+    BackupMemoryCardState();
+  }
+}
+
+void Pad::MarkMemoryCardTransfer()
+{
+  s_last_memory_card_transfer_frame = System::GetFrameNumber();
+  s_memory_card_backup_current = false;
 }
 
 void Pad::RestoreMemoryCardState()
@@ -359,6 +381,7 @@ void Pad::RestoreMemoryCardState()
     if (s_memory_cards[i])
       s_memory_cards[i]->DoState(sw);
   }
+  s_memory_card_backup_current = true;
 }
 
 bool Pad::DoState(StateWrapper& sw, bool is_memory_state)
@@ -429,6 +452,9 @@ bool Pad::DoState(StateWrapper& sw, bool is_memory_state)
           mc->DoState(sw);
         }
       }
+
+      if (sw.IsReading() && process_memcard_state)
+        s_memory_card_backup_current = false;
     }
 
     // Always save controller state.
@@ -472,7 +498,10 @@ bool Pad::DoState(StateWrapper& sw, bool is_memory_state)
     }
 
     if (sw.IsReading())
+    {
       s_last_memory_card_transfer_frame = 0;
+      s_memory_card_backup_current = false;
+    }
   }
 
   if (sw.GetVersion() >= 50) [[unlikely]]
@@ -527,6 +556,7 @@ void Pad::SetMemoryCard(u32 slot, std::unique_ptr<MemoryCard> dev)
            dev ? (dev->GetFilename().empty() ? "<no file configured>" : dev->GetFilename().c_str()) : "<unplugged>");
 
   s_memory_cards[slot] = std::move(dev);
+  s_memory_card_backup_current = false;
 }
 
 std::unique_ptr<MemoryCard> Pad::RemoveMemoryCard(u32 slot)
@@ -761,6 +791,7 @@ void Pad::DoTransfer(TickCount ticks_late)
     {
       if (s_multitaps[s_JOY_CTRL.SLOT].IsEnabled())
       {
+        BackupMemoryCardsBeforeTransfer();
         if ((ack = s_multitaps[s_JOY_CTRL.SLOT].Transfer(data_out, &data_in)) == true)
         {
           TRACE_LOG("Active device set to tap {}, sent 0x{:02X}, received 0x{:02X}", static_cast<int>(s_JOY_CTRL.SLOT),
@@ -772,6 +803,9 @@ void Pad::DoTransfer(TickCount ticks_late)
       {
         if (!controller || (ack = controller->Transfer(data_out, &data_in)) == false)
         {
+          if (memory_card)
+            BackupMemoryCardsBeforeTransfer();
+
           if (!memory_card || (ack = memory_card->Transfer(data_out, &data_in)) == false)
           {
             // nothing connected to this port
@@ -782,16 +816,7 @@ void Pad::DoTransfer(TickCount ticks_late)
             // memory card responded, make it the active device until non-ack
             TRACE_LOG("Transfer to memory card, data_out=0x{:02X}, data_in=0x{:02X}", data_out, data_in);
             s_active_device = ActiveDevice::MemoryCard;
-
-            // back up memory card state in case we roll back to before this transfer begun
-            const u32 frame_number = System::GetFrameNumber();
-
-            // consider u32 overflow case
-            if (ShouldAvoidSavingToState() &&
-                (frame_number - s_last_memory_card_transfer_frame) > GetMaximumRollbackFrames())
-              BackupMemoryCardState();
-
-            s_last_memory_card_transfer_frame = frame_number;
+            MarkMemoryCardTransfer();
           }
         }
         else
@@ -818,7 +843,7 @@ void Pad::DoTransfer(TickCount ticks_late)
     {
       if (memory_card)
       {
-        s_last_memory_card_transfer_frame = System::GetFrameNumber();
+        MarkMemoryCardTransfer();
         ack = memory_card->Transfer(data_out, &data_in);
         TRACE_LOG("Transfer to memory card, data_out=0x{:02X}, data_in=0x{:02X}", data_out, data_in);
       }
@@ -832,6 +857,8 @@ void Pad::DoTransfer(TickCount ticks_late)
         ack = s_multitaps[s_JOY_CTRL.SLOT].Transfer(data_out, &data_in);
         TRACE_LOG("Transfer tap {}, sent 0x{:02X}, received 0x{:02X}, acked: {}", static_cast<int>(s_JOY_CTRL.SLOT),
                   data_out, data_in, ack ? "true" : "false");
+        if (s_multitaps[s_JOY_CTRL.SLOT].IsReadingMemoryCard())
+          MarkMemoryCardTransfer();
       }
     }
     break;
