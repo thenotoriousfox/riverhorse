@@ -131,9 +131,12 @@ void MemMap::UnmapSharedMemory(void* baseaddr, size_t size)
 
 const void* MemMap::GetBaseAddress()
 {
-  const HMODULE mod = GetModuleHandleW(nullptr);
-  if (!mod)
+  HMODULE mod = nullptr;
+  if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                          reinterpret_cast<LPCWSTR>(&GetBaseAddress), &mod))
+  {
     return nullptr;
+  }
 
   MODULEINFO mi;
   if (!GetModuleInformation(GetCurrentProcess(), mod, &mi, sizeof(mi)))

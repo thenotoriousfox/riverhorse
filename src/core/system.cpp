@@ -473,6 +473,10 @@ void System::Internal::ProcessShutdown()
   CPU::CodeCache::ProcessShutdown();
 }
 
+#ifdef _WIN32
+static bool s_cpu_thread_com_initialized = false;
+#endif
+
 bool System::Internal::CPUThreadInitialize(Error* error)
 {
 #ifdef _WIN32
@@ -480,7 +484,8 @@ bool System::Internal::CPUThreadInitialize(Error* error)
   // We need to initialize COM first, before anything else does, because otherwise they might
   // initialize it in single-threaded/apartment mode, which can't be changed to multithreaded.
   HRESULT hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
-  if (FAILED(hr))
+  s_cpu_thread_com_initialized = SUCCEEDED(hr);
+  if (FAILED(hr) && hr != RPC_E_CHANGED_MODE)
   {
     Error::SetHResult(error, "CoInitializeEx() failed: ", hr);
     return false;
@@ -523,7 +528,9 @@ void System::Internal::CPUThreadShutdown()
   InputManager::CloseSources();
 
 #ifdef _WIN32
-  CoUninitialize();
+  if (s_cpu_thread_com_initialized)
+    CoUninitialize();
+  s_cpu_thread_com_initialized = false;
 #endif
 }
 
