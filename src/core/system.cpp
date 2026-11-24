@@ -175,7 +175,9 @@ static void UpdateControllers();
 static void UpdateControllerSettings();
 static void ResetControllers();
 static void UpdatePerGameMemoryCards();
+static u32 GetRunningDiscCount();
 static bool SwitchToNextDisc();
+static void ChangeDiscForWaitingGame();
 static std::unique_ptr<MemoryCard> GetMemoryCardForSlot(u32 slot, MemoryCardType type);
 static void UpdateMultitaps();
 
@@ -236,6 +238,8 @@ static ConsoleRegion s_region = ConsoleRegion::NTSC_U;
 TickCount System::g_ticks_per_second = System::MASTER_CLOCK;
 static TickCount s_max_slice_ticks = System::MASTER_CLOCK / 10;
 static u32 s_frame_number = 1;
+static u32 s_disc_change_attempts = 0;
+static u32 s_last_disc_change_frame = 0;
 static u32 s_internal_frame_number = 1;
 static const BIOS::ImageInfo* s_bios_image_info = nullptr;
 static BIOS::ImageInfo::Hash s_bios_hash = {};
@@ -2060,9 +2064,8 @@ void System::FrameDone()
 
   if (g_settings.cdrom_auto_disc_change && CDROM::IsWaitingForDiscChange())
   {
-    INFO_LOG("The game is waiting for a disc change.");
     CDROM::ClearDiscChangeWait();
-    SwitchToNextDisc();
+    ChangeDiscForWaitingGame();
   }
 
   if (s_frame_step_request)
@@ -4347,26 +4350,38 @@ bool System::SwitchMediaSubImage(u32 index)
   return true;
 }
 
+u32 System::GetRunningDiscCount()
+{
+  if (HasMediaSubImages())
+    return GetMediaSubImageCount();
+
+  if (!s_running_game_entry)
+    return 1;
+
+  const std::vector<std::string>& serials = s_running_game_entry->disc_set_serials;
+  return (std::find(serials.begin(), serials.end(), s_running_game_serial) != serials.end()) ?
+           static_cast<u32>(serials.size()) :
+           1;
+}
+
 bool System::SwitchToNextDisc()
 {
   if (HasMediaSubImages())
-  {
-    const u32 next_index = GetMediaSubImageIndex() + 1;
-    return (next_index < GetMediaSubImageCount() && SwitchMediaSubImage(next_index));
-  }
+    return SwitchMediaSubImage((GetMediaSubImageIndex() + 1) % GetMediaSubImageCount());
 
   if (!s_running_game_entry)
     return false;
 
   const std::vector<std::string>& serials = s_running_game_entry->disc_set_serials;
   const auto current = std::find(serials.begin(), serials.end(), s_running_game_serial);
-  if (current == serials.end() || std::next(current) == serials.end())
+  if (current == serials.end())
     return false;
 
+  const std::string& next_serial = (std::next(current) == serials.end()) ? serials.front() : *std::next(current);
   std::string next_path;
   {
     const auto lock = GameList::GetLock();
-    const GameList::Entry* const next_entry = GameList::GetEntryBySerial(*std::next(current));
+    const GameList::Entry* const next_entry = GameList::GetEntryBySerial(next_serial);
     if (!next_entry)
       return false;
 
@@ -4374,6 +4389,34 @@ bool System::SwitchToNextDisc()
   }
 
   return InsertMedia(next_path.c_str());
+}
+
+void System::ChangeDiscForWaitingGame()
+{
+  static constexpr u32 RETRY_WINDOW_SECONDS = 30;
+
+  const u32 frames_since_change = s_frame_number - s_last_disc_change_frame;
+  const bool retrying = (s_disc_change_attempts > 0 && s_frame_number >= s_last_disc_change_frame &&
+                         frames_since_change <= static_cast<u32>(GetThrottleFrequency() * RETRY_WINDOW_SECONDS));
+  if (!retrying)
+    s_disc_change_attempts = 0;
+
+  const u32 disc_count = GetRunningDiscCount();
+  if (disc_count <= 1)
+    return;
+
+  if (s_disc_change_attempts + 1 >= disc_count)
+  {
+    INFO_LOG("The game is waiting for a disc change, but every other disc has been tried.");
+    return;
+  }
+
+  INFO_LOG("The game is waiting for a disc change, inserting the next disc.");
+  if (SwitchToNextDisc())
+  {
+    s_disc_change_attempts++;
+    s_last_disc_change_frame = s_frame_number;
+  }
 }
 
 bool System::HasCheatList()

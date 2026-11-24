@@ -126,8 +126,9 @@ ConsoleSettingsWidget::ConsoleSettingsWidget(SettingsWindow* dialog, QWidget* pa
        "cases also eliminates stutter when games initiate audio track playback."));
   dialog->registerWidgetHelp(
     m_ui.cdromAutoDiscChange, tr("Change Discs Automatically"), tr("Unchecked"),
-    tr("Inserts the next disc of a multi-disc game when the game stops the disc and waits for it to be changed. "
-       "Works with playlists (.m3u), multi-disc PBP files and discs merged in the game list."));
+    tr("Changes the disc of a multi-disc game when the game stops the disc and waits for it to be changed, trying "
+       "each disc in turn until the game accepts one. Works with playlists (.m3u), multi-disc PBP files and discs "
+       "merged in the game list."));
   dialog->registerWidgetHelp(m_ui.cdromLoadImagePatches, tr("Apply Image Patches"), tr("Unchecked"),
                              tr("Automatically applies patches to disc images when they are present in the same "
                                 "directory. Currently only PPF patches are supported with this option."));
