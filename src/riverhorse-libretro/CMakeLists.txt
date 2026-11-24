@@ -48,6 +48,7 @@ set_target_properties(riverhorse_libretro PROPERTIES PREFIX "" CXX_VISIBILITY_PR
 
 if(LINUX OR BSD)
   target_link_options(riverhorse_libretro PRIVATE "LINKER:--no-undefined"
-                      "LINKER:--version-script=${CMAKE_CURRENT_SOURCE_DIR}/libretro.map")
+                      "LINKER:--version-script=${CMAKE_CURRENT_SOURCE_DIR}/libretro.map"
+                      -static-libstdc++ -static-libgcc)
   set_property(TARGET riverhorse_libretro APPEND PROPERTY LINK_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/libretro.map")
 endif()

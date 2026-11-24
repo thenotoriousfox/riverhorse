@@ -30,6 +30,9 @@ extern "C" {
 #  endif
 #else
 #  define GGPO_API
+#  ifndef __cdecl
+#    define __cdecl
+#  endif
 #endif
 
 #define GGPO_MAX_PLAYERS                  4

@@ -35,6 +35,10 @@
 #include <unistd.h>
 #endif
 
+#if defined(__linux__) && !defined(MAP_FIXED_NOREPLACE)
+#define MAP_FIXED_NOREPLACE 0x100000
+#endif
+
 Log_SetChannel(MemMap);
 
 namespace MemMap {

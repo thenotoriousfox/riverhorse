@@ -51,7 +51,7 @@ version and licence, and keeps its original notices.
 | `dep/libretro/include/libretro.h`, `libretro_vulkan.h` | libretro-common | 52781c4a | MIT |
 | `src/core/netplay.cpp`, `netplay.h`, `netplay_packets.h`, netplay hooks in `system.cpp`, `pad.cpp`, `input_manager.cpp`, `qthost.cpp`, `mainwindow.cpp` | DuckStation pull request #3000 (Stenzek, with Jamie Meyer), submitted 2023-08-30 under GPL-3.0 | 1e585e74 | GPL-3.0 |
 | `dep/enet/` ENet | DuckStation pull request #3000 (from lsalzman/enet) | fcd82df9 (enet ea4607a9) | MIT |
-| `dep/ggpo-x/` GGPO (ggpo-x fork); `GAMEINPUT_MAX_BYTES` raised to 12 and `BITVECTOR_NIBBLE_SIZE` to 16 for analog input | DuckStation pull request #3000 | 5f99fda9 | MIT |
+| `dep/ggpo-x/` GGPO (ggpo-x fork); `GAMEINPUT_MAX_BYTES` raised to 12 and `BITVECTOR_NIBBLE_SIZE` to 16 for analog input; `__cdecl` defined away outside Windows for GCC | DuckStation pull request #3000 | 5f99fda9 | MIT |
 | `data/resources/chtdb.txt`, `patches.txt` codes from `cht/Sony - PlayStation`, converted to this format by `scripts/update_cheat_databases.py` | [libretro-database](https://github.com/libretro/libretro-database) (libretro and contributors) | 90601bff | CC-BY-SA-4.0, used under GPL-3.0 through its one-way compatibility |
 
 ## Fonts
