@@ -137,6 +137,7 @@ struct JoinResponseMessage
     PlayerIDInUse,
     SessionClosed,
     InvalidPassword,
+    Declined,
   };
 
   ControlMessageHeader header;

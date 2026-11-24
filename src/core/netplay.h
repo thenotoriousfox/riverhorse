@@ -4,7 +4,11 @@
 #pragma once
 
 #include "types.h"
+#include <optional>
 #include <string>
+#include <vector>
+
+class Error;
 
 class SettingsInterface;
 
@@ -46,6 +50,21 @@ bool JoinSession(std::string nickname, const std::string& hostname, s32 port, st
                  int inputdelay, std::string game_path = {});
 
 bool IsActive();
+
+/// A session listed on the relay server by its host.
+struct SessionListing
+{
+  u16 session_code;
+  u32 players;
+  u32 max_players;
+  bool has_password;
+  std::string host_nickname;
+  std::string game_title;
+  std::string game_serial;
+};
+
+/// Fetches the sessions listed on the relay server that this version can join. Blocks for up to a few seconds.
+std::optional<std::vector<SessionListing>> GetSessionList(Error* error);
 
 /// Writes the settings every rollback session needs: no fastmem, block linking, runahead, rewind or threaded
 /// rendering, and devices restored from memory states.

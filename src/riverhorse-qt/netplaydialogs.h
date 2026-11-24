@@ -6,7 +6,13 @@
 #include "ui_netplaycreatesessiondialog.h"
 #include "ui_netplayjoinsessiondialog.h"
 
+#include "core/netplay.h"
+
+#include <QtCore/QFutureWatcher>
 #include <QtWidgets/QDialog>
+
+#include <optional>
+#include <vector>
 
 class CreateNetplaySessionDialog final : public QDialog
 {
@@ -41,9 +47,19 @@ public Q_SLOTS:
 
 private Q_SLOTS:
   void updateState();
+  void refreshSessions();
+  void onSessionListFetched();
+  void onSessionSelected();
 
 private:
+  struct SessionListResult
+  {
+    std::optional<std::vector<Netplay::SessionListing>> sessions;
+    QString error;
+  };
+
   bool validate() const;
 
   Ui::NetplayJoinSessionDialog m_ui;
+  QFutureWatcher<SessionListResult> m_session_list_watcher;
 };

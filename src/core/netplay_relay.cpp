@@ -5,6 +5,7 @@
 
 #include "common/error.h"
 #include "common/log.h"
+#include "common/scoped_guard.h"
 #include "common/string_util.h"
 #include "common/timer.h"
 
@@ -57,6 +58,7 @@ static int ENET_CALLBACK SendThroughRelay(ENetHost* host, const ENetAddress* add
 static int ENET_CALLBACK ReceiveFromRelay(ENetHost* host, ENetEvent* event);
 static int ReceiveFromRelayServer(ENetHost* host, const u8* data, size_t size);
 static int ReceiveFromPeer(ENetHost* host, const u8* data, size_t size);
+static bool ResolveRelayAddress(std::string_view relay_address, ENetAddress* address, Error* error);
 
 static ENetHost* s_enet_host = nullptr;
 static ENetAddress s_relay_address = {};
@@ -64,6 +66,7 @@ static ENetAddress s_local_address = {};
 static std::optional<u16> s_virtual_port;
 static Common::Timer s_last_message_time;
 static std::unordered_map<u16, Peer> s_peers;
+static std::vector<u8> s_listing;
 
 } // namespace NetplayRelay
 
@@ -317,7 +320,7 @@ ENetAddress NetplayRelay::FindLocalAddress(ENetHost* host, const ENetAddress& re
   return local;
 }
 
-bool NetplayRelay::Attach(ENetHost* host, std::string_view relay_address, Error* error)
+bool NetplayRelay::ResolveRelayAddress(std::string_view relay_address, ENetAddress* address, Error* error)
 {
   std::string_view relay_host = relay_address;
   u16 relay_port = DEFAULT_PORT;
@@ -334,13 +337,22 @@ bool NetplayRelay::Attach(ENetHost* host, std::string_view relay_address, Error*
     relay_port = port.value();
   }
 
-  ENetAddress address = {};
-  address.port = relay_port;
-  if (enet_address_set_host(&address, std::string(relay_host).c_str()) != 0)
+  *address = {};
+  address->port = relay_port;
+  if (enet_address_set_host(address, std::string(relay_host).c_str()) != 0)
   {
     Error::SetStringView(error, "Could not resolve the relay server.");
     return false;
   }
+
+  return true;
+}
+
+bool NetplayRelay::Attach(ENetHost* host, std::string_view relay_address, Error* error)
+{
+  ENetAddress address;
+  if (!ResolveRelayAddress(relay_address, &address, error))
+    return false;
 
   s_enet_host = host;
   s_relay_address = address;
@@ -357,6 +369,12 @@ void NetplayRelay::Detach()
 {
   if (!s_enet_host)
     return;
+
+  if (!s_listing.empty())
+  {
+    SendControlMessage(MessageType::Unpublish);
+    s_listing.clear();
+  }
 
   s_enet_host->send = nullptr;
   s_enet_host->intercept = nullptr;
@@ -416,4 +434,105 @@ bool NetplayRelay::GetSessionAddress(u16 session_code, ENetAddress* address)
   *address = s_relay_address;
   address->port = session_code;
   return true;
+}
+
+void NetplayRelay::Publish(std::span<const u8> listing)
+{
+  if (!s_enet_host)
+    return;
+
+  s_listing.assign(listing.begin(), listing.begin() + std::min<size_t>(listing.size(), MAX_LISTING_SIZE));
+  std::array<u8, HEADER_SIZE + MAX_LISTING_SIZE> data;
+  WriteHeader(data.data(), MessageType::Publish);
+  std::memcpy(&data[HEADER_SIZE], s_listing.data(), s_listing.size());
+  SendToAddress(s_relay_address, data.data(), HEADER_SIZE + s_listing.size());
+  s_last_message_time.Reset();
+}
+
+std::optional<std::vector<NetplayRelay::ListedSession>> NetplayRelay::FetchSessionList(std::string_view relay_address,
+                                                                                       Error* error)
+{
+  static constexpr u32 RESPONSE_TIMEOUT_MS = 1000;
+  static constexpr u32 ATTEMPTS_PER_PAGE = 2;
+
+  if (enet_initialize() != 0)
+  {
+    Error::SetStringView(error, "Failed to initialize networking.");
+    return std::nullopt;
+  }
+  const ScopedGuard deinitialize = []() { enet_deinitialize(); };
+
+  ENetAddress address;
+  if (!ResolveRelayAddress(relay_address, &address, error))
+    return std::nullopt;
+
+  const ENetSocket socket = enet_socket_create(ENET_SOCKET_TYPE_DATAGRAM);
+  if (socket == ENET_SOCKET_NULL)
+  {
+    Error::SetStringView(error, "Failed to create a socket.");
+    return std::nullopt;
+  }
+  const ScopedGuard close_socket = [socket]() { enet_socket_destroy(socket); };
+
+  std::vector<ListedSession> sessions;
+  u32 total = 0;
+  do
+  {
+    std::array<u8, LIST_PACKET_SIZE> request = {};
+    WriteHeader(request.data(), MessageType::ListRequest);
+    WritePort(&request[5], static_cast<u16>(sessions.size()));
+
+    std::array<u8, LIST_PACKET_SIZE> response;
+    int received = 0;
+    for (u32 attempt = 0; attempt < ATTEMPTS_PER_PAGE && received <= 0; attempt++)
+    {
+      const ENetBuffer request_buffer = MakeBuffer(request.data(), request.size());
+      enet_socket_send(socket, &address, &request_buffer, 1);
+
+      enet_uint32 condition = ENET_SOCKET_WAIT_RECEIVE;
+      if (enet_socket_wait(socket, &condition, RESPONSE_TIMEOUT_MS) != 0 || !(condition & ENET_SOCKET_WAIT_RECEIVE))
+        continue;
+
+      ENetAddress from;
+      ENetBuffer response_buffer = MakeBuffer(response.data(), response.size());
+      received = enet_socket_receive(socket, &from, &response_buffer, 1);
+      if (received < static_cast<int>(LIST_RESPONSE_HEADER_SIZE) ||
+          std::memcmp(response.data(), MAGIC, sizeof(MAGIC)) != 0 ||
+          static_cast<MessageType>(response[4]) != MessageType::ListResponse ||
+          ReadPort(&response[7]) != sessions.size())
+      {
+        received = 0;
+      }
+    }
+
+    if (received <= 0)
+    {
+      if (sessions.empty())
+      {
+        Error::SetStringView(error, "The relay server did not answer.");
+        return std::nullopt;
+      }
+      break;
+    }
+
+    total = ReadPort(&response[5]);
+    const u32 count = response[9];
+    size_t pos = LIST_RESPONSE_HEADER_SIZE;
+    for (u32 i = 0; i < count && pos + 3 <= static_cast<size_t>(received); i++)
+    {
+      const u16 code = ReadPort(&response[pos]);
+      const size_t length = response[pos + 2];
+      pos += 3;
+      if (pos + length > static_cast<size_t>(received))
+        break;
+
+      sessions.push_back(ListedSession{code, std::vector<u8>(&response[pos], &response[pos] + length)});
+      pos += length;
+    }
+
+    if (count == 0)
+      break;
+  } while (sessions.size() < total);
+
+  return sessions;
 }

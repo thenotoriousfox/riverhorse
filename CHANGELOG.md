@@ -19,8 +19,19 @@ Changes since the DuckStation `v0.1-7371` base. Releases are tagged
   can't be reached, the host is told and players join with the host's
   address and port. `-netplayjoin` takes a session code as well as
   `host:port`.
+- Session browser: hosted sessions are listed on the relay with the game,
+  the host's nickname and the player count, and the join dialog (and Join
+  Netplay in Big Picture) shows the ones this version can join, so players
+  pick one instead of typing a code. "List in the session browser" in the
+  host dialog (List Hosted Sessions in Big Picture) turns it off.
+- Ask Before Players Join (host dialog and Big Picture): each join request
+  shows an Accept/Decline prompt to the host; off by default, so players join
+  straight away. A declined player is told so, and the joining side waits up
+  to 90 seconds for an answer.
 - Joining a session from a different Riverhorse version is refused with a
-  message instead of failing while loading the host's state.
+  message instead of failing while loading the host's state. A full session,
+  a wrong password and a declined request are named instead of shown as an
+  error code.
 - Slang shader presets (`.slangp`, the libretro format) as post-processing
   shaders: put a preset and its shaders anywhere under the `shaders` folder,
   for example a copy of the libretro slang-shaders collection, and pick it

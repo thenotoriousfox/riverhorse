@@ -10,6 +10,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#include <algorithm>
 #include <array>
 #include <chrono>
 #include <cstdio>
@@ -32,6 +33,7 @@ struct Client
   sockaddr_in local_address;
   u16 virtual_port;
   Clock::time_point last_seen;
+  std::vector<u8> listing;
 };
 
 static u64 EndpointKey(const sockaddr_in& address)
@@ -45,6 +47,44 @@ static void WriteHeader(u8* data, MessageType type, u16 port)
   data[4] = static_cast<u8>(type);
   data[5] = static_cast<u8>(port >> 8);
   data[6] = static_cast<u8>(port);
+}
+
+static void SendSessionList(int fd, const sockaddr_in& to, u16 start,
+                            const std::unordered_map<u64, Client>& clients)
+{
+  std::vector<const Client*> listed;
+  for (const auto& [key, client] : clients)
+  {
+    if (!client.listing.empty())
+      listed.push_back(&client);
+  }
+  std::sort(listed.begin(), listed.end(),
+            [](const Client* a, const Client* b) { return a->virtual_port < b->virtual_port; });
+  if (listed.size() > MAX_LISTED_SESSIONS)
+    listed.resize(MAX_LISTED_SESSIONS);
+
+  std::array<u8, LIST_PACKET_SIZE> data;
+  WriteHeader(data.data(), MessageType::ListResponse, static_cast<u16>(listed.size()));
+  data[7] = static_cast<u8>(start >> 8);
+  data[8] = static_cast<u8>(start);
+  size_t size = LIST_RESPONSE_HEADER_SIZE;
+  u8 count = 0;
+  for (size_t i = start; i < listed.size(); i++)
+  {
+    const Client& client = *listed[i];
+    if (size + 3 + client.listing.size() > data.size())
+      break;
+
+    data[size++] = static_cast<u8>(client.virtual_port >> 8);
+    data[size++] = static_cast<u8>(client.virtual_port);
+    data[size++] = static_cast<u8>(client.listing.size());
+    std::memcpy(&data[size], client.listing.data(), client.listing.size());
+    size += client.listing.size();
+    count++;
+  }
+  data[9] = count;
+
+  sendto(fd, data.data(), size, 0, reinterpret_cast<const sockaddr*>(&to), sizeof(to));
 }
 
 int main(int argc, char* argv[])
@@ -149,8 +189,15 @@ int main(int argc, char* argv[])
         continue;
 
       const MessageType type = static_cast<MessageType>(packet[4]);
+      if (type == MessageType::ListRequest)
+      {
+        if (size >= LIST_PACKET_SIZE)
+          SendSessionList(fd, received[i].address, static_cast<u16>((packet[5] << 8) | packet[6]), clients);
+        continue;
+      }
+
       if (type != MessageType::Register && type != MessageType::Send && type != MessageType::KeepAlive &&
-          type != MessageType::Locate)
+          type != MessageType::Locate && type != MessageType::Publish && type != MessageType::Unpublish)
         continue;
 
       const sockaddr_in& from = received[i].address;
@@ -186,6 +233,14 @@ int main(int argc, char* argv[])
 
         WriteHeader(packet, MessageType::Registered, client.virtual_port);
         queue_send(packet, ADDRESSED_HEADER_SIZE, client.address);
+      }
+      else if (type == MessageType::Publish)
+      {
+        client.listing.assign(packet + HEADER_SIZE, packet + std::min<size_t>(size, HEADER_SIZE + MAX_LISTING_SIZE));
+      }
+      else if (type == MessageType::Unpublish)
+      {
+        client.listing.clear();
       }
       else if (type == MessageType::Locate && size >= ADDRESSED_HEADER_SIZE)
       {

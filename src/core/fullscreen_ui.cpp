@@ -273,6 +273,8 @@ static void DoStartFile();
 static void DoStartBIOS();
 static void DoHostNetplaySession();
 static void DoJoinNetplaySession();
+static void DoJoinNetplayByAddress();
+static void JoinNetplayAddress(std::string address);
 static void DoStartDisc(std::string path);
 static void DoStartDisc();
 static void DoToggleFastForward();
@@ -3334,32 +3336,75 @@ void FullscreenUI::DoHostNetplaySession()
 
 void FullscreenUI::DoJoinNetplaySession()
 {
+  ShowToast(std::string(), FSUI_STR("Looking for open sessions..."));
+  std::thread([]() {
+    Error error;
+    std::optional<std::vector<Netplay::SessionListing>> sessions = Netplay::GetSessionList(&error);
+    Host::RunOnCPUThread([sessions = std::move(sessions), error = std::move(error)]() {
+      if (!sessions.has_value())
+      {
+        ShowToast(std::string(), fmt::format(FSUI_FSTR("Could not get the session list: {}"), error.GetDescription()));
+        DoJoinNetplayByAddress();
+        return;
+      }
+
+      ImGuiFullscreen::ChoiceDialogOptions options;
+      options.emplace_back(FSUI_STR("Enter a Session Code or Address"), false);
+      std::vector<u16> codes;
+      for (const Netplay::SessionListing& session : sessions.value())
+      {
+        options.emplace_back(fmt::format("{} - {} ({}/{}){}", session.game_title, session.host_nickname,
+                                         session.players, session.max_players,
+                                         session.has_password ? FSUI_STR(", password") : std::string()),
+                             false);
+        codes.push_back(session.session_code);
+      }
+
+      OpenChoiceDialog(FSUI_ICONSTR(ICON_FA_GLOBE, "Join Netplay"), false, std::move(options),
+                       [codes = std::move(codes)](s32 index, const std::string& title, bool checked) {
+                         CloseChoiceDialog();
+                         if (index == 0)
+                           DoJoinNetplayByAddress();
+                         else if (index > 0)
+                           JoinNetplayAddress(std::to_string(codes[static_cast<size_t>(index - 1)]));
+                       });
+    });
+  }).detach();
+}
+
+void FullscreenUI::DoJoinNetplayByAddress()
+{
   OpenInputStringDialog(
     FSUI_ICONSTR(ICON_FA_GLOBE, "Join Netplay"), FSUI_STR("Enter the session code, or the host's address (name or IP, optionally :port)."),
     std::string(), FSUI_STR("Join"), [](std::string address) {
-      address = StringUtil::StripWhitespace(address);
-      if (address.empty())
-        return;
-
-      s32 port = Host::GetBaseIntSettingValue("Netplay", "Port", Netplay::DEFAULT_PORT);
-      const std::string::size_type colon = address.rfind(':');
-      if (colon != std::string::npos)
-      {
-        port = StringUtil::FromChars<s32>(std::string_view(address).substr(colon + 1)).value_or(port);
-        address.erase(colon);
-      }
-
-      Host::SetBaseStringSettingValue("Netplay", "LastHost", address.c_str());
-      Host::CommitBaseSettingChanges();
-
-      const std::string nickname = Host::GetBaseStringSettingValue("Netplay", "Nickname", Netplay::DEFAULT_NICKNAME);
-      const s32 input_delay = Host::GetBaseIntSettingValue("Netplay", "InputDelay", 0);
-      Host::RunOnCPUThread([nickname, address, port, input_delay]() {
-        if (!Netplay::JoinSession(nickname, address, port, std::string(), false, input_delay))
-          ShowToast(std::string(), FSUI_STR("Failed to join netplay session. The log may contain more information."));
-      });
+      JoinNetplayAddress(std::move(address));
     },
     Host::GetBaseStringSettingValue("Netplay", "LastHost", ""));
+}
+
+void FullscreenUI::JoinNetplayAddress(std::string address)
+{
+  address = StringUtil::StripWhitespace(address);
+  if (address.empty())
+    return;
+
+  s32 port = Host::GetBaseIntSettingValue("Netplay", "Port", Netplay::DEFAULT_PORT);
+  const std::string::size_type colon = address.rfind(':');
+  if (colon != std::string::npos)
+  {
+    port = StringUtil::FromChars<s32>(std::string_view(address).substr(colon + 1)).value_or(port);
+    address.erase(colon);
+  }
+
+  Host::SetBaseStringSettingValue("Netplay", "LastHost", address.c_str());
+  Host::CommitBaseSettingChanges();
+
+  const std::string nickname = Host::GetBaseStringSettingValue("Netplay", "Nickname", Netplay::DEFAULT_NICKNAME);
+  const s32 input_delay = Host::GetBaseIntSettingValue("Netplay", "InputDelay", 0);
+  Host::RunOnCPUThread([nickname, address, port, input_delay]() {
+    if (!Netplay::JoinSession(nickname, address, port, std::string(), false, input_delay))
+      ShowToast(std::string(), FSUI_STR("Failed to join netplay session. The log may contain more information."));
+  });
 }
 
 void FullscreenUI::SetQuickGraphicsSetting(const char* key, s32 value)
@@ -3612,6 +3657,14 @@ void FullscreenUI::DrawEssentialsSettingsPage()
                               "connections. Off: players join with the host's address and port."),
                     "Netplay", "UseRelay", true);
   const bool use_relay = bsi->GetBoolValue("Netplay", "UseRelay", true);
+  DrawToggleSetting(bsi, FSUI_ICONSTR(ICON_FA_LIST, "List Hosted Sessions"),
+                    FSUI_CSTR("Shows sessions you host, your nickname and the game to everyone browsing open "
+                              "sessions, so they can join without a code."),
+                    "Netplay", "ListSessions", true, use_relay);
+  DrawToggleSetting(bsi, FSUI_ICONSTR(ICON_FA_USER, "Ask Before Players Join"),
+                    FSUI_CSTR("Shows each join request in a session you host so you can accept or decline it. Off: "
+                              "players join straight away."),
+                    "Netplay", "ConfirmJoins", false);
   const std::string relay = bsi->GetStringValue("Netplay", "RelayServer", "");
   if (MenuButtonWithValue(FSUI_ICONSTR(ICON_FA_SERVER, "Custom Relay Server"),
                           FSUI_CSTR("Address of your own relay server. Everyone in the session must use the same "

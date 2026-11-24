@@ -7,6 +7,7 @@
 #include "bios.h"
 #include "cpu_core.h"
 #include "digital_controller.h"
+#include "fullscreen_ui.h"
 #include "game_list.h"
 #include "gpu.h"
 #include "host.h"
@@ -22,6 +23,7 @@
 #include "util/cd_image.h"
 #include "util/gpu_device.h"
 #include "util/gpu_texture.h"
+#include "util/imgui_fullscreen.h"
 #include "util/imgui_manager.h"
 #include "util/input_manager.h"
 
@@ -100,6 +102,7 @@ static constexpr std::pair<const char*, const char*> s_synced_settings[] = {
 
 // TODO: Might be a bit generous... should we move this to config?
 static constexpr float MAX_CONNECT_TIME = 30.0f;
+static constexpr float MAX_JOIN_APPROVAL_TIME = 90.0f;
 static constexpr float MAX_CLOSE_TIME = 3.0f;
 static constexpr u32 MAX_CONNECT_RETRIES = 4;
 
@@ -130,6 +133,7 @@ static std::string GetRelayServer();
 static void AttachRelay(bool is_hosting);
 static bool WaitForRelayRegistration();
 static std::optional<u16> ParseSessionCode(std::string_view text);
+static void PublishSessionListing();
 static std::string PeerAddressString(const ENetPeer* peer);
 static void HandleEnetEvent(const ENetEvent* event);
 static void PollEnet(Common::Timer::Value until_time);
@@ -154,6 +158,10 @@ static void DropSpectator(s32 slot_id, DropPlayerReason reason);
 
 // Controlpackets
 static void HandleMessageFromNewPeer(ENetPeer* peer, const ENetPacket* pkt);
+static void SendJoinResponse(ENetPeer* peer, JoinResponseMessage::Result result, s32 player_id);
+static void AdmitPeer(ENetPeer* peer, JoinRequestMessage::Mode mode, s32 requested_player_id, std::string nickname);
+static void ShowNextJoinRequest();
+static void ExpirePendingJoins();
 static void HandleControlMessage(s32 player_id, const ENetPacket* pkt);
 static void HandleConnectResponseMessage(s32 player_id, const ENetPacket* pkt);
 static void HandleJoinResponseMessage(s32 player_id, const ENetPacket* pkt);
@@ -250,6 +258,19 @@ static bool s_local_spectating = false;
 /// GGPO
 static std::string s_local_nickname;
 static std::string s_local_session_password;
+
+struct PendingJoin
+{
+  u32 id;
+  ENetPeer* peer;
+  JoinRequestMessage::Mode mode;
+  s32 requested_player_id;
+  std::string nickname;
+  Common::Timer waiting;
+};
+static std::vector<PendingJoin> s_pending_joins;
+static u32 s_next_pending_join_id = 0;
+static bool s_join_prompt_open = false;
 static GGPOPlayerHandle s_local_handle = GGPO_INVALID_HANDLE;
 static s32 s_local_delay = 0;
 static GGPOSession* s_ggpo = nullptr;
@@ -460,6 +481,7 @@ bool Netplay::Start(bool is_hosting, std::string nickname, const std::string& re
     CreateGGPOSession();
     SetSessionState(SessionState::Running);
     SetSettings(GetHostSettingsText());
+    PublishSessionListing();
 
     INFO_LOG("Netplay session started as host on port {}.", port);
 
@@ -520,6 +542,12 @@ void Netplay::CloseSession()
 
   const bool was_host = IsHost();
   s_resync_pending = false;
+  s_pending_joins.clear();
+  if (s_join_prompt_open)
+  {
+    s_join_prompt_open = false;
+    ImGuiFullscreen::CloseMessageDialog();
+  }
 
   DestroyGGPOSession();
   ShutdownEnetHost();
@@ -701,9 +729,13 @@ void Netplay::AttachRelay(bool is_hosting)
 
   Error error;
   if (!NetplayRelay::Attach(s_enet_host, relay, &error))
+  {
     ERROR_LOG("Failed to use relay server: {}", error.GetDescription());
+  }
   else if (!is_hosting || WaitForRelayRegistration())
+  {
     return;
+  }
 
   NetplayRelay::Detach();
   if (is_hosting)
@@ -711,6 +743,94 @@ void Netplay::AttachRelay(bool is_hosting)
     OnNetplayMessage(TRANSLATE_STR("Netplay", "The relay server is unavailable. Players join with your address "
                                               "and port."));
   }
+}
+
+void Netplay::PublishSessionListing()
+{
+  static constexpr size_t MAX_NICKNAME = 32;
+  static constexpr size_t MAX_TITLE = 96;
+  static constexpr size_t MAX_SERIAL = 16;
+
+  if (!Host::GetBaseBoolSettingValue("Netplay", "ListSessions", true))
+    return;
+
+  std::vector<u8> listing;
+  const auto put_u32 = [&listing](u32 value) {
+    for (u32 i = 0; i < 4; i++)
+      listing.push_back(static_cast<u8>(value >> (i * 8)));
+  };
+  const auto put_string = [&listing](std::string_view value, size_t max_length) {
+    value = value.substr(0, max_length);
+    listing.push_back(static_cast<u8>(value.size()));
+    listing.insert(listing.end(), value.begin(), value.end());
+  };
+
+  put_u32(PROTOCOL_VERSION);
+  put_u32(SAVE_STATE_VERSION);
+  listing.push_back(static_cast<u8>(s_num_players));
+  listing.push_back(static_cast<u8>(s_max_players));
+  listing.push_back(static_cast<u8>(!s_local_session_password.empty()));
+  put_string(s_local_nickname, MAX_NICKNAME);
+  put_string(System::GetGameTitle(), MAX_TITLE);
+  put_string(System::GetGameSerial(), MAX_SERIAL);
+  NetplayRelay::Publish(listing);
+}
+
+std::optional<std::vector<Netplay::SessionListing>> Netplay::GetSessionList(Error* error)
+{
+  const std::string relay = GetRelayServer();
+  if (relay.empty())
+  {
+    Error::SetStringView(error, TRANSLATE_SV("Netplay", "The relay server is turned off."));
+    return std::nullopt;
+  }
+
+  std::optional<std::vector<NetplayRelay::ListedSession>> listed = NetplayRelay::FetchSessionList(relay, error);
+  if (!listed.has_value())
+    return std::nullopt;
+
+  std::vector<SessionListing> sessions;
+  for (const NetplayRelay::ListedSession& entry : listed.value())
+  {
+    const std::vector<u8>& data = entry.listing;
+    size_t pos = 0;
+    const auto get_u32 = [&data, &pos]() -> std::optional<u32> {
+      if (pos + 4 > data.size())
+        return std::nullopt;
+      u32 value = 0;
+      for (u32 i = 0; i < 4; i++)
+        value |= static_cast<u32>(data[pos++]) << (i * 8);
+      return value;
+    };
+    const auto get_u8 = [&data, &pos]() -> std::optional<u8> {
+      return (pos < data.size()) ? std::optional<u8>(data[pos++]) : std::nullopt;
+    };
+    const auto get_string = [&data, &pos, &get_u8]() -> std::optional<std::string> {
+      const std::optional<u8> length = get_u8();
+      if (!length.has_value() || pos + length.value() > data.size())
+        return std::nullopt;
+      std::string value(reinterpret_cast<const char*>(&data[pos]), length.value());
+      pos += length.value();
+      return value;
+    };
+
+    if (get_u32() != PROTOCOL_VERSION || get_u32() != SAVE_STATE_VERSION)
+      continue;
+
+    const std::optional<u8> players = get_u8(), max_players = get_u8(), flags = get_u8();
+    std::optional<std::string> nickname = get_string(), title = get_string(), serial = get_string();
+    if (!players.has_value() || !max_players.has_value() || !flags.has_value() || !nickname.has_value() ||
+        !title.has_value() || !serial.has_value())
+    {
+      continue;
+    }
+
+    sessions.push_back(SessionListing{entry.session_code, players.value(), max_players.value(),
+                                      (flags.value() & 1) != 0, std::move(nickname.value()),
+                                      std::move(title.value()), std::move(serial.value())});
+  }
+
+  return sessions;
 }
 
 std::optional<u16> Netplay::ParseSessionCode(std::string_view text)
@@ -798,6 +918,8 @@ void Netplay::HandleEnetEvent(const ENetEvent* event)
 
     case ENET_EVENT_TYPE_DISCONNECT:
     {
+      std::erase_if(s_pending_joins, [peer = event->peer](const PendingJoin& pending) { return pending.peer == peer; });
+
       const s32 spectator_slot = GetSpectatorSlotForPeer(event->peer);
       const s32 player_id = GetPlayerIdForPeer(event->peer);
 
@@ -879,6 +1001,9 @@ void Netplay::HandleEnetEvent(const ENetEvent* event)
 void Netplay::PollEnet(Common::Timer::Value until_time)
 {
   ENetEvent event;
+
+  if (IsHost() && !s_pending_joins.empty())
+    ExpirePendingJoins();
 
   u64 current_time = Common::Timer::GetCurrentValue();
 
@@ -1311,7 +1436,9 @@ void Netplay::DropSpectator(s32 slot_id, DropPlayerReason reason)
 
 void Netplay::UpdateConnectingState()
 {
-  if (s_reset_start_time.GetTimeSeconds() >= MAX_CONNECT_TIME)
+  const bool connected = s_peers[s_host_player_id].peer &&
+                         s_peers[s_host_player_id].peer->state == ENetPeerState::ENET_PEER_STATE_CONNECTED;
+  if (s_reset_start_time.GetTimeSeconds() >= (connected ? MAX_JOIN_APPROVAL_TIME : MAX_CONNECT_TIME))
   {
     CloseSessionWithError(TRANSLATE_SV("Netplay", "Timed out connecting to server."));
     return;
@@ -1333,7 +1460,8 @@ void Netplay::UpdateConnectingState()
 
   // still waiting for connection to host..
   PollEnet(Common::Timer::GetCurrentValue() + Common::Timer::ConvertMillisecondsToValue(16));
-  Host::DisplayLoadingScreen("Connecting to host...");
+  Host::DisplayLoadingScreen(connected ? TRANSLATE_STR("Netplay", "Waiting for the host to accept...").c_str() :
+                                         "Connecting to host...");
   Host::PumpMessagesOnCPUThread();
 }
 
@@ -1351,18 +1479,89 @@ void Netplay::HandleMessageFromNewPeer(ENetPeer* peer, const ENetPacket* pkt)
                                msg->requested_player_id)
                      .c_str());
 
-  PacketWrapper<JoinResponseMessage> response = NewControlPacket<JoinResponseMessage>();
-  response->player_id = -1;
-
   // Gatekeep using the session password.
   if (msg->GetSessionPassword() != s_local_session_password)
   {
-    response->result = JoinResponseMessage::Result::InvalidPassword;
-    SendControlPacket(peer, response);
+    SendJoinResponse(peer, JoinResponseMessage::Result::InvalidPassword, -1);
     return;
   }
 
-  if (msg->mode == JoinRequestMessage::Mode::Spectator)
+  if (std::any_of(s_pending_joins.begin(), s_pending_joins.end(),
+                  [peer](const PendingJoin& pending) { return pending.peer == peer; }))
+  {
+    return;
+  }
+
+  if (!Host::GetBaseBoolSettingValue("Netplay", "ConfirmJoins", false))
+  {
+    AdmitPeer(peer, msg->mode, msg->requested_player_id, std::string(msg->GetNickname()));
+    return;
+  }
+
+  s_pending_joins.push_back(PendingJoin{s_next_pending_join_id++, peer, msg->mode, msg->requested_player_id,
+                                        std::string(msg->GetNickname()), Common::Timer()});
+  OnNetplayMessage(fmt::format(TRANSLATE_FS("Netplay", "{} wants to join the session."), msg->GetNickname()));
+  ShowNextJoinRequest();
+}
+
+void Netplay::SendJoinResponse(ENetPeer* peer, JoinResponseMessage::Result result, s32 player_id)
+{
+  PacketWrapper<JoinResponseMessage> response = NewControlPacket<JoinResponseMessage>();
+  response->result = result;
+  response->player_id = player_id;
+  SendControlPacket(peer, response);
+}
+
+void Netplay::ShowNextJoinRequest()
+{
+  if (s_join_prompt_open || s_pending_joins.empty() || !FullscreenUI::Initialize())
+    return;
+
+  const PendingJoin& pending = s_pending_joins.front();
+  s_join_prompt_open = true;
+  ImGuiFullscreen::OpenConfirmMessageDialog(
+    TRANSLATE_STR("Netplay", "Join Request"),
+    fmt::format((pending.mode == JoinRequestMessage::Mode::Spectator) ?
+                  TRANSLATE_FS("Netplay", "{} wants to watch the session.") :
+                  TRANSLATE_FS("Netplay", "{} wants to join the session."),
+                pending.nickname),
+    [id = pending.id](bool accept) {
+      s_join_prompt_open = false;
+      const auto it = std::find_if(s_pending_joins.begin(), s_pending_joins.end(),
+                                   [id](const PendingJoin& pending) { return pending.id == id; });
+      if (it != s_pending_joins.end())
+      {
+        const PendingJoin pending = std::move(*it);
+        s_pending_joins.erase(it);
+        if (accept)
+          AdmitPeer(pending.peer, pending.mode, pending.requested_player_id, pending.nickname);
+        else
+          SendJoinResponse(pending.peer, JoinResponseMessage::Result::Declined, -1);
+      }
+
+      ShowNextJoinRequest();
+    },
+    TRANSLATE_STR("Netplay", "Accept"), TRANSLATE_STR("Netplay", "Decline"));
+}
+
+void Netplay::ExpirePendingJoins()
+{
+  for (auto it = s_pending_joins.begin(); it != s_pending_joins.end();)
+  {
+    if (it->waiting.GetTimeSeconds() < MAX_JOIN_APPROVAL_TIME)
+    {
+      ++it;
+      continue;
+    }
+
+    SendJoinResponse(it->peer, JoinResponseMessage::Result::Declined, -1);
+    it = s_pending_joins.erase(it);
+  }
+}
+
+void Netplay::AdmitPeer(ENetPeer* peer, JoinRequestMessage::Mode mode, s32 requested_player_id, std::string nickname)
+{
+  if (mode == JoinRequestMessage::Mode::Spectator)
   {
     // something is really wrong if this isn't the host.
     Assert(IsHost());
@@ -1371,59 +1570,52 @@ void Netplay::HandleMessageFromNewPeer(ENetPeer* peer, const ENetPacket* pkt)
     // no free slots? notify the peer.
     if (spectator_slot < 0)
     {
-      response->result = JoinResponseMessage::Result::ServerFull;
-      SendControlPacket(peer, response);
+      SendJoinResponse(peer, JoinResponseMessage::Result::ServerFull, -1);
       return;
     }
 
     Assert(s_num_spectators < MAX_SPECTATORS);
-    response->result = JoinResponseMessage::Result::Success;
-    response->player_id = MAX_PLAYERS + 1 + spectator_slot;
-    SendControlPacket(peer, response);
+    SendJoinResponse(peer, JoinResponseMessage::Result::Success, MAX_PLAYERS + 1 + spectator_slot);
     // continue and add peer to the list.
     s_spectators[spectator_slot].peer = peer;
-    s_spectators[spectator_slot].nickname = msg->GetNickname();
+    s_spectators[spectator_slot].nickname = nickname;
     s_num_spectators++;
     // Force everyone to resync for now. sadly since ggpo currently only supports adding spectators during setup..
     Reset();
     // notify host that the spectator joined
-    OnNetplayMessage(
-      fmt::format(TRANSLATE_FS("Netplay", "{} is joining the session as a Spectator."), msg->GetNickname()));
+    OnNetplayMessage(fmt::format(TRANSLATE_FS("Netplay", "{} is joining the session as a Spectator."), nickname));
     return;
   }
 
   // Player is attempting to reconnect.
   // Hopefully both sides have disconnected completely before they reconnect.
   // If not, too bad.
-  if (msg->requested_player_id >= 0 && IsValidPlayerId(msg->requested_player_id))
+  if (requested_player_id >= 0 && IsValidPlayerId(requested_player_id))
   {
-    ERROR_LOG("Player ID {} is already in use, rejecting connection.", msg->requested_player_id);
-    response->result = JoinResponseMessage::Result::PlayerIDInUse;
-    SendControlPacket(peer, response);
+    ERROR_LOG("Player ID {} is already in use, rejecting connection.", requested_player_id);
+    SendJoinResponse(peer, JoinResponseMessage::Result::PlayerIDInUse, -1);
     return;
   }
 
   // Any free slots?
-  const s32 new_player_id = (msg->requested_player_id >= 0) ? msg->requested_player_id : GetFreePlayerId();
+  const s32 new_player_id = (requested_player_id >= 0) ? requested_player_id : GetFreePlayerId();
   if (new_player_id < 0)
   {
     ERROR_LOG("Server full, rejecting connection.");
-    response->result = JoinResponseMessage::Result::ServerFull;
-    SendControlPacket(peer, response);
+    SendJoinResponse(peer, JoinResponseMessage::Result::ServerFull, -1);
     return;
   }
 
   VERBOSE_LOG(
     fmt::format("New connection from {} assigned to player ID {}", PeerAddressString(peer), new_player_id).c_str());
-  response->result = JoinResponseMessage::Result::Success;
-  response->player_id = new_player_id;
-  SendControlPacket(peer, response);
+  SendJoinResponse(peer, JoinResponseMessage::Result::Success, new_player_id);
 
   // Set up their player slot.
   Assert(s_num_players < MAX_PLAYERS);
   s_peers[new_player_id].peer = peer;
-  s_peers[new_player_id].nickname = msg->GetNickname();
+  s_peers[new_player_id].nickname = std::move(nickname);
   s_num_players++;
+  PublishSessionListing();
 
   // Force everyone to resynchronize with the new player.
   Reset();
@@ -1489,8 +1681,22 @@ void Netplay::HandleJoinResponseMessage(s32 player_id, const ENetPacket* pkt)
   const JoinResponseMessage* msg = CheckReceivedPacket<JoinResponseMessage>(player_id, pkt);
   if (msg->result != JoinResponseMessage::Result::Success)
   {
-    CloseSessionWithError(
-      fmt::format("Connection rejected by server with error code {}", static_cast<u32>(msg->result)));
+    switch (msg->result)
+    {
+      case JoinResponseMessage::Result::ServerFull:
+        CloseSessionWithError(TRANSLATE_SV("Netplay", "The session is full."));
+        break;
+      case JoinResponseMessage::Result::InvalidPassword:
+        CloseSessionWithError(TRANSLATE_SV("Netplay", "The session password is wrong."));
+        break;
+      case JoinResponseMessage::Result::Declined:
+        CloseSessionWithError(TRANSLATE_SV("Netplay", "The host declined your request to join."));
+        break;
+      default:
+        CloseSessionWithError(
+          fmt::format("Connection rejected by server with error code {}", static_cast<u32>(msg->result)));
+        break;
+    }
     return;
   }
 
@@ -1932,6 +2138,8 @@ void Netplay::DropPlayer(s32 player_id, DropPlayerReason reason)
   enet_peer_disconnect_now(s_peers[player_id].peer, 0);
   s_peers[player_id] = {};
   s_num_players--;
+  if (IsHost())
+    PublishSessionListing();
 
   if (!IsHost())
   {
