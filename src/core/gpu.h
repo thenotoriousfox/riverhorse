@@ -671,6 +671,9 @@ public:
   static void CalculateDrawRect(const DisplayState& state, s32 window_width, s32 window_height, bool apply_rotation,
                                 bool apply_aspect_ratio, GSVector4i* display_rect, GSVector4i* draw_rect);
 
+  /// Draw rectangle in the host window, inside the border overlay's game area when one is set.
+  static void CalculateWindowDrawRect(const DisplayState& state, GSVector4i* display_rect, GSVector4i* draw_rect);
+
 protected:
   DisplayState m_presented_display_state = {};
 

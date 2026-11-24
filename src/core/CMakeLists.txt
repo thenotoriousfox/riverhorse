@@ -8,6 +8,8 @@ add_library(core
   analog_joystick.h
   bios.cpp
   bios.h
+  border_overlay.cpp
+  border_overlay.h
   bus.cpp
   bus.h
   cdrom.cpp

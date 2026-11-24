@@ -6,6 +6,11 @@ Changes since the DuckStation `v0.1-7371` base. Releases are tagged
 ## Unreleased
 
 ### New
+- Border overlays (Settings > Graphics > Display > Border Overlay, also in
+  Big Picture): a PNG image, such as a console or TV bezel, drawn around the
+  game. The game is shown in the transparent middle of the image, found
+  automatically, and mouse aiming follows it. Screenshots and video capture
+  show the game without the overlay.
 - Change Discs Automatically (Settings > Console > CD-ROM, also in Big
   Picture; off by default): when a multi-disc game stops the disc and keeps
   polling the drive, as it does while asking for the next disc, the next

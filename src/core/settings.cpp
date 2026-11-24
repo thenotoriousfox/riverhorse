@@ -270,6 +270,7 @@ void Settings::Load(SettingsInterface& si)
     ParseDisplayAlignment(
       si.GetStringValue("Display", "Alignment", GetDisplayAlignmentName(DEFAULT_DISPLAY_ALIGNMENT)).c_str())
       .value_or(DEFAULT_DISPLAY_ALIGNMENT);
+  display_border_overlay_path = si.GetStringValue("Display", "BorderOverlay", "");
   display_rotation =
     ParseDisplayRotation(
       si.GetStringValue("Display", "Rotation", GetDisplayRotationName(DEFAULT_DISPLAY_ROTATION)).c_str())
@@ -584,6 +585,7 @@ void Settings::Save(SettingsInterface& si, bool ignore_base) const
   si.SetStringValue("Display", "AspectRatio", GetDisplayAspectRatioName(display_aspect_ratio));
   si.SetStringValue("Display", "Alignment", GetDisplayAlignmentName(display_alignment));
   si.SetStringValue("Display", "Rotation", GetDisplayRotationName(display_rotation));
+  si.SetStringValue("Display", "BorderOverlay", display_border_overlay_path.c_str());
   si.SetStringValue("Display", "Scaling", GetDisplayScalingName(display_scaling));
   si.SetBoolValue("Display", "OptimalFramePacing", display_optimal_frame_pacing);
   si.SetBoolValue("Display", "PreFrameSleep", display_pre_frame_sleep);

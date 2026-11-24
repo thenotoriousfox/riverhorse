@@ -29,6 +29,7 @@ private Q_SLOTS:
   void updatePGXPSettingsEnabled();
 
   void onAspectRatioChanged();
+  void onBorderOverlayBrowseClicked();
   void updateResolutionDependentOptions();
   void onTrueColorChanged();
   void onDownsampleModeChanged();

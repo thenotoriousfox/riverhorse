@@ -4994,6 +4994,38 @@ void FullscreenUI::DrawDisplaySettingsPage()
                   "Display", "Rotation", Settings::DEFAULT_DISPLAY_ROTATION, &Settings::ParseDisplayRotation,
                   &Settings::GetDisplayRotationName, &Settings::GetDisplayRotationDisplayName, DisplayRotation::Count);
 
+  const std::optional<SmallString> overlay_path(bsi->GetOptionalSmallStringValue(
+    "Display", "BorderOverlay", game_settings ? std::nullopt : std::optional<const char*>("")));
+  const SmallString overlay_name(overlay_path.has_value() ?
+                                   (overlay_path->empty() ? std::string_view(FSUI_CSTR("None")) :
+                                                            Path::GetFileName(overlay_path->view())) :
+                                   std::string_view(FSUI_CSTR("Use Global Setting")));
+  if (MenuButtonWithValue(FSUI_ICONSTR(ICON_FA_TV, "Border Overlay"),
+                          FSUI_CSTR("A PNG image drawn around the game, such as a console or TV bezel. The game is "
+                                    "shown in the transparent middle of the image."),
+                          overlay_name.c_str()))
+  {
+    OpenFileSelector(FSUI_ICONSTR(ICON_FA_TV, "Border Overlay"), false,
+                     [game_settings](const std::string& path) {
+                       if (path.empty())
+                         return;
+
+                       auto lock = Host::GetSettingsLock();
+                       SettingsInterface* bsi = GetEditingSettingsInterface(game_settings);
+                       bsi->SetStringValue("Display", "BorderOverlay", path.c_str());
+                       SetSettingsChanged(bsi);
+                       CloseFileSelector();
+                     },
+                     {"*.png"});
+  }
+  if (overlay_path.has_value() && !overlay_path->empty() &&
+      MenuButton(FSUI_ICONSTR(ICON_FA_TRASH, "Remove Border Overlay"),
+                 FSUI_CSTR("Shows the game without a border overlay.")))
+  {
+    bsi->SetStringValue("Display", "BorderOverlay", "");
+    SetSettingsChanged(bsi);
+  }
+
   if (is_hardware)
   {
     DrawEnumSetting(bsi, FSUI_CSTR("Line Detection"),

@@ -12,6 +12,9 @@
 
 #include "util/media_capture.h"
 
+#include <QtCore/QDir>
+#include <QtWidgets/QFileDialog>
+
 #include <algorithm>
 
 static QVariant GetMSAAModeValue(uint multisamples, bool ssaa)
@@ -121,6 +124,8 @@ GraphicsSettingsWidget::GraphicsSettingsWidget(SettingsWindow* dialog, QWidget* 
   SettingWidgetBinder::BindWidgetToEnumSetting(sif, m_ui.displayRotation, "Display", "Rotation",
                                                &Settings::ParseDisplayRotation, &Settings::GetDisplayRotationName,
                                                Settings::DEFAULT_DISPLAY_ROTATION);
+  SettingWidgetBinder::BindWidgetToStringSetting(sif, m_ui.borderOverlayPath, "Display", "BorderOverlay");
+  connect(m_ui.borderOverlayBrowse, &QPushButton::clicked, this, &GraphicsSettingsWidget::onBorderOverlayBrowseClicked);
   SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.gpuThread, "GPU", "UseThread", true);
   SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.hardwareThread, "GPU", "UseHardwareThread", false);
   SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.softwareFastRasterizer, "GPU", "SoftwareFastRasterizer",
@@ -387,6 +392,10 @@ GraphicsSettingsWidget::GraphicsSettingsWidget(SettingsWindow* dialog, QWidget* 
     m_ui.displayAlignment, tr("Position"),
     QString::fromUtf8(Settings::GetDisplayAlignmentDisplayName(Settings::DEFAULT_DISPLAY_ALIGNMENT)),
     tr("Determines the position on the screen when black borders must be added."));
+  dialog->registerWidgetHelp(
+    m_ui.borderOverlayPath, tr("Border Overlay"), tr("None"),
+    tr("A PNG image drawn around the game, such as a console or TV bezel. The game is shown in the transparent "
+       "middle of the image."));
   dialog->registerWidgetHelp(
     m_ui.softwareFastRasterizer, tr("Fast Software Rasterizer"), tr("Unchecked"),
     tr("Draws with the psx_gpu rasterizer from pcsx_rearmed, which uses NEON on ARM. Much faster on handhelds and "
@@ -963,6 +972,17 @@ void GraphicsSettingsWidget::updatePGXPSettingsEnabled()
   m_ui.pgxpGeometryToleranceLabel->setEnabled(enabled);
   m_ui.pgxpDepthClearThreshold->setEnabled(depth_enabled);
   m_ui.pgxpDepthClearThresholdLabel->setEnabled(depth_enabled);
+}
+
+void GraphicsSettingsWidget::onBorderOverlayBrowseClicked()
+{
+  const QString path = QDir::toNativeSeparators(QFileDialog::getOpenFileName(
+    QtUtils::GetRootWidget(this), tr("Select Border Overlay"), m_ui.borderOverlayPath->text(),
+    tr("PNG Images (*.png)")));
+  if (path.isEmpty())
+    return;
+
+  m_ui.borderOverlayPath->setText(path);
 }
 
 void GraphicsSettingsWidget::onAspectRatioChanged()

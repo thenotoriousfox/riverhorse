@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 #include "gpu.h"
+#include "border_overlay.h"
 #include "gpu_backend.h"
 #include "dma.h"
 #include "gpu_shadergen.h"
@@ -1290,7 +1291,7 @@ void GPU::ConvertScreenCoordinatesToDisplayCoordinates(float window_x, float win
                                                        float* display_y) const
 {
   GSVector4i display_rc, draw_rc;
-  CalculateDrawRect(g_gpu_device->GetWindowWidth(), g_gpu_device->GetWindowHeight(), true, true, &display_rc, &draw_rc);
+  CalculateWindowDrawRect(GetDisplayState(), &display_rc, &draw_rc);
 
   // convert coordinates to active display region, then to full display region
   const float scaled_display_x =
@@ -1999,8 +2000,15 @@ bool GPU::PresentDisplay()
 
     GSVector4i display_rect;
     GSVector4i draw_rect;
-    CalculateDrawRect(m_presented_display_state, g_gpu_device->GetWindowWidth(), g_gpu_device->GetWindowHeight(),
-                      !g_settings.debugging.show_vram, true, &display_rect, &draw_rect);
+    if (g_settings.debugging.show_vram)
+    {
+      CalculateDrawRect(m_presented_display_state, g_gpu_device->GetWindowWidth(), g_gpu_device->GetWindowHeight(),
+                        false, true, &display_rect, &draw_rect);
+    }
+    else
+    {
+      CalculateWindowDrawRect(m_presented_display_state, &display_rect, &draw_rect);
+    }
     return RenderDisplay(nullptr, display_rect, draw_rect, !g_settings.debugging.show_vram);
   });
 }
@@ -2432,6 +2440,17 @@ void GPU::CalculateDrawRect(s32 window_width, s32 window_height, bool apply_rota
 {
   CalculateDrawRect(GetDisplayState(), window_width, window_height, apply_rotation, apply_aspect_ratio, display_rect,
                     draw_rect);
+}
+
+void GPU::CalculateWindowDrawRect(const DisplayState& state, GSVector4i* display_rect, GSVector4i* draw_rect)
+{
+  const GSVector4i screen =
+    BorderOverlay::GetScreenRect(g_gpu_device->GetWindowWidth(), g_gpu_device->GetWindowHeight());
+  CalculateDrawRect(state, screen.width(), screen.height(), true, true, display_rect, draw_rect);
+
+  const GSVector4i offset = screen.xyxy();
+  *display_rect = display_rect->add32(offset);
+  *draw_rect = draw_rect->add32(offset);
 }
 
 void GPU::CalculateDrawRect(const DisplayState& state, s32 window_width, s32 window_height, bool apply_rotation,

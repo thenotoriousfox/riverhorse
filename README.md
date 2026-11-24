@@ -61,6 +61,7 @@ The current release is 1.2.0; downloads are on the [Releases](https://github.com
 - Fullscreen interface with dark, light and high-contrast themes
 - Home screen with "Continue Playing" and library cover shelves
 - In-game side panel with quick graphics toggles
+- Border overlays (bezels) around the game
 - Interface Size option with a Handheld preset, and touch swiping
 - Native Wayland, with X11 as a fallback
 

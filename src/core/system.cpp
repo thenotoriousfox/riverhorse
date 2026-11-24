@@ -5,6 +5,7 @@
 #include "IconsFontAwesome5.h"
 #include "achievements.h"
 #include "bios.h"
+#include "border_overlay.h"
 #include "bus.h"
 #include "cdrom.h"
 #include "cheats.h"
@@ -4650,6 +4651,9 @@ void System::CheckForSettingsChanges(const Settings& old_settings)
     if (g_settings.display_show_gpu_stats != old_settings.display_show_gpu_stats)
       g_gpu->ResetStatistics();
 
+    if (g_settings.display_border_overlay_path != old_settings.display_border_overlay_path && IsPaused())
+      InvalidateDisplay();
+
     if (g_settings.cdrom_readahead_sectors != old_settings.cdrom_readahead_sectors)
       CDROM::SetReadaheadSectors(g_settings.cdrom_readahead_sectors);
 
@@ -5997,6 +6001,12 @@ bool System::PresentDisplay(bool skip_present, bool explicit_present)
 
   if (!skip_present)
   {
+    if (IsValid() && !g_settings.debugging.show_vram)
+    {
+      BorderOverlay::Update();
+      BorderOverlay::Draw();
+    }
+
     FullscreenUI::Render();
     ImGuiManager::RenderTextOverlays();
     ImGuiManager::RenderOSDMessages();

@@ -286,6 +286,7 @@ struct Settings
 
   ParallelPortDevice parallel_port_device = DEFAULT_PARALLEL_PORT_DEVICE;
   std::string parallel_port_image_path;
+  std::string display_border_overlay_path;
   bool parallel_port_image_writes = false;
   bool parallel_port_switch_on = true;
 
