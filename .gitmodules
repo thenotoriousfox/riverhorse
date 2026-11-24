@@ -1,0 +1,36 @@
+[submodule "dep/bundled/zlib"]
+	path = dep/bundled/zlib
+	url = https://github.com/madler/zlib.git
+	shallow = true
+[submodule "dep/bundled/zstd"]
+	path = dep/bundled/zstd
+	url = https://github.com/facebook/zstd.git
+	shallow = true
+[submodule "dep/bundled/libpng"]
+	path = dep/bundled/libpng
+	url = https://github.com/pnggroup/libpng.git
+	shallow = true
+[submodule "dep/bundled/libwebp"]
+	path = dep/bundled/libwebp
+	url = https://github.com/webmproject/libwebp.git
+	shallow = true
+[submodule "dep/bundled/freetype"]
+	path = dep/bundled/freetype
+	url = https://github.com/freetype/freetype.git
+	shallow = true
+[submodule "dep/bundled/soundtouch"]
+	path = dep/bundled/soundtouch
+	url = https://github.com/stenzek/soundtouch.git
+	shallow = true
+[submodule "dep/bundled/cpuinfo"]
+	path = dep/bundled/cpuinfo
+	url = https://github.com/stenzek/cpuinfo.git
+	shallow = true
+[submodule "dep/bundled/shaderc"]
+	path = dep/bundled/shaderc
+	url = https://github.com/stenzek/shaderc.git
+	shallow = true
+[submodule "dep/bundled/SPIRV-Cross"]
+	path = dep/bundled/spirv_cross
+	url = https://github.com/KhronosGroup/SPIRV-Cross.git
+	shallow = true

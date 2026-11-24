@@ -119,6 +119,12 @@ with `-DCMAKE_PREFIX_PATH="$PWD/deps-libretro" -DBUILD_QT_FRONTEND=OFF
 -DBUILD_LIBRETRO_CORE=ON -DENABLE_DESKTOP_INTEGRATION=OFF` and build the
 `riverhorse_libretro` target. Without desktop integration the core needs no
 SDL, curl, D-Bus, udev, libbacktrace, Discord, X11 or Wayland libraries.
+
+To build the core without a dependency directory, fetch the bundled sources
+with `git submodule update --init --recursive` and configure with
+`-DBUILD_QT_FRONTEND=OFF -DBUILD_LIBRETRO_CORE=ON
+-DENABLE_DESKTOP_INTEGRATION=OFF -DUSE_BUNDLED_DEPENDENCIES=ON` (no
+`CMAKE_PREFIX_PATH`). The result needs only the C and C++ runtime.
 `scripts/libretro/make-libretro-package.sh` packs the result.
 
 To install: put `riverhorse_libretro.so` and `riverhorse_libretro.info` in

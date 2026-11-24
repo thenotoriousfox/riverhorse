@@ -23,14 +23,18 @@ if(ENABLE_DESKTOP_INTEGRATION)
   endif()
 endif()
 
-find_package(Zstd 1.5.6 REQUIRED)
-find_package(WebP REQUIRED) # v1.4.0, spews an error on Linux because no pkg-config.
-find_package(ZLIB REQUIRED) # 1.3, but Mac currently doesn't use it.
-find_package(PNG 1.6.40 REQUIRED)
-find_package(JPEG REQUIRED) # No version because flatpak uses libjpeg-turbo.
-find_package(Freetype 2.11.1 REQUIRED)
-find_package(cpuinfo REQUIRED)
-find_package(SoundTouch 2.3.3 REQUIRED)
+if(USE_BUNDLED_DEPENDENCIES)
+  add_subdirectory("${CMAKE_SOURCE_DIR}/dep/bundled" "${CMAKE_BINARY_DIR}/dep/bundled")
+else()
+  find_package(Zstd 1.5.6 REQUIRED)
+  find_package(WebP REQUIRED) # v1.4.0, spews an error on Linux because no pkg-config.
+  find_package(ZLIB REQUIRED) # 1.3, but Mac currently doesn't use it.
+  find_package(PNG 1.6.40 REQUIRED)
+  find_package(JPEG REQUIRED) # No version because flatpak uses libjpeg-turbo.
+  find_package(Freetype 2.11.1 REQUIRED)
+  find_package(cpuinfo REQUIRED)
+  find_package(SoundTouch 2.3.3 REQUIRED)
+endif()
 
 if(ENABLE_X11)
   find_package(X11 REQUIRED)
@@ -45,7 +49,11 @@ if(ENABLE_WAYLAND)
   find_package(Wayland REQUIRED Egl)
 endif()
 
-if(ENABLE_VULKAN AND LINK_SHADER_COMPILERS)
+if(ENABLE_VULKAN AND USE_BUNDLED_DEPENDENCIES)
+  if(NOT LINK_SHADER_COMPILERS)
+    message(FATAL_ERROR "USE_BUNDLED_DEPENDENCIES needs LINK_SHADER_COMPILERS.")
+  endif()
+elseif(ENABLE_VULKAN AND LINK_SHADER_COMPILERS)
   find_package(Shaderc REQUIRED)
   find_package(spirv_cross_core REQUIRED)
   find_package(spirv_cross_glsl REQUIRED)

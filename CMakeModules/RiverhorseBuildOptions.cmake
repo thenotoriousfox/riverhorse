@@ -8,6 +8,7 @@ option(BUILD_LIBRETRO_CORE "Build the libretro core" OFF)
 option(LINK_SHADER_COMPILERS "Link static shaderc and SPIRV-Cross instead of loading them at run time" ${BUILD_LIBRETRO_CORE})
 option(BUILD_TESTS "Build unit tests" OFF)
 option(BUILD_RELAY_SERVER "Build the netplay relay server (Linux)" OFF)
+option(USE_BUNDLED_DEPENDENCIES "Build zlib, zstd, libpng, libjpeg, libwebp, FreeType, SoundTouch, cpuinfo, shaderc and SPIRV-Cross from the dep/bundled submodules instead of using installed copies. Needs git submodule update --init." OFF)
 option(ENABLE_DESKTOP_INTEGRATION "Build SDL input and audio, Discord presence, HTTP downloads, crash backtraces, screensaver inhibition and window system support. Turn off for a build of only the libretro core." ON)
 
 if((LINUX OR BSD) AND ENABLE_DESKTOP_INTEGRATION)

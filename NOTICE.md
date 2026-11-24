@@ -70,3 +70,19 @@ weight 400 with `fonttools varLib.instancer wght=400 --update-name-table`.
 ## Third-party libraries
 
 Libraries bundled under `dep/` keep the licences given in their directories.
+
+`dep/bundled/` holds the libraries a self-contained build (`-DUSE_BUNDLED_DEPENDENCIES=ON`, used for the libretro
+core) compiles from source: git submodules pinned to the versions the dependency scripts build, plus libjpeg.
+
+| Directory | Source | Version | Licence |
+|---|---|---|---|
+| `zlib` | madler/zlib | v1.3.1 | Zlib |
+| `zstd` | facebook/zstd | v1.5.6 | BSD-3-Clause (or GPL-2.0) |
+| `libpng` | pnggroup/libpng | v1.6.43 | libpng-2.0 |
+| `libjpeg` | IJG `jpegsrc.v9f.tar.gz`: library sources and `README`; `ConfigureJConfig.cmake` and `jconfig.h.in` from `scripts/deps/libjpeg-cmake.patch` | 9f | IJG |
+| `libwebp` | webmproject/libwebp | v1.4.0 | BSD-3-Clause |
+| `freetype` | freetype/freetype | VER-2-13-3 | FTL or GPL-2.0-or-later (used under the GPL) |
+| `soundtouch` | stenzek/soundtouch | 463ade38 | LGPL-2.1 |
+| `cpuinfo` | stenzek/cpuinfo | 7524ad50 | BSD-2-Clause |
+| `shaderc` | stenzek/shaderc, with glslang, SPIRV-Tools and SPIRV-Headers | feb2460b | Apache-2.0 (glslang: BSD-3-Clause and others) |
+| `spirv_cross` | KhronosGroup/SPIRV-Cross | vulkan-sdk-1.3.290.0 | Apache-2.0 |
