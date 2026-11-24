@@ -179,7 +179,7 @@ elseif(ENABLE_VULKAN OR APPLE)
   target_include_directories(util PUBLIC ${SHADERC_INCLUDE_DIR})
 endif()
 
-if(NOT ANDROID)
+if(NOT ANDROID AND ENABLE_DESKTOP_INTEGRATION)
   target_sources(util PRIVATE
     cubeb_audio_stream.cpp
     sdl_audio_stream.cpp
@@ -188,9 +188,11 @@ if(NOT ANDROID)
   )
   target_link_libraries(util PUBLIC
     cubeb
-    freesurround
     SDL2::SDL2
   )
+endif()
+if(NOT ANDROID)
+  target_link_libraries(util PUBLIC freesurround)
   # FFmpeg loaded dynamically on demand.
   target_include_directories(util PUBLIC ${FFMPEG_INCLUDE_DIRS})
 endif()
@@ -260,17 +262,19 @@ elseif(NOT ANDROID)
   target_sources(util PRIVATE
     platform_misc_unix.cpp
   )
-  find_package(PkgConfig REQUIRED)
-  pkg_check_modules(DBUS REQUIRED dbus-1)
-  target_include_directories(util PRIVATE ${DBUS_INCLUDE_DIRS})
-  target_link_libraries(util PRIVATE ${DBUS_LINK_LIBRARIES})
+  if(ENABLE_DESKTOP_INTEGRATION)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(DBUS REQUIRED dbus-1)
+    target_include_directories(util PRIVATE ${DBUS_INCLUDE_DIRS})
+    target_link_libraries(util PRIVATE ${DBUS_LINK_LIBRARIES})
 
-  if(LINUX)
-    target_link_libraries(util PRIVATE UDEV::UDEV)
+    if(LINUX)
+      target_link_libraries(util PRIVATE UDEV::UDEV)
+    endif()
   endif()
 endif()
 
-if(NOT WIN32 AND NOT ANDROID)
+if(NOT WIN32 AND NOT ANDROID AND ENABLE_DESKTOP_INTEGRATION)
   target_sources(util PRIVATE
     http_downloader_curl.cpp
     http_downloader_curl.h

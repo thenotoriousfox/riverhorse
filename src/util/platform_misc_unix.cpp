@@ -11,7 +11,9 @@
 #include "common/small_string.h"
 
 #include <cinttypes>
+#ifdef ENABLE_DESKTOP_INTEGRATION
 #include <dbus/dbus.h>
+#endif
 #include <signal.h>
 #include <spawn.h>
 #include <unistd.h>
@@ -30,6 +32,7 @@ bool PlatformMisc::InitializeSocketSupport(Error* error)
   return true;
 }
 
+#ifdef ENABLE_DESKTOP_INTEGRATION
 static bool SetScreensaverInhibitDBus(const bool inhibit_requested, const char* program_name, const char* reason)
 {
   static dbus_uint32_t s_cookie;
@@ -107,6 +110,12 @@ static bool SetScreensaverInhibit(bool inhibit)
 {
   return SetScreensaverInhibitDBus(inhibit, "Riverhorse", "Riverhorse VM is running.");
 }
+#else
+static bool SetScreensaverInhibit(bool inhibit)
+{
+  return false;
+}
+#endif
 
 static bool s_screensaver_suspended;
 

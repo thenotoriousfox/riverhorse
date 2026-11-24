@@ -98,8 +98,11 @@ if(APPLE)
   target_link_libraries(common PRIVATE ${COCOA_LIBRARY})
 endif()
 
-if(NOT WIN32 AND NOT ANDROID AND NOT APPLE)
-  target_link_libraries(common PRIVATE libbacktrace::libbacktrace)
+if(ENABLE_DESKTOP_INTEGRATION)
+  target_compile_definitions(common PUBLIC "-DENABLE_DESKTOP_INTEGRATION=1")
+  if(NOT WIN32 AND NOT ANDROID AND NOT APPLE)
+    target_link_libraries(common PRIVATE libbacktrace::libbacktrace)
+  endif()
 endif()
 
 if(ANDROID)

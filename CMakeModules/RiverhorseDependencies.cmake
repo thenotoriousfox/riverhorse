@@ -9,7 +9,20 @@ endif()
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 
-find_package(SDL2 2.30.6 REQUIRED)
+if(ENABLE_DESKTOP_INTEGRATION)
+  find_package(SDL2 2.30.6 REQUIRED)
+  find_package(DiscordRPC 3.4.0 REQUIRED)
+  if(NOT WIN32)
+    find_package(CURL REQUIRED)
+  endif()
+  if(LINUX)
+    find_package(UDEV REQUIRED)
+  endif()
+  if(NOT WIN32 AND NOT APPLE)
+    find_package(Libbacktrace REQUIRED)
+  endif()
+endif()
+
 find_package(Zstd 1.5.6 REQUIRED)
 find_package(WebP REQUIRED) # v1.4.0, spews an error on Linux because no pkg-config.
 find_package(ZLIB REQUIRED) # 1.3, but Mac currently doesn't use it.
@@ -17,12 +30,7 @@ find_package(PNG 1.6.40 REQUIRED)
 find_package(JPEG REQUIRED) # No version because flatpak uses libjpeg-turbo.
 find_package(Freetype 2.11.1 REQUIRED)
 find_package(cpuinfo REQUIRED)
-find_package(DiscordRPC 3.4.0 REQUIRED)
 find_package(SoundTouch 2.3.3 REQUIRED)
-
-if(NOT WIN32)
-  find_package(CURL REQUIRED)
-endif()
 
 if(ENABLE_X11)
   find_package(X11 REQUIRED)
@@ -56,13 +64,6 @@ elseif(ENABLE_VULKAN)
   endif()
 endif()
 
-if(LINUX)
-  find_package(UDEV REQUIRED)
-endif()
-
-if(NOT WIN32 AND NOT APPLE)
-  find_package(Libbacktrace REQUIRED)
-endif()
 
 if(NOT ANDROID AND NOT WIN32)
   find_package(FFMPEG COMPONENTS avcodec avformat avutil swresample swscale)

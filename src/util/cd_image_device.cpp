@@ -685,7 +685,6 @@ bool CDImage::IsDeviceName(const char* filename)
 #elif defined(__linux__) && !defined(__ANDROID__)
 
 #include <fcntl.h>
-#include <libudev.h>
 #include <linux/cdrom.h>
 #include <scsi/sg.h>
 #include <sys/ioctl.h>
@@ -1090,10 +1089,15 @@ std::unique_ptr<CDImage> CDImage::OpenDeviceImage(const char* filename, Error* e
   return image;
 }
 
+#ifdef ENABLE_DESKTOP_INTEGRATION
+#include <libudev.h>
+#endif
+
 std::vector<std::pair<std::string, std::string>> CDImage::GetDeviceList()
 {
   std::vector<std::pair<std::string, std::string>> ret;
 
+#ifdef ENABLE_DESKTOP_INTEGRATION
   // borrowed from PCSX2
   udev* udev_context = udev_new();
   if (udev_context)
@@ -1120,6 +1124,7 @@ std::vector<std::pair<std::string, std::string>> CDImage::GetDeviceList()
     }
     udev_unref(udev_context);
   }
+#endif
 
   return ret;
 }

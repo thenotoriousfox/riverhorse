@@ -184,7 +184,7 @@ void CrashHandler::WriteDumpForCaller()
   WriteMinidumpAndCallstack(nullptr);
 }
 
-#elif !defined(__APPLE__)
+#elif !defined(__APPLE__) && defined(ENABLE_DESKTOP_INTEGRATION)
 
 #include <backtrace.h>
 #include <cstdarg>

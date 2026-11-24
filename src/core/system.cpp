@@ -89,8 +89,10 @@ Log_SetChannel(System);
 #include <objbase.h>
 #endif
 
-#ifndef __ANDROID__
+#if !defined(__ANDROID__) && defined(ENABLE_DESKTOP_INTEGRATION)
 #define ENABLE_DISCORD_PRESENCE 1
+#endif
+#ifndef __ANDROID__
 #define ENABLE_PINE_SERVER 1
 #define ENABLE_GDB_SERVER 1
 #define ENABLE_SOCKET_MULTIPLEXER 1

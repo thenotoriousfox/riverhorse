@@ -322,3 +322,10 @@ std::string HTTPDownloader::GetExtensionForContentType(const std::string& conten
   }
   return ret;
 }
+
+#if !defined(_WIN32) && !defined(ENABLE_DESKTOP_INTEGRATION)
+std::unique_ptr<HTTPDownloader> HTTPDownloader::Create(std::string user_agent)
+{
+  return {};
+}
+#endif

@@ -116,7 +116,9 @@ build-essential clang cmake curl extra-cmake-modules git libasound2-dev libcurl4
 Build the dependencies with `scripts/deps/build-dependencies-linux.sh
 --libretro deps-libretro`, then configure a separate build directory as above
 with `-DCMAKE_PREFIX_PATH="$PWD/deps-libretro" -DBUILD_QT_FRONTEND=OFF
--DBUILD_LIBRETRO_CORE=ON` and build the `riverhorse_libretro` target.
+-DBUILD_LIBRETRO_CORE=ON -DENABLE_DESKTOP_INTEGRATION=OFF` and build the
+`riverhorse_libretro` target. Without desktop integration the core needs no
+SDL, curl, D-Bus, udev, libbacktrace, Discord, X11 or Wayland libraries.
 `scripts/libretro/make-libretro-package.sh` packs the result.
 
 To install: put `riverhorse_libretro.so` and `riverhorse_libretro.info` in

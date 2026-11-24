@@ -76,7 +76,7 @@ std::vector<std::pair<std::string, std::string>> AudioStream::GetDriverNames(Aud
   std::vector<std::pair<std::string, std::string>> ret;
   switch (backend)
   {
-#ifndef __ANDROID__
+#if !defined(__ANDROID__) && defined(ENABLE_DESKTOP_INTEGRATION)
     case AudioBackend::Cubeb:
       ret = GetCubebDriverNames();
       break;
@@ -95,7 +95,7 @@ std::vector<AudioStream::DeviceInfo> AudioStream::GetOutputDevices(AudioBackend 
   std::vector<AudioStream::DeviceInfo> ret;
   switch (backend)
   {
-#ifndef __ANDROID__
+#if !defined(__ANDROID__) && defined(ENABLE_DESKTOP_INTEGRATION)
     case AudioBackend::Cubeb:
       ret = GetCubebOutputDevices(driver, sample_rate);
       break;
@@ -114,13 +114,13 @@ std::unique_ptr<AudioStream> AudioStream::CreateStream(AudioBackend backend, u32
 {
   switch (backend)
   {
-#ifndef __ANDROID__
+#if !defined(__ANDROID__) && defined(ENABLE_DESKTOP_INTEGRATION)
     case AudioBackend::Cubeb:
       return CreateCubebAudioStream(sample_rate, parameters, driver_name, device_name, error);
 
     case AudioBackend::SDL:
       return CreateSDLAudioStream(sample_rate, parameters, error);
-#else
+#elif defined(__ANDROID__)
     case AudioBackend::AAudio:
       return CreateAAudioAudioStream(sample_rate, parameters, error);
 
