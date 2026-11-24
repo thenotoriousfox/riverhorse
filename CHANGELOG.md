@@ -3,9 +3,24 @@
 Changes since the DuckStation `v0.1-7371` base. Releases are tagged
 `vMAJOR.MINOR.PATCH`.
 
-## Unreleased
+## 1.2.0 (2026-11-24)
 
 ### New
+- Netplay for up to four players. Players 3 and 4 need a multitap in the
+  host's controller settings; players take the slots in the order they join.
+- Netplay through a relay server: the host is shown a session code and the
+  others join with it, without forwarding a port. The relay introduces the
+  players and they connect directly when their routers allow it (also
+  players behind the same router, over their LAN), so most sessions put
+  almost no load on the relay and play with the shortest ping. A default
+  relay is used; Settings > Essentials > Netplay and the host and join
+  dialogs can turn it off or set your own, which is a separate program,
+  `riverhorse-relay` (build with `-DBUILD_RELAY_SERVER=ON`). When the relay
+  can't be reached, the host is told and players join with the host's
+  address and port. `-netplayjoin` takes a session code as well as
+  `host:port`.
+- Joining a session from a different Riverhorse version is refused with a
+  message instead of failing while loading the host's state.
 - Slang shader presets (`.slangp`, the libretro format) as post-processing
   shaders: put a preset and its shaders anywhere under the `shaders` folder,
   for example a copy of the libretro slang-shaders collection, and pick it
@@ -27,44 +42,16 @@ Changes since the DuckStation `v0.1-7371` base. Releases are tagged
   Not used during netplay.
 
 ### Changes
-- The game list's save icons come from the game's own save, found by its
-  product code on any memory card the game uses, shared cards included.
-  Before, only the first save on a per-game card in slot 1 was used,
-  whichever game it belonged to.
-- Netplay uses a relay server by default: the host is shown a session code
-  and the others join with it, without forwarding a port. Players still
-  connect directly when their routers allow it. Settings > Essentials >
-  Netplay and the host and join dialogs can turn the relay off or set a
-  custom one. When the relay can't be reached, the host is told and players
-  join with the host's address as before. `-netplayjoin` takes a session
-  code as well as `host:port`.
-
-### Fixes
-- With a relay server set, joining a host by its address failed: packets
-  to and from addresses other than the relay were dropped.
-
-## 1.2.0 (2026-11-24)
-
-### New
-- Netplay for up to four players. Players 3 and 4 need a multitap in the
-  host's controller settings; players take the slots in the order they join.
-- Netplay through a relay server, for players who can't reach each other
-  directly: set the same Relay Server in Settings > Essentials > Netplay (or
-  in the host and join dialogs). The relay is a separate program,
-  `riverhorse-relay` (build with `-DBUILD_RELAY_SERVER=ON`). It introduces
-  players and they connect directly when their routers allow it (also
-  players behind the same router, over their LAN), so most sessions put
-  almost no load on the relay and play with the shortest ping.
-- Joining a session from a different Riverhorse version is refused with a
-  message instead of failing while loading the host's state.
-
-### Changes
 - Netplay sessions run the CPU on the cached interpreter. With the
   recompilers, players who rolled back drifted out of sync.
 - Spyro 2 and Spyro 3 always use 1x CD-ROM read speedup: with speedup on,
   cutscene sound drops out or the cutscene stops loading.
 - Gran Turismo 1 turns the widescreen hack off: it has no effect there and the
   picture was only stretched.
+- The game list's save icons come from the game's own save, found by its
+  product code on any memory card the game uses, shared cards included.
+  Before, only the first save on a per-game card in slot 1 was used,
+  whichever game it belonged to.
 
 ### Fixes
 - Multitap slots now use the controllers set up for them. Before, with a
