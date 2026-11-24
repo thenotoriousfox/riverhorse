@@ -1,0 +1,104 @@
+name: libretro cores
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+jobs:
+  windows:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        submodules: recursive
+
+    - name: Install packages
+      run: |
+        sudo scripts/retry.sh apt-get update
+        sudo scripts/retry.sh apt-get -y install cmake ninja-build g++-mingw-w64-x86-64-posix gcc-mingw-w64-x86-64-posix zip
+
+    - name: Build
+      run: |
+        cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=scripts/libretro/mingw-w64-x86_64.cmake \
+          -DBUILD_QT_FRONTEND=OFF -DBUILD_LIBRETRO_CORE=ON -DENABLE_DESKTOP_INTEGRATION=OFF -DUSE_BUNDLED_DEPENDENCIES=ON \
+          -B build
+        cmake --build build --parallel --target riverhorse_libretro
+        STRIP=x86_64-w64-mingw32-strip scripts/libretro/make-libretro-package.sh \
+          build/bin/riverhorse_libretro.dll . windows-x64
+
+    - uses: actions/upload-artifact@v4
+      with:
+        name: windows-x64-libretro
+        path: riverhorse_libretro-windows-x64.zip
+        retention-days: 1
+
+  android:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        abi: [arm64-v8a, x86_64]
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        submodules: recursive
+
+    - name: Install packages
+      run: |
+        sudo scripts/retry.sh apt-get update
+        sudo scripts/retry.sh apt-get -y install cmake ninja-build patchelf zip
+
+    - uses: nttld/setup-ndk@v1
+      id: ndk
+      with:
+        ndk-version: r29
+
+    - name: Build
+      run: |
+        NDK="${{ steps.ndk.outputs.ndk-path }}"
+        cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE="$NDK/build/cmake/android.toolchain.cmake" \
+          -DANDROID_ABI=${{ matrix.abi }} -DANDROID_PLATFORM=android-24 -DANDROID_STL=c++_static \
+          -DBUILD_QT_FRONTEND=OFF -DBUILD_LIBRETRO_CORE=ON -DENABLE_DESKTOP_INTEGRATION=OFF -DUSE_BUNDLED_DEPENDENCIES=ON \
+          -B build
+        cmake --build build --parallel --target riverhorse_libretro
+        STRIP="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip" scripts/libretro/make-libretro-package.sh \
+          build/src/riverhorse-libretro/riverhorse_libretro.so . android-${{ matrix.abi }} riverhorse_libretro_android.so
+
+    - uses: actions/upload-artifact@v4
+      with:
+        name: android-${{ matrix.abi }}-libretro
+        path: riverhorse_libretro-android-${{ matrix.abi }}.zip
+        retention-days: 1
+
+  macos:
+    runs-on: macos-15
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [arm64, x86_64]
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        submodules: recursive
+
+    - name: Build
+      env:
+        MACOSX_DEPLOYMENT_TARGET: "10.15"
+      run: |
+        cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_QT_FRONTEND=OFF -DBUILD_LIBRETRO_CORE=ON \
+          -DENABLE_DESKTOP_INTEGRATION=OFF -DUSE_BUNDLED_DEPENDENCIES=ON \
+          -DCMAKE_OSX_ARCHITECTURES=${{ matrix.arch }} . -Bbuild
+        cmake --build build --target riverhorse_libretro --config Release -- -j "$(sysctl -n hw.ncpu)"
+        scripts/libretro/make-libretro-package.sh build/src/riverhorse-libretro/riverhorse_libretro.dylib . macos-${{ matrix.arch }}
+
+    - uses: actions/upload-artifact@v4
+      with:
+        name: macos-${{ matrix.arch }}-libretro
+        path: riverhorse_libretro-macos-${{ matrix.arch }}.zip
+        retention-days: 1

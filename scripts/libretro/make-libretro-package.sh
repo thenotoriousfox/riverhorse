@@ -1,29 +1,35 @@
 #!/usr/bin/env bash
-# Usage: make-libretro-package.sh <build directory> <output directory> <name suffix>
+# Usage: make-libretro-package.sh <core file> <output directory> <name suffix> [packaged core name]
 # Creates riverhorse_libretro-<suffix>.zip: the core and its .info file, for the frontend's cores directory.
+# Set STRIP to the platform's strip tool when cross-compiling.
 
 set -e
 
-if [ "$#" -ne 3 ]; then
-	echo "Syntax: $0 <build directory> <output directory> <name suffix>"
+if [ "$#" -lt 3 ] || [ "$#" -gt 4 ]; then
+	echo "Syntax: $0 <core file> <output directory> <name suffix> [packaged core name]"
 	exit 1
 fi
 
 ROOTDIR=$(realpath "$(dirname "${BASH_SOURCE[0]}")/../..")
-BUILDDIR=$(realpath "$1")
-OUTDIR=$(realpath -m "$2")
+CORE=$(realpath "$1")
+mkdir -p "$2"
+OUTDIR=$(realpath "$2")
 SUFFIX="$3"
-mkdir -p "$OUTDIR"
+NAME="${4:-$(basename "$CORE")}"
 
 STAGING=$(mktemp -d)
 trap 'rm -rf "$STAGING"' EXIT
-mkdir -p "$STAGING/core"
 
-cp "$BUILDDIR/src/riverhorse-libretro/riverhorse_libretro.so" "$STAGING/core/"
-strip --strip-unneeded "$STAGING/core/riverhorse_libretro.so"
-patchelf --remove-rpath "$STAGING/core/riverhorse_libretro.so"
-cp "$ROOTDIR/src/riverhorse-libretro/riverhorse_libretro.info" "$STAGING/core/"
+cp "$CORE" "$STAGING/$NAME"
+case "$NAME" in
+	*.dylib) "${STRIP:-strip}" -x "$STAGING/$NAME" ;;
+	*) "${STRIP:-strip}" --strip-unneeded "$STAGING/$NAME" ;;
+esac
+case "$NAME" in
+	*.so) patchelf --remove-rpath "$STAGING/$NAME" ;;
+esac
+cp "$ROOTDIR/src/riverhorse-libretro/riverhorse_libretro.info" "$STAGING/"
 
 rm -f "$OUTDIR/riverhorse_libretro-$SUFFIX.zip"
-(cd "$STAGING/core" && zip -qr "$OUTDIR/riverhorse_libretro-$SUFFIX.zip" .)
+(cd "$STAGING" && zip -qr "$OUTDIR/riverhorse_libretro-$SUFFIX.zip" .)
 echo "Created $OUTDIR/riverhorse_libretro-$SUFFIX.zip"

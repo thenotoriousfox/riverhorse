@@ -276,7 +276,7 @@ jobs:
           -DCMAKE_CXX_COMPILER=clang++-17 -DCMAKE_EXE_LINKER_FLAGS_INIT="-fuse-ld=lld" -DCMAKE_SHARED_LINKER_FLAGS_INIT="-fuse-ld=lld" \
           -DBUILD_QT_FRONTEND=OFF -DBUILD_LIBRETRO_CORE=ON
         cmake --build build --parallel --target riverhorse_libretro
-        scripts/libretro/make-libretro-package.sh build . "linux-${{ matrix.arch }}"
+        scripts/libretro/make-libretro-package.sh build/src/riverhorse-libretro/riverhorse_libretro.so . "linux-${{ matrix.arch }}"
 
     - name: Upload libretro core
       uses: actions/upload-artifact@v4
@@ -284,6 +284,10 @@ jobs:
         name: "linux-${{ matrix.arch }}-libretro"
         path: riverhorse_libretro-linux-${{ matrix.arch }}.zip
         retention-days: 1
+
+
+  libretro-cores:
+    uses: ./.github/workflows/libretro-cores.yml
 
 
   linux-flatpak-build:
@@ -406,7 +410,7 @@ jobs:
 
 
   create-release:
-    needs: [windows-build, windows-arm64-build, linux-build, linux-libretro-build, linux-flatpak-build, macos-build]
+    needs: [windows-build, windows-arm64-build, linux-build, linux-libretro-build, libretro-cores, linux-flatpak-build, macos-build]
     runs-on: ubuntu-22.04
     permissions:
       contents: write
@@ -440,6 +444,11 @@ jobs:
             ./artifacts/linux-arm64-appimage-qt/Riverhorse-arm64.AppImage
             ./artifacts/linux-x64-libretro/riverhorse_libretro-linux-x64.zip
             ./artifacts/linux-arm64-libretro/riverhorse_libretro-linux-arm64.zip
+            ./artifacts/windows-x64-libretro/riverhorse_libretro-windows-x64.zip
+            ./artifacts/android-arm64-v8a-libretro/riverhorse_libretro-android-arm64-v8a.zip
+            ./artifacts/android-x86_64-libretro/riverhorse_libretro-android-x86_64.zip
+            ./artifacts/macos-arm64-libretro/riverhorse_libretro-macos-arm64.zip
+            ./artifacts/macos-x86_64-libretro/riverhorse_libretro-macos-x86_64.zip
             ./artifacts/linux-x64-flatpak/riverhorse-x64.flatpak
             ./artifacts/linux-arm64-flatpak/riverhorse-arm64.flatpak
             ./artifacts/macos/riverhorse-mac-release.zip

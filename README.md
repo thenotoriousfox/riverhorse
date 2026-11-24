@@ -125,11 +125,16 @@ with `git submodule update --init --recursive` and configure with
 `-DBUILD_QT_FRONTEND=OFF -DBUILD_LIBRETRO_CORE=ON
 -DENABLE_DESKTOP_INTEGRATION=OFF -DUSE_BUNDLED_DEPENDENCIES=ON` (no
 `CMAKE_PREFIX_PATH`). The result needs only the C and C++ runtime.
-`scripts/libretro/make-libretro-package.sh` packs the result.
+`scripts/libretro/make-libretro-package.sh <core file> <output directory>
+<name suffix>` packs the result. For Windows, cross-compile with
+`-DCMAKE_TOOLCHAIN_FILE=scripts/libretro/mingw-w64-x86_64.cmake`.
 
-To install: put `riverhorse_libretro.so` and `riverhorse_libretro.info` in
-the frontend's cores and info directories, and BIOS images in its system
-directory. The game database, cheats, patches and shaders are built into the
+Each release has the core for Linux, Windows, Android and macOS
+(`riverhorse_libretro-<platform>.zip`). To install: put the core
+(`riverhorse_libretro.so`, `.dll`, `.dylib`, or `riverhorse_libretro_android.so`)
+and `riverhorse_libretro.info` in the frontend's cores and info directories,
+and BIOS images in its system directory. On Android, use RetroArch's Load Core >
+Install or Restore a Core. The game database, cheats, patches and shaders are built into the
 core.
 
 ---
