@@ -4326,12 +4326,10 @@ void FullscreenUI::DrawControllerSettingsPage()
     {(mtap_mode == MultitapMode::Port1Only || mtap_mode == MultitapMode::BothPorts),
      (mtap_mode == MultitapMode::Port2Only || mtap_mode == MultitapMode::BothPorts)}};
 
-  // we reorder things a little to make it look less silly for mtap
   static constexpr const std::array<char, 4> mtap_slot_names = {{'A', 'B', 'C', 'D'}};
-  static constexpr const std::array<u32, NUM_CONTROLLER_AND_CARD_PORTS> mtap_port_order = {{0, 2, 3, 4, 1, 5, 6, 7}};
 
   // create the ports
-  for (u32 global_slot : mtap_port_order)
+  for (u32 global_slot : Controller::PortOrder)
   {
     const auto [mtap_port, mtap_slot] = Controller::ConvertPadToPortAndSlot(global_slot);
     const bool is_mtap_port = Controller::PortAndSlotIsMultitap(mtap_port, mtap_slot);

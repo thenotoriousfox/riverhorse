@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2019-2024 Connor McLaughlin <stenzek@gmail.com> and contributors.
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #pragma once
 
@@ -16,7 +16,7 @@ public:
 
   void Reset();
 
-  void SetEnable(bool enable, u32 base_index);
+  void SetEnable(bool enable, u32 port);
   ALWAYS_INLINE bool IsEnabled() const { return m_enabled; };
 
   bool DoState(StateWrapper& sw);
@@ -52,6 +52,6 @@ private:
 
   std::array<u8, 32> m_transfer_buffer{};
 
-  u32 m_base_index;
+  u32 m_port = 0;
   bool m_enabled = false;
 };

@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2019-2024 Connor McLaughlin <stenzek@gmail.com>
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #include "controllersettingswindow.h"
 #include "controllerbindingwidgets.h"
@@ -392,11 +392,8 @@ void ControllerSettingsWindow::createWidgets()
   // load mtap settings
   const std::array<bool, 2> mtap_enabled = getEnabledMultitaps();
 
-  // we reorder things a little to make it look less silly for mtap
-  static constexpr const std::array<u32, MAX_PORTS> mtap_port_order = {{0, 2, 3, 4, 1, 5, 6, 7}};
-
   // create the ports
-  for (u32 global_slot : mtap_port_order)
+  for (u32 global_slot : Controller::PortOrder)
   {
     const bool is_mtap_port = Controller::PadIsMultitapSlot(global_slot);
     const auto [port, slot] = Controller::ConvertPadToPortAndSlot(global_slot);

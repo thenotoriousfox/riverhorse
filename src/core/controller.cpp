@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2019-2023 Connor McLaughlin <stenzek@gmail.com>
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #include "controller.h"
 #include "analog_controller.h"
@@ -171,6 +171,8 @@ std::optional<u32> Controller::GetBindIndex(ControllerType type, std::string_vie
 
   return std::nullopt;
 }
+
+const std::array<u32, NUM_CONTROLLER_AND_CARD_PORTS> Controller::PortOrder = {{0, 2, 3, 4, 1, 5, 6, 7}};
 
 std::tuple<u32, u32> Controller::ConvertPadToPortAndSlot(u32 index)
 {

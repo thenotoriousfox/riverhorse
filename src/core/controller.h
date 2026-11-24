@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2019-2024 Connor McLaughlin <stenzek@gmail.com>
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #pragma once
 
@@ -7,6 +7,7 @@
 #include "settings.h"
 #include "types.h"
 
+#include <array>
 #include <memory>
 #include <optional>
 #include <span>
@@ -113,6 +114,9 @@ public:
 
   /// Converts a multitap port and slot to a global pad index.
   static u32 ConvertPortAndSlotToPad(u32 port, u32 slot);
+
+  /// Pad indices in port order: 1, 1B-1D, 2, 2B-2D.
+  static const std::array<u32, NUM_CONTROLLER_AND_CARD_PORTS> PortOrder;
 
   /// Returns true if the given pad index is a multitap slot.
   static bool PadIsMultitapSlot(u32 index);
