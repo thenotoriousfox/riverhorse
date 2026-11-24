@@ -341,7 +341,7 @@ void Settings::Load(SettingsInterface& si)
   cdrom_fast_forward_loading = si.GetBoolValue("CDROM", "FastForwardLoading", false);
   cdrom_disable_speedup_on_mdec = si.GetBoolValue("CDROM", "DisableSpeedupOnMDEC", false);
   cdrom_load_image_patches = si.GetBoolValue("CDROM", "LoadImagePatches", false);
-  cdrom_auto_disc_change = si.GetBoolValue("CDROM", "AutoDiscChange", false);
+  cdrom_auto_disc_change = si.GetBoolValue("CDROM", "AutoDiscChange", DEFAULT_CDROM_AUTO_DISC_CHANGE);
   cdrom_mute_cd_audio = si.GetBoolValue("CDROM", "MuteCDAudio", false);
   cdrom_subq_skew = si.GetBoolValue("CDROM", "SubQSkew", false);
   cdrom_read_speedup = si.GetIntValue("CDROM", "ReadSpeedup", 1);

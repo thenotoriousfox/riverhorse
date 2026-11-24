@@ -3989,7 +3989,7 @@ void FullscreenUI::DrawConsoleSettingsPage()
   DrawToggleSetting(bsi, FSUI_ICONSTR(ICON_FA_COMPACT_DISC, "Change Discs Automatically"),
                     FSUI_CSTR("Changes the disc of a multi-disc game when the game stops the disc and waits for it "
                               "to be changed, trying each disc in turn until the game accepts one."),
-                    "CDROM", "AutoDiscChange", false);
+                    "CDROM", "AutoDiscChange", Settings::DEFAULT_CDROM_AUTO_DISC_CHANGE);
 
   EndMenuButtons();
 }

@@ -19,12 +19,12 @@ Changes since the DuckStation `v0.1-7371` base. Releases are tagged
   automatically, and mouse aiming follows it. Screenshots and video capture
   show the game without the overlay.
 - Change Discs Automatically (Settings > Console > CD-ROM, also in Big
-  Picture; off by default): when a multi-disc game stops the disc and keeps
+  Picture; on by default): when a multi-disc game stops the disc and keeps
   polling the drive, as it does while asking for a disc, the next disc of
   its playlist, multi-disc PBP or merged disc set is inserted, going back to
   disc 1 after the last. If the game rejects that disc and asks again within
   30 seconds, the following one is tried, until every disc has been tried.
-  Not used during netplay. `riverhorse-regtest -autodiscchange` turns it on.
+  Not used during netplay.
 
 ### Changes
 - The game list's save icons come from the game's own save, found by its

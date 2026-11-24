@@ -67,7 +67,8 @@ ConsoleSettingsWidget::ConsoleSettingsWidget(SettingsWindow* dialog, QWidget* pa
     tr("Runs at unlimited speed while the game reads from the disc without updating the screen. Animated loading "
        "screens still run at normal speed."));
   SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.cdromLoadImagePatches, "CDROM", "LoadImagePatches", false);
-  SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.cdromAutoDiscChange, "CDROM", "AutoDiscChange", false);
+  SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.cdromAutoDiscChange, "CDROM", "AutoDiscChange",
+                                               Settings::DEFAULT_CDROM_AUTO_DISC_CHANGE);
 
   if (!m_dialog->isPerGameSettings())
   {
@@ -125,7 +126,7 @@ ConsoleSettingsWidget::ConsoleSettingsWidget(SettingsWindow* dialog, QWidget* pa
     tr("Loads the game image into RAM. Useful for network paths that may become unreliable during gameplay. In some "
        "cases also eliminates stutter when games initiate audio track playback."));
   dialog->registerWidgetHelp(
-    m_ui.cdromAutoDiscChange, tr("Change Discs Automatically"), tr("Unchecked"),
+    m_ui.cdromAutoDiscChange, tr("Change Discs Automatically"), tr("Checked"),
     tr("Changes the disc of a multi-disc game when the game stops the disc and waits for it to be changed, trying "
        "each disc in turn until the game accepts one. Works with playlists (.m3u), multi-disc PBP files and discs "
        "merged in the game list."));

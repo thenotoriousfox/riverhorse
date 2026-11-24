@@ -194,7 +194,7 @@ struct Settings
   bool cdrom_fast_forward_loading : 1 = false;
   bool cdrom_disable_speedup_on_mdec : 1 = false;
   bool cdrom_load_image_patches : 1 = false;
-  bool cdrom_auto_disc_change : 1 = false;
+  bool cdrom_auto_disc_change : 1 = DEFAULT_CDROM_AUTO_DISC_CHANGE;
   bool cdrom_mute_cd_audio : 1 = false;
   bool cdrom_subq_skew : 1 = false;
   u32 cdrom_read_speedup = 1;
@@ -535,6 +535,7 @@ struct Settings
   static constexpr ControllerType DEFAULT_CONTROLLER_2_TYPE = ControllerType::None;
   static constexpr MemoryCardType DEFAULT_MEMORY_CARD_1_TYPE = MemoryCardType::PerGameTitle;
   static constexpr MemoryCardType DEFAULT_MEMORY_CARD_2_TYPE = MemoryCardType::None;
+  static constexpr bool DEFAULT_CDROM_AUTO_DISC_CHANGE = true;
   static constexpr MultitapMode DEFAULT_MULTITAP_MODE = MultitapMode::Disabled;
   static constexpr ParallelPortDevice DEFAULT_PARALLEL_PORT_DEVICE = ParallelPortDevice::None;
 
