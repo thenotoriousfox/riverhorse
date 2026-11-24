@@ -8,6 +8,10 @@
 #include "common/string_util.h"
 #include "common/timer.h"
 
+#ifdef _WIN32
+#include "common/windows_headers.h"
+#endif
+
 #include "enet/enet.h"
 
 #include <algorithm>
@@ -54,7 +58,7 @@ static int ENET_CALLBACK ReceiveFromRelay(ENetHost* host, ENetEvent* event);
 static int ReceiveFromRelayServer(ENetHost* host, const u8* data, size_t size);
 static int ReceiveFromPeer(ENetHost* host, const u8* data, size_t size);
 
-static ENetHost* s_host = nullptr;
+static ENetHost* s_enet_host = nullptr;
 static ENetAddress s_relay_address = {};
 static ENetAddress s_local_address = {};
 static std::optional<u16> s_virtual_port;
@@ -96,7 +100,7 @@ static bool SameAddress(const ENetAddress& a, const ENetAddress& b)
 void NetplayRelay::SendToAddress(const ENetAddress& address, const u8* data, size_t size)
 {
   const ENetBuffer buffer = MakeBuffer(const_cast<u8*>(data), size);
-  enet_socket_send(s_host->socket, &address, &buffer, 1);
+  enet_socket_send(s_enet_host->socket, &address, &buffer, 1);
 }
 
 void NetplayRelay::SendControlMessage(MessageType type)
@@ -338,7 +342,7 @@ bool NetplayRelay::Attach(ENetHost* host, std::string_view relay_address, Error*
     return false;
   }
 
-  s_host = host;
+  s_enet_host = host;
   s_relay_address = address;
   s_local_address = FindLocalAddress(host, address);
   s_virtual_port.reset();
@@ -351,19 +355,19 @@ bool NetplayRelay::Attach(ENetHost* host, std::string_view relay_address, Error*
 
 void NetplayRelay::Detach()
 {
-  if (!s_host)
+  if (!s_enet_host)
     return;
 
-  s_host->send = nullptr;
-  s_host->intercept = nullptr;
-  s_host = nullptr;
+  s_enet_host->send = nullptr;
+  s_enet_host->intercept = nullptr;
+  s_enet_host = nullptr;
   s_virtual_port.reset();
   s_peers.clear();
 }
 
 void NetplayRelay::Poll()
 {
-  if (!s_host)
+  if (!s_enet_host)
     return;
 
   const double seconds = s_last_message_time.GetTimeSeconds();
@@ -406,7 +410,7 @@ std::optional<u16> NetplayRelay::GetVirtualPort()
 
 bool NetplayRelay::GetSessionAddress(u16 session_code, ENetAddress* address)
 {
-  if (!s_host)
+  if (!s_enet_host)
     return false;
 
   *address = s_relay_address;
