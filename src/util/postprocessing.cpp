@@ -8,6 +8,7 @@
 #include "postprocessing_shader.h"
 #include "postprocessing_shader_fx.h"
 #include "postprocessing_shader_glsl.h"
+#include "postprocessing_shader_slang.h"
 
 // TODO: Remove me
 #include "core/host.h"
@@ -198,6 +199,23 @@ std::vector<std::pair<std::string, std::string>> PostProcessing::GetAvailableSha
     if (std::none_of(names.begin(), names.end(), [&fd](const auto& other) { return fd.FileName == other.second; }))
     {
       std::string display_name = fmt::format(TRANSLATE_FS("PostProcessing", "{} [ReShade]"), fd.FileName);
+      names.emplace_back(std::move(display_name), std::move(fd.FileName));
+    }
+  }
+
+  results.clear();
+  FileSystem::FindFiles(EmuFolders::Shaders.c_str(), "*.slangp",
+                        FILESYSTEM_FIND_FILES | FILESYSTEM_FIND_RECURSIVE | FILESYSTEM_FIND_RELATIVE_PATHS, &results);
+  for (FILESYSTEM_FIND_DATA& fd : results)
+  {
+    fd.FileName.erase(fd.FileName.rfind('.'));
+#ifdef _WIN32
+    StringUtil::ReplaceAll(&fd.FileName, '\\', '/');
+#endif
+
+    if (std::none_of(names.begin(), names.end(), [&fd](const auto& other) { return fd.FileName == other.second; }))
+    {
+      std::string display_name = fmt::format(TRANSLATE_FS("PostProcessing", "{} [Slang]"), fd.FileName);
       names.emplace_back(std::move(display_name), std::move(fd.FileName));
     }
   }
@@ -718,6 +736,14 @@ std::unique_ptr<PostProcessing::Shader> PostProcessing::TryLoadingShader(const s
   {
     std::unique_ptr<ReShadeFXShader> shader = std::make_unique<ReShadeFXShader>();
     if (shader->LoadFromFile(std::string(shader_name), filename.c_str(), only_config, error))
+      return shader;
+  }
+
+  filename = Path::Combine(EmuFolders::Shaders, fmt::format("{}.slangp", shader_name));
+  if (FileSystem::FileExists(filename.c_str()))
+  {
+    std::unique_ptr<SlangShader> shader = std::make_unique<SlangShader>();
+    if (shader->LoadFromFile(std::string(shader_name), filename, error))
       return shader;
   }
 

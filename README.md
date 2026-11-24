@@ -62,6 +62,7 @@ The current release is 1.2.0; downloads are on the [Releases](https://github.com
 - Home screen with "Continue Playing" and library cover shelves
 - In-game side panel with quick graphics toggles
 - Border overlays (bezels) around the game
+- Post-processing with GLSL, ReShade FX and libretro slang shader presets
 - Interface Size option with a Handheld preset, and touch swiping
 - Native Wayland, with X11 as a fallback
 

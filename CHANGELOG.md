@@ -6,6 +6,13 @@ Changes since the DuckStation `v0.1-7371` base. Releases are tagged
 ## Unreleased
 
 ### New
+- Slang shader presets (`.slangp`, the libretro format) as post-processing
+  shaders: put a preset and its shaders anywhere under the `shaders` folder,
+  for example a copy of the libretro slang-shaders collection, and pick it
+  in Settings > Post-Processing. Multiple passes, scale types, float
+  framebuffers, lookup textures, aliases, frame history, pass feedback and
+  `#pragma parameter` options are supported; mipmapped inputs and sRGB
+  framebuffers are treated as plain ones.
 - Border overlays (Settings > Graphics > Display > Border Overlay, also in
   Big Picture): a PNG image, such as a console or TV bezel, drawn around the
   game. The game is shown in the transparent middle of the image, found
