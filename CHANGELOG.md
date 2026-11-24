@@ -6,6 +6,10 @@ Changes since the DuckStation `v0.1-7371` base. Releases are tagged
 ## Unreleased
 
 ### Changes
+- The game list's save icons come from the game's own save, found by its
+  product code on any memory card the game uses, shared cards included.
+  Before, only the first save on a per-game card in slot 1 was used,
+  whichever game it belonged to.
 - Netplay uses a relay server by default: the host is shown a session code
   and the others join with it, without forwarding a port. Players still
   connect directly when their routers allow it. Settings > Essentials >

@@ -124,6 +124,9 @@ static std::string GetCustomPropertiesFile();
 
 static FileSystem::ManagedCFilePtr OpenMemoryCardTimestampCache(bool for_write);
 static bool UpdateMemcardTimestampCache(const MemcardTimestampCacheEntry& entry);
+static bool SaveBelongsToSerial(std::string_view save_filename, std::string_view serial);
+static const MemoryCardImage::FileInfo* FindSaveWithIcon(const std::vector<MemoryCardImage::FileInfo>& files,
+                                                        std::string_view serial, bool any_save);
 
 static EntryList s_entries;
 static std::recursive_mutex s_mutex;
@@ -1971,6 +1974,49 @@ void GameList::ReloadMemcardTimestampCache()
     entry.serial[sizeof(entry.serial) - 1] = 0;
 }
 
+bool GameList::SaveBelongsToSerial(std::string_view save_filename, std::string_view serial)
+{
+  static constexpr size_t REGION_PREFIX_LENGTH = 2;
+  if (save_filename.length() <= REGION_PREFIX_LENGTH)
+    return false;
+
+  const auto is_code_char = [](char ch) {
+    return (ch >= '0' && ch <= '9') || (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z');
+  };
+  const auto to_upper = [](char ch) { return (ch >= 'a' && ch <= 'z') ? static_cast<char>(ch - 'a' + 'A') : ch; };
+  std::string_view::const_iterator save_it = save_filename.begin() + REGION_PREFIX_LENGTH;
+  for (const char ch : serial)
+  {
+    if (!is_code_char(ch))
+      continue;
+
+    while (save_it != save_filename.end() && !is_code_char(*save_it))
+      ++save_it;
+    if (save_it == save_filename.end() || to_upper(*save_it) != to_upper(ch))
+      return false;
+    ++save_it;
+  }
+
+  return true;
+}
+
+const MemoryCardImage::FileInfo* GameList::FindSaveWithIcon(const std::vector<MemoryCardImage::FileInfo>& files,
+                                                            std::string_view serial, bool any_save)
+{
+  const auto has_icon = [](const MemoryCardImage::FileInfo& fi) { return !fi.icon_frames.empty(); };
+  const auto it = std::find_if(files.begin(), files.end(), [&serial, &has_icon](const MemoryCardImage::FileInfo& fi) {
+    return has_icon(fi) && SaveBelongsToSerial(fi.filename, serial);
+  });
+  if (it != files.end())
+    return &*it;
+
+  if (!any_save)
+    return nullptr;
+
+  const auto any = std::find_if(files.begin(), files.end(), has_icon);
+  return (any != files.end()) ? &*any : nullptr;
+}
+
 std::string GameList::GetGameIconPath(std::string_view serial, std::string_view path)
 {
   std::string ret;
@@ -1983,17 +2029,30 @@ std::string GameList::GetGameIconPath(std::string_view serial, std::string_view 
   if (FileSystem::FileExists(ret.c_str()))
     return ret;
 
-  MemoryCardType type;
-  std::string memcard_path = System::GetGameMemoryCardPath(serial, path, 0, &type);
-  FILESYSTEM_STAT_DATA memcard_sd;
-  if (memcard_path.empty() || type == MemoryCardType::Shared ||
-      !FileSystem::StatFile(memcard_path.c_str(), &memcard_sd))
+  struct CardToSearch
+  {
+    std::string path;
+    bool per_game;
+  };
+  std::vector<CardToSearch> cards;
+  s64 timestamp = 0;
+  for (u32 slot = 0; slot < NUM_CONTROLLER_AND_CARD_PORTS; slot++)
+  {
+    MemoryCardType type;
+    std::string memcard_path = System::GetGameMemoryCardPath(serial, path, slot, &type);
+    FILESYSTEM_STAT_DATA memcard_sd;
+    if (memcard_path.empty() || !FileSystem::StatFile(memcard_path.c_str(), &memcard_sd))
+      continue;
+
+    timestamp = std::max(timestamp, memcard_sd.ModificationTime);
+    cards.push_back(CardToSearch{std::move(memcard_path), Settings::IsPerGameMemoryCardType(type)});
+  }
+  if (cards.empty())
   {
     ret = {};
     return ret;
   }
 
-  const s64 timestamp = memcard_sd.ModificationTime;
   TinyString index_serial;
   index_serial.assign(
     serial.substr(0, std::min<size_t>(serial.length(), MemcardTimestampCacheEntry::MAX_SERIAL_LENGTH - 1)));
@@ -2026,37 +2085,35 @@ std::string GameList::GetGameIconPath(std::string_view serial, std::string_view 
   serial_entry->icon_was_extracted = false;
   StringUtil::Strlcpy(serial_entry->serial, index_serial.view(), sizeof(serial_entry->serial));
 
-  // Try extracting an icon.
-  Error error;
   std::unique_ptr<MemoryCardImage::DataArray> data = std::make_unique<MemoryCardImage::DataArray>();
-  if (MemoryCardImage::LoadFromFile(data.get(), memcard_path.c_str(), &error))
+  for (const CardToSearch& card : cards)
   {
-    std::vector<MemoryCardImage::FileInfo> files = MemoryCardImage::EnumerateFiles(*data.get(), false);
-    if (!files.empty())
+    Error error;
+    if (!MemoryCardImage::LoadFromFile(data.get(), card.path.c_str(), &error))
     {
-      const MemoryCardImage::FileInfo& fi = files.front();
-      if (!fi.icon_frames.empty())
-      {
-        INFO_LOG("Extracting memory card icon from {} ({}) to {}", fi.filename, Path::GetFileTitle(memcard_path),
-                 Path::GetFileTitle(ret));
-
-        RGBA8Image image(MemoryCardImage::ICON_WIDTH, MemoryCardImage::ICON_HEIGHT);
-        std::memcpy(image.GetPixels(), &fi.icon_frames.front().pixels,
-                    MemoryCardImage::ICON_WIDTH * MemoryCardImage::ICON_HEIGHT * sizeof(u32));
-        serial_entry->icon_was_extracted = image.SaveToFile(ret.c_str());
-        if (!serial_entry->icon_was_extracted)
-        {
-          ERROR_LOG("Failed to save memory card icon to {}.", ret);
-          ret = {};
-          return ret;
-        }
-      }
+      ERROR_LOG("Failed to load memory card '{}': {}", Path::GetFileName(card.path), error.GetDescription());
+      continue;
     }
+
+    const std::vector<MemoryCardImage::FileInfo> files = MemoryCardImage::EnumerateFiles(*data.get(), false);
+    const MemoryCardImage::FileInfo* fi = FindSaveWithIcon(files, serial, card.per_game);
+    if (!fi)
+      continue;
+
+    INFO_LOG("Extracting memory card icon from {} ({}) to {}", fi->filename, Path::GetFileTitle(card.path),
+             Path::GetFileTitle(ret));
+
+    RGBA8Image image(MemoryCardImage::ICON_WIDTH, MemoryCardImage::ICON_HEIGHT);
+    std::memcpy(image.GetPixels(), &fi->icon_frames.front().pixels,
+                MemoryCardImage::ICON_WIDTH * MemoryCardImage::ICON_HEIGHT * sizeof(u32));
+    serial_entry->icon_was_extracted = image.SaveToFile(ret.c_str());
+    if (!serial_entry->icon_was_extracted)
+      ERROR_LOG("Failed to save memory card icon to {}.", ret);
+    break;
   }
-  else
-  {
-    ERROR_LOG("Failed to load memory card '{}': {}", Path::GetFileName(memcard_path), error.GetDescription());
-  }
+
+  if (!serial_entry->icon_was_extracted)
+    ret = {};
 
   UpdateMemcardTimestampCache(*serial_entry);
   return ret;
