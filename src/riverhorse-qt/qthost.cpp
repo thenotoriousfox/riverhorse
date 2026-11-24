@@ -2099,11 +2099,12 @@ static void SignalHandler(int signal)
   static bool graceful_shutdown_attempted = false;
   if (!graceful_shutdown_attempted && g_main_window)
   {
-    std::fprintf(stderr, "Received CTRL+C, attempting graceful shutdown. Press CTRL+C again to force.\n");
+    std::fprintf(stderr, "Received %s, attempting graceful shutdown. Send it again to force.\n",
+                 (signal == SIGTERM) ? "SIGTERM" : "CTRL+C");
     graceful_shutdown_attempted = true;
 
     // This could be a bit risky invoking from a signal handler... hopefully it's okay.
-    QMetaObject::invokeMethod(g_main_window, "requestExit", Qt::QueuedConnection, Q_ARG(bool, true));
+    QMetaObject::invokeMethod(g_main_window, "requestExit", Qt::QueuedConnection, Q_ARG(bool, false));
     return;
   }
 

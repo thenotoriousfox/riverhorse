@@ -9,6 +9,10 @@ Changes since the DuckStation `v0.1-7371` base. Releases are tagged
 - The Linux AppImage starts again without `RIVERHORSE_X11=1`: it failed with
   "Could not find the Qt platform plugin" unless forced onto X11. It now runs
   on Wayland when the session has it and falls back to X11 otherwise.
+- SIGTERM and Ctrl+C in a terminal shut down without the "Confirm Shutdown"
+  dialog. Before, the dialog waited for a click, so `kill` or a session
+  manager stopping Riverhorse hung, and with `-nogui` the dialog was never
+  visible. The resume state is still saved when Save State On Exit is on.
 
 ## 1.1.0 (2026-11-22)
 
