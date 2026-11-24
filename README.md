@@ -147,7 +147,9 @@ as `host` or `host:port`). The host is then shown the address to give the
 others, the relay's host name and a port it assigned. To run a relay, build
 with `-DBUILD_RELAY_SERVER=ON` and start `riverhorse-relay [port]` (UDP 31210
 by default) on a machine with that port open; it only forwards between
-players registered with it.
+players registered with it. Players behind ordinary home routers, or behind
+the same router, are connected directly after the relay introduces them;
+only those whose routers block that keep going through the relay.
 
 ---
 

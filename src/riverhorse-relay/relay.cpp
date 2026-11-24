@@ -5,7 +5,8 @@
 
 #include <arpa/inet.h>
 #include <netinet/in.h>
-#include <poll.h>
+#include <sys/time.h>
+#include <sys/uio.h>
 #include <sys/socket.h>
 #include <unistd.h>
 
@@ -16,16 +17,19 @@
 #include <cstring>
 #include <random>
 #include <unordered_map>
+#include <vector>
 
 using namespace NetplayRelay;
 using Clock = std::chrono::steady_clock;
 
 static constexpr size_t MAX_CLIENTS = 4096;
 static constexpr u16 FIRST_VIRTUAL_PORT = 1024;
+static constexpr u32 BATCH_SIZE = 64;
 
 struct Client
 {
   sockaddr_in address;
+  sockaddr_in local_address;
   u16 virtual_port;
   Clock::time_point last_seen;
 };
@@ -73,12 +77,35 @@ int main(int argc, char* argv[])
   std::uniform_int_distribution<u32> port_distribution(FIRST_VIRTUAL_PORT, 65535);
   Clock::time_point last_expiry = Clock::now();
 
-  std::array<u8, ADDRESSED_HEADER_SIZE + MAX_PAYLOAD_SIZE> packet;
-  std::array<u8, ADDRESSED_HEADER_SIZE + MAX_PAYLOAD_SIZE> forward;
+  struct Datagram
+  {
+    std::array<u8, ADDRESSED_HEADER_SIZE + MAX_PAYLOAD_SIZE> data;
+    sockaddr_in address;
+    iovec buffer;
+  };
+  std::vector<Datagram> received(BATCH_SIZE);
+  std::array<mmsghdr, BATCH_SIZE> receive_headers = {};
+  for (u32 i = 0; i < BATCH_SIZE; i++)
+  {
+    received[i].buffer = {received[i].data.data(), received[i].data.size()};
+    receive_headers[i].msg_hdr.msg_name = &received[i].address;
+    receive_headers[i].msg_hdr.msg_iov = &received[i].buffer;
+    receive_headers[i].msg_hdr.msg_iovlen = 1;
+  }
+
+  std::array<sockaddr_in, BATCH_SIZE * 2> send_addresses;
+  std::array<iovec, BATCH_SIZE * 2> send_buffers;
+  std::array<mmsghdr, BATCH_SIZE * 2> send_headers = {};
+  std::array<std::array<u8, INTRODUCE_SIZE>, BATCH_SIZE * 2> introductions;
+
+  const timeval receive_timeout = {1, 0};
+  setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &receive_timeout, sizeof(receive_timeout));
+
   for (;;)
   {
-    pollfd pfd = {fd, POLLIN, 0};
-    poll(&pfd, 1, 1000);
+    for (mmsghdr& header : receive_headers)
+      header.msg_hdr.msg_namelen = sizeof(sockaddr_in);
+    const int count = recvmmsg(fd, receive_headers.data(), BATCH_SIZE, MSG_WAITFORONE, nullptr);
 
     const Clock::time_point now = Clock::now();
     if (now - last_expiry >= std::chrono::seconds(KEEPALIVE_INTERVAL_SECONDS))
@@ -99,60 +126,104 @@ int main(int argc, char* argv[])
       last_expiry = now;
     }
 
-    if (!(pfd.revents & POLLIN))
+    if (count <= 0)
       continue;
 
-    sockaddr_in from = {};
-    socklen_t from_size = sizeof(from);
-    const ssize_t size =
-      recvfrom(fd, packet.data(), packet.size(), 0, reinterpret_cast<sockaddr*>(&from), &from_size);
-    if (size < static_cast<ssize_t>(HEADER_SIZE) || std::memcmp(packet.data(), MAGIC, sizeof(MAGIC)) != 0)
-      continue;
+    u32 send_count = 0;
+    const auto queue_send = [&](u8* data, size_t size, const sockaddr_in& address) {
+      send_addresses[send_count] = address;
+      send_buffers[send_count] = {data, size};
+      msghdr& header = send_headers[send_count].msg_hdr;
+      header.msg_name = &send_addresses[send_count];
+      header.msg_namelen = sizeof(sockaddr_in);
+      header.msg_iov = &send_buffers[send_count];
+      header.msg_iovlen = 1;
+      send_count++;
+    };
 
-    const MessageType type = static_cast<MessageType>(packet[4]);
-    if (type != MessageType::Register && type != MessageType::Send && type != MessageType::KeepAlive)
-      continue;
-
-    const u64 key = EndpointKey(from);
-    auto it = clients.find(key);
-    if (it == clients.end())
+    for (int i = 0; i < count; i++)
     {
-      if (clients.size() >= MAX_CLIENTS)
+      u8* const packet = received[i].data.data();
+      const size_t size = receive_headers[i].msg_len;
+      if (size < HEADER_SIZE || std::memcmp(packet, MAGIC, sizeof(MAGIC)) != 0)
         continue;
 
-      u16 virtual_port;
-      do
-        virtual_port = static_cast<u16>(port_distribution(rng));
-      while (clients_by_port.contains(virtual_port));
-
-      it = clients.emplace(key, Client{from, virtual_port, now}).first;
-      clients_by_port.emplace(virtual_port, key);
-      std::printf("Registered virtual port %u.\n", virtual_port);
-      std::fflush(stdout);
-    }
-
-    Client& client = it->second;
-    client.last_seen = now;
-
-    if (type == MessageType::Register)
-    {
-      WriteHeader(forward.data(), MessageType::Registered, client.virtual_port);
-      sendto(fd, forward.data(), ADDRESSED_HEADER_SIZE, 0, reinterpret_cast<const sockaddr*>(&client.address),
-             sizeof(client.address));
-    }
-    else if (type == MessageType::Send && size > static_cast<ssize_t>(ADDRESSED_HEADER_SIZE))
-    {
-      const u16 destination_port = static_cast<u16>((packet[5] << 8) | packet[6]);
-      const auto destination = clients_by_port.find(destination_port);
-      if (destination == clients_by_port.end())
+      const MessageType type = static_cast<MessageType>(packet[4]);
+      if (type != MessageType::Register && type != MessageType::Send && type != MessageType::KeepAlive &&
+          type != MessageType::Locate)
         continue;
 
-      const Client& target = clients.at(destination->second);
-      const size_t payload_size = static_cast<size_t>(size) - ADDRESSED_HEADER_SIZE;
-      WriteHeader(forward.data(), MessageType::Receive, client.virtual_port);
-      std::memcpy(&forward[ADDRESSED_HEADER_SIZE], &packet[ADDRESSED_HEADER_SIZE], payload_size);
-      sendto(fd, forward.data(), ADDRESSED_HEADER_SIZE + payload_size, 0,
-             reinterpret_cast<const sockaddr*>(&target.address), sizeof(target.address));
+      const sockaddr_in& from = received[i].address;
+      const u64 key = EndpointKey(from);
+      auto it = clients.find(key);
+      if (it == clients.end())
+      {
+        if (clients.size() >= MAX_CLIENTS)
+          continue;
+
+        u16 virtual_port;
+        do
+          virtual_port = static_cast<u16>(port_distribution(rng));
+        while (clients_by_port.contains(virtual_port));
+
+        it = clients.emplace(key, Client{from, {}, virtual_port, now}).first;
+        clients_by_port.emplace(virtual_port, key);
+        std::printf("Registered virtual port %u.\n", virtual_port);
+        std::fflush(stdout);
+      }
+
+      Client& client = it->second;
+      client.last_seen = now;
+
+      if (type == MessageType::Register)
+      {
+        if (size >= HEADER_SIZE + ENDPOINT_SIZE)
+        {
+          client.local_address.sin_family = AF_INET;
+          std::memcpy(&client.local_address.sin_addr.s_addr, &packet[HEADER_SIZE], 4);
+          std::memcpy(&client.local_address.sin_port, &packet[HEADER_SIZE + 4], 2);
+        }
+
+        WriteHeader(packet, MessageType::Registered, client.virtual_port);
+        queue_send(packet, ADDRESSED_HEADER_SIZE, client.address);
+      }
+      else if (type == MessageType::Locate && size >= ADDRESSED_HEADER_SIZE)
+      {
+        const auto target = clients_by_port.find(static_cast<u16>((packet[5] << 8) | packet[6]));
+        if (target == clients_by_port.end())
+          continue;
+
+        const Client& other = clients.at(target->second);
+        const auto introduce = [&](const Client& to, const Client& about) {
+          u8* const data = introductions[send_count].data();
+          WriteHeader(data, MessageType::Introduce, about.virtual_port);
+          std::memcpy(&data[ADDRESSED_HEADER_SIZE], &about.address.sin_addr.s_addr, 4);
+          std::memcpy(&data[ADDRESSED_HEADER_SIZE + 4], &about.address.sin_port, 2);
+          std::memcpy(&data[ADDRESSED_HEADER_SIZE + ENDPOINT_SIZE], &about.local_address.sin_addr.s_addr, 4);
+          std::memcpy(&data[ADDRESSED_HEADER_SIZE + ENDPOINT_SIZE + 4], &about.local_address.sin_port, 2);
+          queue_send(data, INTRODUCE_SIZE, to.address);
+        };
+        introduce(client, other);
+        introduce(other, client);
+      }
+      else if (type == MessageType::Send && size > ADDRESSED_HEADER_SIZE)
+      {
+        const u16 destination_port = static_cast<u16>((packet[5] << 8) | packet[6]);
+        const auto destination = clients_by_port.find(destination_port);
+        if (destination == clients_by_port.end())
+          continue;
+
+        WriteHeader(packet, MessageType::Receive, client.virtual_port);
+        queue_send(packet, size, clients.at(destination->second).address);
+      }
+    }
+
+    for (u32 sent = 0; sent < send_count;)
+    {
+      const int result = sendmmsg(fd, &send_headers[sent], send_count - sent, 0);
+      if (result <= 0)
+        break;
+      sent += static_cast<u32>(result);
     }
   }
 }

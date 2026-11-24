@@ -11,7 +11,10 @@ Changes since the DuckStation `v0.1-7371` base. Releases are tagged
 - Netplay through a relay server, for players who can't reach each other
   directly: set the same Relay Server in Settings > Essentials > Netplay (or
   in the host and join dialogs). The relay is a separate program,
-  `riverhorse-relay` (build with `-DBUILD_RELAY_SERVER=ON`).
+  `riverhorse-relay` (build with `-DBUILD_RELAY_SERVER=ON`). It introduces
+  players and they connect directly when their routers allow it (also
+  players behind the same router, over their LAN), so most sessions put
+  almost no load on the relay and play with the shortest ping.
 - Joining a session from a different Riverhorse version is refused with a
   message instead of failing while loading the host's state.
 
