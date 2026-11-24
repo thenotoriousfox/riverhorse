@@ -334,6 +334,13 @@
           </property>
          </widget>
         </item>
+        <item row="2" column="1">
+         <widget class="QCheckBox" name="cdromAutoDiscChange">
+          <property name="text">
+           <string>Change Discs Automatically</string>
+          </property>
+         </widget>
+        </item>
        </layout>
       </item>
       <item row="0" column="0">

@@ -3986,6 +3986,10 @@ void FullscreenUI::DrawConsoleSettingsPage()
     bsi, FSUI_ICONSTR(ICON_FA_VEST_PATCHES, "Apply Image Patches"),
     FSUI_CSTR("Automatically applies patches to disc images when they are present, currently only PPF is supported."),
     "CDROM", "LoadImagePatches", false);
+  DrawToggleSetting(bsi, FSUI_ICONSTR(ICON_FA_COMPACT_DISC, "Change Discs Automatically"),
+                    FSUI_CSTR("Inserts the next disc of a multi-disc game when the game stops the disc and waits for "
+                              "it to be changed."),
+                    "CDROM", "AutoDiscChange", false);
 
   EndMenuButtons();
 }

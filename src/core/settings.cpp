@@ -340,6 +340,7 @@ void Settings::Load(SettingsInterface& si)
   cdrom_fast_forward_loading = si.GetBoolValue("CDROM", "FastForwardLoading", false);
   cdrom_disable_speedup_on_mdec = si.GetBoolValue("CDROM", "DisableSpeedupOnMDEC", false);
   cdrom_load_image_patches = si.GetBoolValue("CDROM", "LoadImagePatches", false);
+  cdrom_auto_disc_change = si.GetBoolValue("CDROM", "AutoDiscChange", false);
   cdrom_mute_cd_audio = si.GetBoolValue("CDROM", "MuteCDAudio", false);
   cdrom_subq_skew = si.GetBoolValue("CDROM", "SubQSkew", false);
   cdrom_read_speedup = si.GetIntValue("CDROM", "ReadSpeedup", 1);
@@ -624,6 +625,7 @@ void Settings::Save(SettingsInterface& si, bool ignore_base) const
   si.SetBoolValue("CDROM", "FastForwardLoading", cdrom_fast_forward_loading);
   si.SetBoolValue("CDROM", "DisableSpeedupOnMDEC", cdrom_disable_speedup_on_mdec);
   si.SetBoolValue("CDROM", "LoadImagePatches", cdrom_load_image_patches);
+  si.SetBoolValue("CDROM", "AutoDiscChange", cdrom_auto_disc_change);
   si.SetBoolValue("CDROM", "MuteCDAudio", cdrom_mute_cd_audio);
   si.SetBoolValue("CDROM", "SubQSkew", cdrom_subq_skew);
   si.SetIntValue("CDROM", "ReadSpeedup", cdrom_read_speedup);

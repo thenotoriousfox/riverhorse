@@ -28,6 +28,11 @@ void DisableReadSpeedup();
 bool IsMediaAudioCD();
 bool DoesMediaRegionMatchConsole();
 
+/// True once the game has stopped the disc and only polled the drive status for a while, as games do while
+/// asking for the next disc. Cleared by ClearDiscChangeWait(), any other command, or changing the media.
+bool IsWaitingForDiscChange();
+void ClearDiscChangeWait();
+
 void InsertMedia(std::unique_ptr<CDImage> media, DiscRegion region);
 std::unique_ptr<CDImage> RemoveMedia(bool for_disc_swap);
 bool PrecacheMedia();

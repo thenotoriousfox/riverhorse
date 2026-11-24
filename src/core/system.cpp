@@ -174,6 +174,7 @@ static void UpdateControllers();
 static void UpdateControllerSettings();
 static void ResetControllers();
 static void UpdatePerGameMemoryCards();
+static bool SwitchToNextDisc();
 static std::unique_ptr<MemoryCard> GetMemoryCardForSlot(u32 slot, MemoryCardType type);
 static void UpdateMultitaps();
 
@@ -2054,6 +2055,13 @@ void System::FrameDone()
   {
     Netplay::FrameDone();
     return;
+  }
+
+  if (g_settings.cdrom_auto_disc_change && CDROM::IsWaitingForDiscChange())
+  {
+    INFO_LOG("The game is waiting for a disc change.");
+    CDROM::ClearDiscChangeWait();
+    SwitchToNextDisc();
   }
 
   if (s_frame_step_request)
@@ -4336,6 +4344,35 @@ bool System::SwitchMediaSubImage(u32 index)
 
   ClearMemorySaveStates();
   return true;
+}
+
+bool System::SwitchToNextDisc()
+{
+  if (HasMediaSubImages())
+  {
+    const u32 next_index = GetMediaSubImageIndex() + 1;
+    return (next_index < GetMediaSubImageCount() && SwitchMediaSubImage(next_index));
+  }
+
+  if (!s_running_game_entry)
+    return false;
+
+  const std::vector<std::string>& serials = s_running_game_entry->disc_set_serials;
+  const auto current = std::find(serials.begin(), serials.end(), s_running_game_serial);
+  if (current == serials.end() || std::next(current) == serials.end())
+    return false;
+
+  std::string next_path;
+  {
+    const auto lock = GameList::GetLock();
+    const GameList::Entry* const next_entry = GameList::GetEntryBySerial(*std::next(current));
+    if (!next_entry)
+      return false;
+
+    next_path = next_entry->path;
+  }
+
+  return InsertMedia(next_path.c_str());
 }
 
 bool System::HasCheatList()

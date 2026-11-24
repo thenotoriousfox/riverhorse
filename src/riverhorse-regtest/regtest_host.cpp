@@ -671,6 +671,7 @@ void RegTestHost::PrintCommandLineHelp(const char* progname)
   std::fprintf(stderr, "  -fastsw: Uses the fast software rasterizer.\n");
   std::fprintf(stderr, "  -hwthread: Runs the hardware renderer on its own thread.\n");
   std::fprintf(stderr, "  -runahead <frames>: Runs ahead by the given number of frames.\n");
+  std::fprintf(stderr, "  -autodiscchange: Inserts the next disc when the game waits for a disc change.\n");
   std::fprintf(stderr, "  -cheats: Loads the game's cheat file from the cheats directory.\n");
   std::fprintf(stderr, "  -patch <name>: Turns on the game's patch with this name. Can be repeated.\n");
   std::fprintf(stderr, "  -frames: Sets the number of frames to execute.\n");
@@ -786,6 +787,11 @@ bool RegTestHost::ParseCommandLineParameters(int argc, char* argv[], std::option
       else if (CHECK_ARG("-hwthread"))
       {
         s_base_settings_interface->SetBoolValue("GPU", "UseHardwareThread", true);
+        continue;
+      }
+      else if (CHECK_ARG("-autodiscchange"))
+      {
+        s_base_settings_interface->SetBoolValue("CDROM", "AutoDiscChange", true);
         continue;
       }
       else if (CHECK_ARG("-cheats"))

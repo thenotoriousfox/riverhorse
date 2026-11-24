@@ -194,6 +194,7 @@ struct Settings
   bool cdrom_fast_forward_loading : 1 = false;
   bool cdrom_disable_speedup_on_mdec : 1 = false;
   bool cdrom_load_image_patches : 1 = false;
+  bool cdrom_auto_disc_change : 1 = false;
   bool cdrom_mute_cd_audio : 1 = false;
   bool cdrom_subq_skew : 1 = false;
   u32 cdrom_read_speedup = 1;

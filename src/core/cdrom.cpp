@@ -413,6 +413,9 @@ static CDImage::LBA s_physical_lba{}; // current position of the disc with respe
 static u32 s_physical_lba_update_tick = 0;
 static u32 s_physical_lba_update_carry = 0;
 static bool s_setloc_pending = false;
+static bool s_stopped_for_disc_change = false;
+static u32 s_disc_change_status_polls = 0;
+static u32 s_disc_change_stop_time = 0;
 static bool s_read_after_seek = false;
 static bool s_play_after_seek = false;
 
@@ -554,6 +557,7 @@ void CDROM::Shutdown()
 
 void CDROM::Reset()
 {
+  ClearDiscChangeWait();
   s_command = Command::None;
   s_command_event.Deactivate();
   ClearCommandSecondResponse();
@@ -695,6 +699,7 @@ TickCount CDROM::SoftReset(TickCount ticks_late)
 
 bool CDROM::DoState(StateWrapper& sw)
 {
+  ClearDiscChangeWait();
   sw.Do(&s_command);
   sw.DoEx(&s_command_second_response, 53, Command::None);
   sw.Do(&s_drive_state);
@@ -845,6 +850,21 @@ bool CDROM::DoState(StateWrapper& sw)
   return !sw.HasError();
 }
 
+bool CDROM::IsWaitingForDiscChange()
+{
+  static constexpr u32 MIN_STATUS_POLLS = 30;
+  static constexpr u32 MIN_WAIT_SECONDS = 2;
+
+  return s_stopped_for_disc_change && s_disc_change_status_polls >= MIN_STATUS_POLLS &&
+         (System::GetGlobalTickCounter() - s_disc_change_stop_time) >= (System::MASTER_CLOCK * MIN_WAIT_SECONDS);
+}
+
+void CDROM::ClearDiscChangeWait()
+{
+  s_stopped_for_disc_change = false;
+  s_disc_change_status_polls = 0;
+}
+
 bool CDROM::HasMedia()
 {
   return s_reader.HasMedia();
@@ -947,6 +967,7 @@ std::unique_ptr<CDImage> CDROM::RemoveMedia(bool for_disc_swap)
     stop_ticks += System::ScaleTicksToOverclock(System::MASTER_CLOCK * 2);
 
   INFO_LOG("Removing CD...");
+  ClearDiscChangeWait();
   std::unique_ptr<CDImage> image = s_reader.RemoveMedia();
 
   if (s_show_current_file)
@@ -1820,6 +1841,9 @@ void CDROM::ExecuteCommand(void*, TickCount ticks, TickCount ticks_late)
   // Stop command event first, reduces our chances of ending up with out-of-order events.
   s_command_event.Deactivate();
 
+  if (s_command != Command::Getstat)
+    s_stopped_for_disc_change = false;
+
   switch (s_command)
   {
     case Command::Getstat:
@@ -1832,6 +1856,9 @@ void CDROM::ExecuteCommand(void*, TickCount ticks, TickCount ticks_late)
       // shell open bit is cleared after sending the status
       if (CanReadMedia())
         s_secondary_status.shell_open = false;
+
+      if (s_stopped_for_disc_change && !IsMotorOn())
+        s_disc_change_status_polls++;
 
       EndCommand();
       return;
@@ -2190,6 +2217,10 @@ void CDROM::ExecuteCommand(void*, TickCount ticks, TickCount ticks_late)
 
     case Command::Stop:
     {
+      s_stopped_for_disc_change = true;
+      s_disc_change_status_polls = 0;
+      s_disc_change_stop_time = System::GetGlobalTickCounter();
+
       const TickCount stop_time = GetTicksForStop(IsMotorOn(), s_current_lba);
       ClearAsyncInterrupt();
       ClearCommandSecondResponse();
