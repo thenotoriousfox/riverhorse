@@ -3659,7 +3659,7 @@ void FullscreenUI::DrawEssentialsSettingsPage()
   DrawToggleSetting(bsi, FSUI_ICONSTR(ICON_FA_LIST, "List Hosted Sessions"),
                     FSUI_CSTR("Shows sessions you host, your nickname and the game to everyone browsing open "
                               "sessions, so they can join without a code."),
-                    "Netplay", "ListSessions", true, use_relay);
+                    "Netplay", "ListSessions", false, use_relay);
   DrawToggleSetting(bsi, FSUI_ICONSTR(ICON_FA_USER, "Ask Before Players Join"),
                     FSUI_CSTR("Shows each join request in a session you host so you can accept or decline it. Off: "
                               "players join straight away."),

@@ -13,6 +13,8 @@
 #include "host.h"
 #include "imgui_overlays.h"
 #include "netplay_packets.h"
+#include "netplay_listing.h"
+#include "scmversion/scmversion.h"
 #include "netplay_relay.h"
 #include "pad.h"
 #include "save_state_version.h"
@@ -275,6 +277,7 @@ static std::vector<PendingJoin> s_pending_joins;
 static u32 s_next_pending_join_id = 0;
 static bool s_join_prompt_open = false;
 static bool s_print_events = false;
+static bool s_list_session = false;
 static GGPOPlayerHandle s_local_handle = GGPO_INVALID_HANDLE;
 static s32 s_local_delay = 0;
 static GGPOSession* s_ggpo = nullptr;
@@ -761,33 +764,20 @@ void Netplay::AttachRelay(bool is_hosting)
 
 void Netplay::PublishSessionListing()
 {
-  static constexpr size_t MAX_NICKNAME = 32;
-  static constexpr size_t MAX_TITLE = 96;
-  static constexpr size_t MAX_SERIAL = 16;
-
-  if (!Host::GetBaseBoolSettingValue("Netplay", "ListSessions", true))
+  if (!s_list_session && !Host::GetBaseBoolSettingValue("Netplay", "ListSessions", false))
     return;
 
-  std::vector<u8> listing;
-  const auto put_u32 = [&listing](u32 value) {
-    for (u32 i = 0; i < 4; i++)
-      listing.push_back(static_cast<u8>(value >> (i * 8)));
-  };
-  const auto put_string = [&listing](std::string_view value, size_t max_length) {
-    value = value.substr(0, max_length);
-    listing.push_back(static_cast<u8>(value.size()));
-    listing.insert(listing.end(), value.begin(), value.end());
-  };
-
-  put_u32(PROTOCOL_VERSION);
-  put_u32(SAVE_STATE_VERSION);
-  listing.push_back(static_cast<u8>(s_num_players));
-  listing.push_back(static_cast<u8>(s_max_players));
-  listing.push_back(static_cast<u8>(!s_local_session_password.empty()));
-  put_string(s_local_nickname, MAX_NICKNAME);
-  put_string(System::GetGameTitle(), MAX_TITLE);
-  put_string(System::GetGameSerial(), MAX_SERIAL);
-  NetplayRelay::Publish(listing);
+  NetplayListing::Listing listing;
+  listing.protocol_version = PROTOCOL_VERSION;
+  listing.save_state_version = SAVE_STATE_VERSION;
+  listing.players = static_cast<u32>(s_num_players);
+  listing.max_players = static_cast<u32>(s_max_players);
+  listing.has_password = !s_local_session_password.empty();
+  listing.nickname = s_local_nickname;
+  listing.title = System::GetGameTitle();
+  listing.serial = System::GetGameSerial();
+  listing.version = g_scm_tag_str;
+  NetplayRelay::Publish(NetplayListing::Encode(listing));
 }
 
 std::optional<std::vector<Netplay::SessionListing>> Netplay::GetSessionList(Error* error)
@@ -806,45 +796,24 @@ std::optional<std::vector<Netplay::SessionListing>> Netplay::GetSessionList(Erro
   std::vector<SessionListing> sessions;
   for (const NetplayRelay::ListedSession& entry : listed.value())
   {
-    const std::vector<u8>& data = entry.listing;
-    size_t pos = 0;
-    const auto get_u32 = [&data, &pos]() -> std::optional<u32> {
-      if (pos + 4 > data.size())
-        return std::nullopt;
-      u32 value = 0;
-      for (u32 i = 0; i < 4; i++)
-        value |= static_cast<u32>(data[pos++]) << (i * 8);
-      return value;
-    };
-    const auto get_u8 = [&data, &pos]() -> std::optional<u8> {
-      return (pos < data.size()) ? std::optional<u8>(data[pos++]) : std::nullopt;
-    };
-    const auto get_string = [&data, &pos, &get_u8]() -> std::optional<std::string> {
-      const std::optional<u8> length = get_u8();
-      if (!length.has_value() || pos + length.value() > data.size())
-        return std::nullopt;
-      std::string value(reinterpret_cast<const char*>(&data[pos]), length.value());
-      pos += length.value();
-      return value;
-    };
-
-    if (get_u32() != PROTOCOL_VERSION || get_u32() != SAVE_STATE_VERSION)
-      continue;
-
-    const std::optional<u8> players = get_u8(), max_players = get_u8(), flags = get_u8();
-    std::optional<std::string> nickname = get_string(), title = get_string(), serial = get_string();
-    if (!players.has_value() || !max_players.has_value() || !flags.has_value() || !nickname.has_value() ||
-        !title.has_value() || !serial.has_value())
+    std::optional<NetplayListing::Listing> listing = NetplayListing::Decode(entry.listing);
+    if (!listing.has_value() || listing->protocol_version != PROTOCOL_VERSION ||
+        listing->save_state_version != SAVE_STATE_VERSION)
     {
       continue;
     }
 
-    sessions.push_back(SessionListing{entry.session_code, players.value(), max_players.value(),
-                                      (flags.value() & 1) != 0, std::move(nickname.value()),
-                                      std::move(title.value()), std::move(serial.value())});
+    sessions.push_back(SessionListing{entry.session_code, listing->players, listing->max_players,
+                                      listing->has_password, std::move(listing->nickname),
+                                      std::move(listing->title), std::move(listing->serial)});
   }
 
   return sessions;
+}
+
+void Netplay::SetListSession(bool enabled)
+{
+  s_list_session = enabled;
 }
 
 void Netplay::SetPrintEvents(bool enabled)

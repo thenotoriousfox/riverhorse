@@ -2169,6 +2169,7 @@ void QtHost::PrintCommandLineHelp(const char* progname)
                        "    or at that address. A boot filename, if given, is used when it is the host's game.\n");
   std::fprintf(stderr, "  -netplaynick <name>: Name shown to other netplay players.\n");
   std::fprintf(stderr, "  -netplayspectate: With -netplayjoin, watch the session without playing.\n");
+  std::fprintf(stderr, "  -netplaypublic: With -netplayhost, lists the session publicly on the relay server.\n");
   std::fprintf(stderr, "  -netplayevents: Prints netplay events on stdout, one per line (see README).\n");
   std::fprintf(stderr, "  -state <index>: Loads specified save state by index. If a boot\n"
                        "    filename is provided, a per-game state will be loaded, otherwise\n"
@@ -2336,6 +2337,11 @@ bool QtHost::ParseCommandLineParametersAndInitializeConfig(QApplication& app,
       else if (CHECK_ARG_PARAM("-netplaynick"))
       {
         s_netplay_nickname = args[++i].toStdString();
+        continue;
+      }
+      else if (CHECK_ARG("-netplaypublic"))
+      {
+        Netplay::SetListSession(true);
         continue;
       }
       else if (CHECK_ARG("-netplayevents"))

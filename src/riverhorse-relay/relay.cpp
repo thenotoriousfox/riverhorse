@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Riverhorse contributors
 // SPDX-License-Identifier: GPL-3.0-only
 
+#include "core/netplay_listing.h"
 #include "core/netplay_relay.h"
 
 #include <arpa/inet.h>
@@ -16,6 +17,10 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <mutex>
+#include <string>
+#include <string_view>
+#include <thread>
 #include <random>
 #include <unordered_map>
 #include <vector>
@@ -47,6 +52,187 @@ static void WriteHeader(u8* data, MessageType type, u16 port)
   data[4] = static_cast<u8>(type);
   data[5] = static_cast<u8>(port >> 8);
   data[6] = static_cast<u8>(port);
+}
+
+struct PublicSession
+{
+  std::string version;
+  std::string json;
+};
+
+static std::mutex s_public_sessions_mutex;
+static std::vector<PublicSession> s_public_sessions;
+
+static void AppendJsonString(std::string* out, std::string_view value)
+{
+  out->push_back('"');
+  for (const char ch : value)
+  {
+    if (ch == '"' || ch == '\\')
+    {
+      out->push_back('\\');
+      out->push_back(ch);
+    }
+    else if (static_cast<unsigned char>(ch) < 0x20)
+    {
+      char escaped[8];
+      std::snprintf(escaped, sizeof(escaped), "\\u%04x", static_cast<unsigned>(static_cast<unsigned char>(ch)));
+      out->append(escaped);
+    }
+    else
+    {
+      out->push_back(ch);
+    }
+  }
+  out->push_back('"');
+}
+
+static void UpdatePublicSessions(const std::unordered_map<u64, Client>& clients)
+{
+  std::vector<PublicSession> sessions;
+  for (const auto& [key, client] : clients)
+  {
+    if (client.listing.empty())
+      continue;
+
+    const std::optional<NetplayListing::Listing> listing = NetplayListing::Decode(client.listing);
+    if (!listing.has_value())
+      continue;
+
+    std::string json = "{\"id\":" + std::to_string(client.virtual_port) +
+                       ",\"code\":" + std::to_string(client.virtual_port) + ",\"nickname\":";
+    AppendJsonString(&json, listing->nickname);
+    json += ",\"serial\":";
+    AppendJsonString(&json, listing->serial);
+    json += ",\"title\":";
+    AppendJsonString(&json, listing->title);
+    json += ",\"version\":";
+    AppendJsonString(&json, listing->version);
+    json += ",\"protocol\":" + std::to_string(listing->protocol_version) +
+            ",\"state_version\":" + std::to_string(listing->save_state_version) +
+            ",\"players\":" + std::to_string(listing->players) +
+            ",\"max_players\":" + std::to_string(listing->max_players) +
+            ",\"password\":" + (listing->has_password ? "true" : "false") +
+            ",\"joinable\":" + ((listing->players < listing->max_players) ? "true" : "false") + "}";
+    sessions.push_back(PublicSession{listing->version, std::move(json)});
+  }
+
+  std::unique_lock lock(s_public_sessions_mutex);
+  s_public_sessions = std::move(sessions);
+}
+
+static std::string DecodeQueryValue(std::string_view value)
+{
+  std::string out;
+  for (size_t i = 0; i < value.size(); i++)
+  {
+    if (value[i] == '+')
+      out.push_back(' ');
+    else if (value[i] == '%' && i + 2 < value.size())
+    {
+      out.push_back(static_cast<char>(std::strtol(std::string(value.substr(i + 1, 2)).c_str(), nullptr, 16)));
+      i += 2;
+    }
+    else
+      out.push_back(value[i]);
+  }
+  return out;
+}
+
+static std::string BuildHttpResponse(std::string_view request)
+{
+  const auto respond = [](std::string_view status, std::string_view body) {
+    return "HTTP/1.1 " + std::string(status) +
+           "\r\nContent-Type: application/json\r\nAccess-Control-Allow-Origin: *\r\nCache-Control: no-store\r\n"
+           "Connection: close\r\nContent-Length: " +
+           std::to_string(body.size()) + "\r\n\r\n" + std::string(body);
+  };
+
+  const size_t line_end = request.find("\r\n");
+  const std::string_view line = request.substr(0, line_end);
+  if (!line.starts_with("GET "))
+    return respond("405 Method Not Allowed", "{\"error\":\"method not allowed\"}");
+
+  const size_t target_end = line.find(' ', 4);
+  const std::string_view target = line.substr(4, (target_end == std::string_view::npos) ? line.size() - 4 : target_end - 4);
+  const size_t query_start = target.find('?');
+  const std::string_view path = target.substr(0, query_start);
+  if (path != "/v1/sessions")
+    return respond("404 Not Found", "{\"error\":\"not found\"}");
+
+  std::string version;
+  if (query_start != std::string_view::npos)
+  {
+    std::string_view query = target.substr(query_start + 1);
+    while (!query.empty())
+    {
+      const size_t amp = query.find('&');
+      const std::string_view pair = query.substr(0, amp);
+      if (pair.starts_with("version="))
+        version = DecodeQueryValue(pair.substr(8));
+      query = (amp == std::string_view::npos) ? std::string_view() : query.substr(amp + 1);
+    }
+  }
+
+  std::string body = "{\"sessions\":[";
+  {
+    std::unique_lock lock(s_public_sessions_mutex);
+    bool first = true;
+    for (const PublicSession& session : s_public_sessions)
+    {
+      if (!version.empty() && session.version != version)
+        continue;
+      if (!first)
+        body.push_back(',');
+      body += session.json;
+      first = false;
+    }
+  }
+  body += "]}";
+  return respond("200 OK", body);
+}
+
+static void ServeHttp(int listen_port)
+{
+  const int fd = socket(AF_INET, SOCK_STREAM, 0);
+  const int reuse = 1;
+  setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse));
+  sockaddr_in address = {};
+  address.sin_family = AF_INET;
+  address.sin_addr.s_addr = htonl(INADDR_ANY);
+  address.sin_port = htons(static_cast<u16>(listen_port));
+  if (fd < 0 || bind(fd, reinterpret_cast<const sockaddr*>(&address), sizeof(address)) != 0 || listen(fd, 16) != 0)
+  {
+    std::perror("HTTP listen");
+    return;
+  }
+
+  std::printf("Session list on http://0.0.0.0:%d/v1/sessions.\n", listen_port);
+  std::fflush(stdout);
+
+  const timeval timeout = {2, 0};
+  for (;;)
+  {
+    const int client = accept(fd, nullptr, nullptr);
+    if (client < 0)
+      continue;
+
+    setsockopt(client, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+    setsockopt(client, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
+    std::string request;
+    char buffer[1024];
+    while (request.size() < 8192 && request.find("\r\n\r\n") == std::string::npos)
+    {
+      const ssize_t received = recv(client, buffer, sizeof(buffer), 0);
+      if (received <= 0)
+        break;
+      request.append(buffer, static_cast<size_t>(received));
+    }
+
+    const std::string response = BuildHttpResponse(request);
+    send(client, response.data(), response.size(), MSG_NOSIGNAL);
+    close(client);
+  }
 }
 
 static void SendSessionList(int fd, const sockaddr_in& to, u16 start,
@@ -110,6 +296,8 @@ int main(int argc, char* argv[])
 
   std::printf("Riverhorse netplay relay listening on UDP port %d.\n", listen_port);
   std::fflush(stdout);
+  std::thread(ServeHttp, listen_port).detach();
+  bool listings_changed = false;
 
   std::unordered_map<u64, Client> clients;
   std::unordered_map<u16, u64> clients_by_port;
@@ -143,6 +331,12 @@ int main(int argc, char* argv[])
 
   for (;;)
   {
+    if (listings_changed)
+    {
+      UpdatePublicSessions(clients);
+      listings_changed = false;
+    }
+
     for (mmsghdr& header : receive_headers)
       header.msg_hdr.msg_namelen = sizeof(sockaddr_in);
     const int count = recvmmsg(fd, receive_headers.data(), BATCH_SIZE, MSG_WAITFORONE, nullptr);
@@ -159,6 +353,7 @@ int main(int argc, char* argv[])
         }
 
         std::printf("Expired virtual port %u.\n", it->second.virtual_port);
+        listings_changed |= !it->second.listing.empty();
         clients_by_port.erase(it->second.virtual_port);
         it = clients.erase(it);
       }
@@ -237,10 +432,12 @@ int main(int argc, char* argv[])
       else if (type == MessageType::Publish)
       {
         client.listing.assign(packet + HEADER_SIZE, packet + std::min<size_t>(size, HEADER_SIZE + MAX_LISTING_SIZE));
+        listings_changed = true;
       }
       else if (type == MessageType::Unpublish)
       {
         client.listing.clear();
+        listings_changed = true;
       }
       else if (type == MessageType::Locate && size >= ADDRESSED_HEADER_SIZE)
       {

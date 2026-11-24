@@ -9,6 +9,16 @@ Changes since the DuckStation `v0.1-7371` base. Releases are tagged
 - `-netplayevents` prints netplay events on stdout (hosting, players joining
   and leaving, stopped) for frontends to read, also for sessions started from
   the menus. The line format is in the README.
+- Public session list: riverhorse-relay serves the sessions hosts chose to
+  list as JSON at `http://<relay>:<relay port>/v1/sessions` (TCP, same port
+  number as the relay), optionally `?version=<Riverhorse version>`, so any
+  frontend can show open games; see the README. `-netplaypublic` lists a
+  session started from the command line.
+
+### Changes
+- Hosted sessions are only listed when the host turns on "List in the
+  session browser" (or List Hosted Sessions in Big Picture); it used to be on
+  by default. Listings now carry the host's Riverhorse version.
 
 ### Fixes
 - Netplay started from the command line uses the Nickname setting when

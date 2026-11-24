@@ -167,6 +167,18 @@ percent-encoded (anything other than letters, digits and `-._~:` becomes
 - `stopped` when the session ends; a frontend should also treat the
   process exiting as the end of the session
 
+Hosts can list their session publicly ("List in the session browser" in the
+host dialog, List Hosted Sessions in Big Picture, or `-netplaypublic` with
+`-netplayhost`; off by default). The relay serves the list as JSON over HTTP
+on the relay's port number (TCP): `GET /v1/sessions`, optionally
+`?version=<Riverhorse version tag>` to keep only sessions of that version
+(players can only join the same version). Each session has `id` and `code`
+(the session code, join with `-netplayjoin <code>`), `nickname`, `serial`,
+`title`, `version`, `protocol`, `state_version`, `players`, `max_players`,
+`password` and `joinable` (not full). Sessions leave the list when the host
+stops or stops answering the relay (30 seconds). Host addresses are never
+listed; joining goes through the relay.
+
 Session codes come from a relay server, which introduces the players; they
 then connect directly, and only players whose routers block that keep going
 through the relay. Riverhorse uses a default relay; Settings > Essentials >

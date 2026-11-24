@@ -155,6 +155,7 @@
     <ClInclude Include="negcon.h" />
     <ClInclude Include="netplay.h" />
     <ClInclude Include="netplay_packets.h" />
+    <ClInclude Include="netplay_listing.h" />
     <ClInclude Include="netplay_relay.h" />
     <ClInclude Include="negcon_rumble.h" />
     <ClInclude Include="pad.h" />

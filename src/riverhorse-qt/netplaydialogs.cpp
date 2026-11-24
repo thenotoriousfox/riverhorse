@@ -21,7 +21,7 @@ CreateNetplaySessionDialog::CreateNetplaySessionDialog(QWidget* parent) : QDialo
   m_ui.inputDelay->setValue(Host::GetBaseIntSettingValue("Netplay", "InputDelay", 0));
   m_ui.useRelay->setChecked(Host::GetBaseBoolSettingValue("Netplay", "UseRelay", true));
   m_ui.relayServer->setText(QString::fromStdString(Host::GetBaseStringSettingValue("Netplay", "RelayServer", "")));
-  m_ui.listSession->setChecked(Host::GetBaseBoolSettingValue("Netplay", "ListSessions", true));
+  m_ui.listSession->setChecked(Host::GetBaseBoolSettingValue("Netplay", "ListSessions", false));
   m_ui.confirmJoins->setChecked(Host::GetBaseBoolSettingValue("Netplay", "ConfirmJoins", false));
 
   connect(m_ui.nickname, &QLineEdit::textChanged, this, &CreateNetplaySessionDialog::updateState);
