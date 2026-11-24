@@ -36,7 +36,7 @@ namespace GameDatabase {
 enum : u32
 {
   GAME_DATABASE_CACHE_SIGNATURE = 0x45434C48,
-  GAME_DATABASE_CACHE_VERSION = 14,
+  GAME_DATABASE_CACHE_VERSION = 15,
 };
 
 static Entry* GetMutableEntry(std::string_view serial);
@@ -89,6 +89,7 @@ static constexpr const std::array<const char*, static_cast<u32>(GameDatabase::Tr
   "ForceRecompilerLUTFastmem",
   "ForceCDROMSubQSkew",
   "DisableCDROMSpeedupOnMDEC",
+  "DisableCDROMReadSpeedup",
   "IsLibCryptProtected",
 }};
 
@@ -120,6 +121,7 @@ static constexpr const std::array<const char*, static_cast<u32>(GameDatabase::Tr
   TRANSLATE_NOOP("GameDatabase", "Force Recompiler LUT Fastmem"),
   TRANSLATE_NOOP("GameDatabase", "Force CD-ROM SubQ Skew"),
   TRANSLATE_NOOP("GameDatabase", "Disable CD-ROM Speedup on MDEC"),
+  TRANSLATE_NOOP("GameDatabase", "Disable CD-ROM Read Speedup"),
   TRANSLATE_NOOP("GameDatabase", "Is LibCrypt Protected"),
 }};
 
@@ -704,6 +706,14 @@ void GameDatabase::Entry::ApplySettings(Settings& settings, bool display_osd_mes
   {
     WARNING_LOG("CD-ROM speedup during MDEC decoding disabled by compatibility settings.");
     settings.cdrom_disable_speedup_on_mdec = true;
+  }
+
+  if (HasTrait(Trait::DisableCDROMReadSpeedup))
+  {
+    if (display_osd_messages && settings.cdrom_read_speedup != 1)
+      APPEND_MESSAGE(TRANSLATE_SV("GameDatabase", "CD-ROM read speedup disabled."));
+
+    settings.cdrom_read_speedup = 1;
   }
 
   if (HasTrait(Trait::ForceCDROMSubQSkew))

@@ -65844,6 +65844,7 @@ SCES-00984:
     - DigitalController
     - NeGcon
   traits:
+    - DisableWidescreen # The widescreen hack has no effect here; the picture is only stretched.
     - NormalizePGXPDepth # Shrinks the transforms of distant objects, breaking the depth buffer.
   metadata:
     publisher: "Sony"
@@ -65884,6 +65885,7 @@ SCPS-10045:
     - SCPS-91128
     - SCPS-91301
   traits:
+    - DisableWidescreen # The widescreen hack has no effect here; the picture is only stretched.
     - NormalizePGXPDepth # Shrinks the transforms of distant objects, breaking the depth buffer.
   metadata:
     publisher: "Sony"
@@ -65909,6 +65911,7 @@ SCUS-94194:
     - DigitalController
     - NeGcon
   traits:
+    - DisableWidescreen # The widescreen hack has no effect here; the picture is only stretched.
     - NormalizePGXPDepth # Shrinks the transforms of distant objects, breaking the depth buffer.
   metadata:
     publisher: "Sony"
@@ -152457,6 +152460,7 @@ SCES-02835:
     - AnalogController
     - DigitalController
   traits:
+    - DisableCDROMReadSpeedup # Read speedup silences or hangs the cutscene audio.
     - ForcePGXPCPUMode
   libcrypt: true
   metadata:
@@ -152486,6 +152490,7 @@ SCUS-94467:
     - AnalogController
     - DigitalController
   traits:
+    - DisableCDROMReadSpeedup # Read speedup silences or hangs the cutscene audio.
     - ForcePGXPCPUMode
   metadata:
     publisher: "Sony"
@@ -152503,6 +152508,8 @@ SCUS-94467:
     linkCable: false
 SCUS-94615:
   name: "Spyro - Year of the Dragon (USA) (Demo)"
+  traits:
+    - DisableCDROMReadSpeedup # Read speedup silences or hangs the cutscene audio.
 SCES-02104:
   name: "Spyro 2 - Gateway to Glimmer (Europe) (En,Fr,De,Es,It)"
   compatibility:
@@ -152511,6 +152518,7 @@ SCES-02104:
     - AnalogController
     - DigitalController
   traits:
+    - DisableCDROMReadSpeedup # Read speedup silences or hangs the cutscene audio.
     - ForcePGXPCPUMode
   libcrypt: true
   metadata:
@@ -152540,6 +152548,7 @@ SCUS-94425:
     - AnalogController
     - DigitalController
   traits:
+    - DisableCDROMReadSpeedup # Read speedup silences or hangs the cutscene audio.
     - ForcePGXPCPUMode
   metadata:
     publisher: "Sony"
@@ -152557,8 +152566,12 @@ SCUS-94425:
     linkCable: false
 SCUS-94460:
   name: "Spyro 2 - Ripto's Rage! (USA) (Demo)"
+  traits:
+    - DisableCDROMReadSpeedup # Read speedup silences or hangs the cutscene audio.
 SCUS-94632:
   name: "Spyro 2 - Ripto's Rage! + Crash Team Racing (USA)"
+  traits:
+    - DisableCDROMReadSpeedup # Read speedup silences or hangs the cutscene audio.
 SCPS-45395:
   name: "Spyro the Dragon"
   controllers:

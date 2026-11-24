@@ -55,6 +55,7 @@ enum class Trait : u32
   ForceRecompilerLUTFastmem,
   ForceCDROMSubQSkew,
   DisableCDROMSpeedupOnMDEC,
+  DisableCDROMReadSpeedup,
   IsLibCryptProtected,
 
   Count
