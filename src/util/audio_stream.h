@@ -261,9 +261,7 @@ private:
 
   void InternalWriteFrames(SampleType* samples, u32 num_frames);
 
-#ifndef __ANDROID__
   void ExpandAllocate();
-#endif
 
   void StretchAllocate();
   void StretchDestroy();
@@ -302,14 +300,12 @@ private:
   // float buffer, soundtouch only accepts float samples as input
   std::unique_ptr<float[]> m_float_buffer;
 
-#ifndef __ANDROID__
   std::unique_ptr<FreeSurroundDecoder> m_expander;
 
   // block buffer for expansion
   std::unique_ptr<float[]> m_expand_buffer;
   float* m_expand_output_buffer = nullptr;
   u32 m_expand_buffer_pos = 0;
-#endif
 };
 
 template<AudioExpansionMode mode, AudioStream::ReadChannel c0, AudioStream::ReadChannel c1, AudioStream::ReadChannel c2,

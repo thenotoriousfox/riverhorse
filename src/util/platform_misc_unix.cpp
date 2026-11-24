@@ -152,7 +152,7 @@ size_t PlatformMisc::GetRuntimePageSize()
 
 bool PlatformMisc::PlaySoundAsync(const char* path)
 {
-#ifdef __linux__
+#if defined(__linux__) && !defined(__ANDROID__)
   // This is... pretty awful. But I can't think of a better way without linking to e.g. gstreamer.
   const char* cmdname = "aplay";
   const char* argv[] = {cmdname, path, nullptr};

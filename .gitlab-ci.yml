@@ -7,12 +7,15 @@
     CORE_ARGS: >-
       -DBUILD_QT_FRONTEND=OFF -DBUILD_LIBRETRO_CORE=ON -DENABLE_DESKTOP_INTEGRATION=OFF
       -DUSE_BUNDLED_DEPENDENCIES=ON
+    API_LEVEL: 24
 
 include:
   - project: 'libretro-infrastructure/ci-templates'
     file: '/linux-cmake.yml'
   - project: 'libretro-infrastructure/ci-templates'
     file: '/windows-cmake-mingw.yml'
+  - project: 'libretro-infrastructure/ci-templates'
+    file: '/android-cmake.yml'
 
 stages:
   - build-prepare
@@ -36,4 +39,14 @@ libretro-build-linux-aarch64:
 libretro-build-windows-x64:
   extends:
     - .libretro-windows-cmake-x86_64
+    - .core-defs
+
+android-arm64-v8a:
+  extends:
+    - .libretro-android-cmake-arm64-v8a
+    - .core-defs
+
+android-x86_64:
+  extends:
+    - .libretro-android-cmake-x86_64
     - .core-defs

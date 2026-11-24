@@ -15,9 +15,7 @@
 #include "soundtouch/SoundTouch.h"
 #include "soundtouch/SoundTouchDLL.h"
 
-#ifndef __ANDROID__
 #include "freesurround_decoder.h"
-#endif
 
 #include <algorithm>
 #include <cmath>
@@ -504,14 +502,12 @@ void AudioStream::DestroyBuffer()
 
 void AudioStream::EmptyBuffer()
 {
-#ifndef __ANDROID__
   if (IsExpansionEnabled())
   {
     m_expander->Flush();
     m_expand_output_buffer = nullptr;
     m_expand_buffer_pos = 0;
   }
-#endif
 
   if (IsStretchEnabled())
   {
@@ -624,7 +620,6 @@ void AudioStream::ExpandAllocate()
   if (m_parameters.expansion_mode == AudioExpansionMode::Disabled)
     return;
 
-#ifndef __ANDROID__
   static constexpr std::array<std::pair<FreeSurroundDecoder::ChannelSetup, bool>,
                               static_cast<size_t>(AudioExpansionMode::Count)>
     channel_setup_mapping = {{
@@ -649,9 +644,6 @@ void AudioStream::ExpandAllocate()
   m_expander->SetRearSeparation(m_parameters.expand_rear_separation);
   m_expander->SetLowCutoff(static_cast<float>(m_parameters.expand_low_cutoff) / m_sample_rate * 2);
   m_expander->SetHighCutoff(static_cast<float>(m_parameters.expand_high_cutoff) / m_sample_rate * 2);
-#else
-  Panic("Attempting to use expansion on Android.");
-#endif
 }
 
 void AudioStream::EndWrite(u32 num_frames)
@@ -673,7 +665,6 @@ void AudioStream::EndWrite(u32 num_frames)
     return;
   }
 
-#ifndef __ANDROID__
   if (IsExpansionEnabled())
   {
     // StretchWriteBlock() overwrites the staging buffer on output, so we need to copy into the expand buffer first.
@@ -693,7 +684,6 @@ void AudioStream::EndWrite(u32 num_frames)
     }
   }
   else
-#endif
   {
     S16ChunkToFloat(m_staging_buffer.get(), m_float_buffer.get(), CHUNK_SIZE * NUM_INPUT_CHANNELS);
     StretchWriteBlock(m_float_buffer.get());
@@ -907,14 +897,10 @@ void AudioStreamParameters::Load(SettingsInterface& si, const char* section)
     AudioStream::ParseStretchMode(
       si.GetStringValue(section, "StretchMode", AudioStream::GetStretchModeName(DEFAULT_STRETCH_MODE)).c_str())
       .value_or(DEFAULT_STRETCH_MODE);
-#ifndef __ANDROID__
   expansion_mode =
     AudioStream::ParseExpansionMode(
       si.GetStringValue(section, "ExpansionMode", AudioStream::GetExpansionModeName(DEFAULT_EXPANSION_MODE)).c_str())
       .value_or(DEFAULT_EXPANSION_MODE);
-#else
-  expansion_mode = AudioExpansionMode::Disabled;
-#endif
   output_latency_ms = static_cast<u16>(std::min<u32>(
     si.GetUIntValue(section, "OutputLatencyMS", DEFAULT_OUTPUT_LATENCY_MS), std::numeric_limits<u16>::max()));
   output_latency_minimal = si.GetBoolValue(section, "OutputLatencyMinimal", DEFAULT_OUTPUT_LATENCY_MINIMAL);

@@ -27,12 +27,15 @@
 #include <mach/mach_vm.h>
 #include <mach/vm_map.h>
 #include <sys/mman.h>
-#elif !defined(__ANDROID__)
+#else
 #include <cerrno>
 #include <dlfcn.h>
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <unistd.h>
+#ifdef __ANDROID__
+#include <sys/syscall.h>
+#endif
 #endif
 
 #if defined(_WIN32) && !defined(_MSC_VER)
@@ -616,7 +619,14 @@ void MemMap::EndCodeWrite()
 
 #endif
 
-#elif !defined(__ANDROID__)
+#else
+
+static void UnlinkSharedMemory(const char* name)
+{
+#ifndef __ANDROID__
+  shm_unlink(name);
+#endif
+}
 
 bool MemMap::MemProtect(void* baseaddr, size_t size, PageProtect mode)
 {
@@ -646,7 +656,14 @@ std::string MemMap::GetFileMappingName(const char* prefix)
 void* MemMap::CreateSharedMemory(const char* name, size_t size, Error* error)
 {
   const bool is_anonymous = (!name || *name == 0);
-#if defined(__linux__) || defined(__FreeBSD__)
+#if defined(__ANDROID__)
+  const int fd = static_cast<int>(syscall(__NR_memfd_create, is_anonymous ? "" : name, 0));
+  if (fd < 0)
+  {
+    Error::SetErrno(error, "memfd_create() failed: ", errno);
+    return nullptr;
+  }
+#elif defined(__linux__) || defined(__FreeBSD__)
   const int fd = is_anonymous ? memfd_create("", 0) : shm_open(name, O_CREAT | O_EXCL | O_RDWR, 0600);
   if (fd < 0)
   {
@@ -663,7 +680,7 @@ void* MemMap::CreateSharedMemory(const char* name, size_t size, Error* error)
 
   // we're not going to be opening this mapping in other processes, so remove the file
   if (is_anonymous)
-    shm_unlink(name);
+    UnlinkSharedMemory(name);
 #endif
 
   // use fallocate() to ensure we don't SIGBUS later on.
@@ -673,7 +690,7 @@ void* MemMap::CreateSharedMemory(const char* name, size_t size, Error* error)
     Error::SetErrno(error, TinyString::from_format("fallocate({}) failed: ", size), errno);
     close(fd);
     if (!is_anonymous)
-      shm_unlink(name);
+      UnlinkSharedMemory(name);
     return nullptr;
   }
 #else
@@ -683,7 +700,7 @@ void* MemMap::CreateSharedMemory(const char* name, size_t size, Error* error)
     Error::SetErrno(error, TinyString::from_format("ftruncate({}) failed: ", size), errno);
     close(fd);
     if (!is_anonymous)
-      shm_unlink(name);
+      UnlinkSharedMemory(name);
     return nullptr;
   }
 #endif
@@ -698,7 +715,7 @@ void MemMap::DestroySharedMemory(void* ptr)
 
 void MemMap::DeleteSharedMemory(const char* name)
 {
-  shm_unlink(name);
+  UnlinkSharedMemory(name);
 }
 
 void* MemMap::MapSharedMemory(void* handle, size_t offset, void* baseaddr, size_t size, PageProtect mode)

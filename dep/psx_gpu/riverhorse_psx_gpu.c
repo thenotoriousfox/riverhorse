@@ -13,7 +13,8 @@ static void* aligned_gpu_alloc(size_t alignment, size_t size)
 #ifdef _WIN32
   return _aligned_malloc(size, alignment);
 #else
-  return aligned_alloc(alignment, size);
+  void* ptr = NULL;
+  return (posix_memalign(&ptr, alignment, size) == 0) ? ptr : NULL;
 #endif
 }
 

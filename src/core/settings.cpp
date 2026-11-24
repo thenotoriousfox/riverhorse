@@ -85,7 +85,7 @@ float SettingInfo::FloatStepValue() const
 
 #if defined(_WIN32)
 const MediaCaptureBackend Settings::DEFAULT_MEDIA_CAPTURE_BACKEND = MediaCaptureBackend::MediaFoundation;
-#elif !defined(__ANDROID__)
+#else
 const MediaCaptureBackend Settings::DEFAULT_MEDIA_CAPTURE_BACKEND = MediaCaptureBackend::FFmpeg;
 #endif
 
@@ -466,14 +466,6 @@ void Settings::Load(SettingsInterface& si)
   texture_replacements.dump_vram_write_height_threshold =
     si.GetIntValue("TextureReplacements", "DumpVRAMWriteHeightThreshold", 128);
 
-#ifdef __ANDROID__
-  // No expansion due to license incompatibility.
-  audio_expansion_mode = AudioExpansionMode::Disabled;
-
-  // Android users are incredibly silly and don't understand that stretch is in the aspect ratio list...
-  if (si.GetBoolValue("Display", "Stretch", false))
-    display_aspect_ratio = DisplayAspectRatio::MatchWindow;
-#endif
 }
 
 void Settings::Save(SettingsInterface& si, bool ignore_base) const

@@ -19,7 +19,7 @@
 #include "opengl_context_wgl.h"
 #elif defined(__APPLE__)
 #include "opengl_context_agl.h"
-#elif defined(__ANDROID__)
+#elif defined(__ANDROID__) && defined(ENABLE_DESKTOP_INTEGRATION)
 #include "opengl_context_egl_android.h"
 #else
 #ifdef ENABLE_EGL
@@ -164,7 +164,7 @@ std::unique_ptr<OpenGLContext> OpenGLContext::Create(const WindowInfo& wi, Error
 #elif defined(__APPLE__)
   else
     context = OpenGLContextAGL::Create(wi, versions_to_try, error);
-#elif defined(__ANDROID__)
+#elif defined(__ANDROID__) && defined(ENABLE_DESKTOP_INTEGRATION)
   else
     context = ContextEGLAndroid::Create(wi, versions_to_try, error);
 #else

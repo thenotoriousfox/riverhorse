@@ -133,9 +133,6 @@ if(ENABLE_OPENGL)
         opengl_context_egl_wayland.h
       )
     endif()
-    if(ANDROID)
-      target_include_directories(util PRIVATE "${CMAKE_SOURCE_DIR}/android/app/src/cpp")
-    endif()
   endif()
 
   if(APPLE)
@@ -191,11 +188,9 @@ if(NOT ANDROID AND ENABLE_DESKTOP_INTEGRATION)
     SDL2::SDL2
   )
 endif()
-if(NOT ANDROID)
-  target_link_libraries(util PUBLIC freesurround)
-  # FFmpeg loaded dynamically on demand.
-  target_include_directories(util PUBLIC ${FFMPEG_INCLUDE_DIRS})
-endif()
+target_link_libraries(util PUBLIC freesurround)
+# FFmpeg loaded dynamically on demand.
+target_include_directories(util PUBLIC ${FFMPEG_INCLUDE_DIRS})
 
 if(WIN32)
   target_sources(util PRIVATE platform_misc_win32.cpp)
@@ -262,7 +257,7 @@ elseif(APPLE)
   find_library(QUARTZCORE_LIBRARY QuartzCore)
   target_link_libraries(util PRIVATE ${METAL_LIBRARY} ${QUARTZCORE_LIBRARY} ${IOK_LIBRARY})
   set_source_files_properties(${MAC_SOURCES} PROPERTIES SKIP_PRECOMPILE_HEADERS TRUE)
-elseif(NOT ANDROID AND NOT WIN32)
+elseif(NOT WIN32)
   target_sources(util PRIVATE
     platform_misc_unix.cpp
   )

@@ -4260,17 +4260,12 @@ bool System::CheckForSBIFile(CDImage* image, Error* error)
       return true;
     }
   }
-#ifndef __ANDROID__
   Error::SetStringFmt(
     error,
     TRANSLATE_FS("System", "You are attempting to run a libcrypt protected game without an SBI file:\n\n{0}: "
                            "{1}\n\nYour dump is incomplete, you must add the SBI file to run this game. \n\nThe "
                            "name of the SBI file must match the name of the disc image."),
     s_running_game_serial, s_running_game_title);
-#else
-  // Shorter because no confirm messages.
-  Error::SetStringView(error, "Missing SBI file.", "The selected game requires a SBI file to run properly.");
-#endif
 
   return false;
 }

@@ -79,7 +79,7 @@ if(NOT ANDROID AND NOT WIN32)
     message(WARNING "FFmpeg not found, using bundled headers.")
   endif()
 endif()
-if(NOT ANDROID AND NOT FFMPEG_FOUND)
+if(NOT FFMPEG_FOUND)
   set(FFMPEG_INCLUDE_DIRS "${CMAKE_SOURCE_DIR}/dep/ffmpeg/include")
 endif()
 
