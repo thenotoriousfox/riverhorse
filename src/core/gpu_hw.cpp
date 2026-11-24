@@ -2991,13 +2991,19 @@ void GPU_HW_Backend::FillVRAM(u32 x, u32 y, u32 width, u32 height, u32 color, GP
   RestoreDeviceContext();
 }
 
+void GPU_HW_Backend::SyncSoftwareRenderer()
+{
+  if (m_sw_renderer)
+    m_sw_renderer->Sync(false);
+}
+
 void GPU_HW_Backend::ReadVRAM(u32 x, u32 y, u32 width, u32 height)
 {
   GL_PUSH_FMT("ReadVRAM({},{} => {},{} ({}x{})", x, y, x + width, y + height, width, height);
 
   if (m_sw_renderer)
   {
-    m_sw_renderer->Sync(false);
+    SyncSoftwareRenderer();
     GL_POP();
     return;
   }
@@ -3988,6 +3994,7 @@ bool GPU_HW::DoState(StateWrapper& sw, GPUTexture** host_texture, bool update_di
   bool result = false;
   m_backend->RunOnBackendThreadAndWait([this, &sw, host_texture, update_display, &result]() {
     GPU_HW_Backend& backend = GetHWBackend();
+    backend.SyncSoftwareRenderer();
 
     // Need to download local VRAM copy before calling the base class, because it serializes this.
     if (!backend.HasSoftwareReadbacks() && sw.IsWriting() && !host_texture)

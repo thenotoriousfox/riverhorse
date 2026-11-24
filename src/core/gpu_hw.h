@@ -57,6 +57,7 @@ public:
 
   const Threading::Thread* GetSWThread() const;
   ALWAYS_INLINE bool HasSoftwareReadbacks() const { return static_cast<bool>(m_sw_renderer); }
+  void SyncSoftwareRenderer();
 
   bool Initialize(bool force_thread) override;
   void Shutdown() override;

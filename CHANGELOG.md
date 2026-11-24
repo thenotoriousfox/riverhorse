@@ -34,6 +34,12 @@ Changes since the DuckStation `v0.1-7371` base. Releases are tagged
 - Netplay desyncs: a peer that had loaded a state saved one more timing event
   than the others, so states compared as different.
 - A third netplay player no longer crashes on joining.
+- Netplay desyncs when a game used the memory card around a rollback (Ape
+  Escape desynced every session): the card backup was taken after the card
+  had already started the transfer, and cards behind a multitap were never
+  backed up at all.
+- Netplay desyncs with the hardware renderer: save states could hold a
+  palette the readback renderer hadn't finished loading.
 - The Linux AppImage starts again without `RIVERHORSE_X11=1`: it failed with
   "Could not find the Qt platform plugin" unless forced onto X11. It now runs
   on Wayland when the session has it and falls back to X11 otherwise.
