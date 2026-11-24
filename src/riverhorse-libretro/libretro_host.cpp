@@ -35,6 +35,7 @@
 #include "libretro.h"
 #include "libretro_core_options.h"
 #include "libretro_resources.h"
+#include "libretro_rumble.h"
 #ifdef ENABLE_OPENGL
 #include "libretro_video_opengl.h"
 #endif
@@ -686,10 +687,12 @@ RETRO_API void retro_init(void)
 
   s_can_dupe_frames = false;
   s_environment(RETRO_ENVIRONMENT_GET_CAN_DUPE, &s_can_dupe_frames);
+  LibretroRumble::Initialize(s_environment);
 }
 
 RETRO_API void retro_deinit(void)
 {
+  LibretroRumble::Shutdown();
   Log::UnregisterCallback(&LibretroHost::LogCallback, nullptr);
 }
 
@@ -1142,6 +1145,7 @@ const char* InputManager::ConvertHostKeyboardCodeToIcon(u32 code)
 
 void Host::AddFixedInputBindings(SettingsInterface& si)
 {
+  LibretroRumble::AddBindings();
 }
 
 void Host::OnInputDeviceConnected(std::string_view identifier, std::string_view device_name)

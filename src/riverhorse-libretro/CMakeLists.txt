@@ -4,6 +4,8 @@ add_library(riverhorse_libretro SHARED
   libretro_host.cpp
   libretro_resources.cpp
   libretro_resources.h
+  libretro_rumble.cpp
+  libretro_rumble.h
 )
 
 # Files under data/resources are built into the core. Add a pattern to the EXCLUDE filter to leave files out.

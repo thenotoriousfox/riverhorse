@@ -18,6 +18,8 @@ Changes since the DuckStation `v0.1-7371` base. Releases are tagged
   x86_64) and Linux arm64 on every release, built from the bundled
   dependencies. The core is also submitted to libretro's buildbot, so
   RetroArch's Core Downloader can offer it once it is accepted.
+- libretro core: controller rumble through the frontend's rumble interface
+  (both DualShock motors).
 
 ### Changes
 - Hosted sessions are only listed when the host turns on "List in the
