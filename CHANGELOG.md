@@ -3,6 +3,13 @@
 Changes since the DuckStation `v0.1-7371` base. Releases are tagged
 `vMAJOR.MINOR.PATCH`.
 
+## Unreleased
+
+### Fixes
+- The Linux AppImage starts again without `RIVERHORSE_X11=1`: it failed with
+  "Could not find the Qt platform plugin" unless forced onto X11. It now runs
+  on Wayland when the session has it and falls back to X11 otherwise.
+
 ## 1.1.0 (2026-11-22)
 
 ### New
