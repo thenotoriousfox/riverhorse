@@ -185,7 +185,10 @@ void CPU::PGXP::Reset()
   g_state.pgxp_gpr[static_cast<u8>(Reg::zero)].flags = VALID_XY;
 
   if (s_mem)
-    std::memset(s_mem, 0, sizeof(PGXP_value) * PGXP_MEM_SIZE);
+  {
+    std::memset(s_mem, 0, sizeof(PGXP_value) * (Bus::g_ram_size / 4));
+    std::memset(&s_mem[PGXP_MEM_SCRATCH_OFFSET], 0, sizeof(PGXP_value) * (CPU::SCRATCHPAD_SIZE / 4));
+  }
 
   if (g_settings.gpu_pgxp_vertex_cache && s_vertex_cache)
     std::memset(s_vertex_cache, 0, sizeof(PGXP_value) * VERTEX_CACHE_SIZE);
