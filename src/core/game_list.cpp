@@ -2044,7 +2044,7 @@ std::string GameList::GetGameIconPath(std::string_view serial, std::string_view 
     if (memcard_path.empty() || !FileSystem::StatFile(memcard_path.c_str(), &memcard_sd))
       continue;
 
-    timestamp = std::max(timestamp, memcard_sd.ModificationTime);
+    timestamp = std::max<s64>(timestamp, memcard_sd.ModificationTime);
     cards.push_back(CardToSearch{std::move(memcard_path), Settings::IsPerGameMemoryCardType(type)});
   }
   if (cards.empty())
