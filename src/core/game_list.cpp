@@ -31,8 +31,8 @@
 #include <algorithm>
 #include <array>
 #include <ctime>
+#include <condition_variable>
 #include <mutex>
-#include <semaphore>
 #include <span>
 #include <string_view>
 #include <type_traits>
@@ -1562,7 +1562,9 @@ static bool IsPNGData(std::span<const u8> data);
 static std::mutex s_cover_index_mutex;
 static std::unordered_map<std::string, std::string> s_cover_index;
 static bool s_cover_index_loaded = false;
-static std::counting_semaphore<MAX_CONCURRENT_COVER_FETCHES> s_cover_fetch_slots(MAX_CONCURRENT_COVER_FETCHES);
+static std::mutex s_cover_fetch_mutex;
+static std::condition_variable s_cover_fetch_cv;
+static u32 s_cover_fetches_running = 0;
 } // namespace GameList
 
 std::string GameList::GetCoverIndexFile()
@@ -1732,8 +1734,18 @@ std::string GameList::FetchCoverImage(const std::string& path)
 
   HTTPDownloader::Request::Data image;
   {
-    s_cover_fetch_slots.acquire();
-    const ScopedGuard release_slot([]() { s_cover_fetch_slots.release(); });
+    {
+      std::unique_lock lock(s_cover_fetch_mutex);
+      s_cover_fetch_cv.wait(lock, []() { return s_cover_fetches_running < MAX_CONCURRENT_COVER_FETCHES; });
+      s_cover_fetches_running++;
+    }
+    const ScopedGuard release_slot([]() {
+      {
+        std::unique_lock lock(s_cover_fetch_mutex);
+        s_cover_fetches_running--;
+      }
+      s_cover_fetch_cv.notify_one();
+    });
 
     std::unique_ptr<HTTPDownloader> downloader(HTTPDownloader::Create(Host::GetHTTPUserAgent()));
     if (!downloader)
