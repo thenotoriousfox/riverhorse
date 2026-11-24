@@ -34,6 +34,12 @@ Changes since the DuckStation `v0.1-7371` base. Releases are tagged
   renderer when the frontend has no hardware renderer at all.
 - macOS 10.15 builds no longer need a macOS 11 feature in the cover
   downloader.
+- PGXP uses about 30 MB less memory with the console's 2 MB of RAM: a reset
+  cleared memory for the 8 MB development RAM.
+- libretro core: no longer starts every Vulkan driver at load. On frontends
+  with a hardware renderer it doesn't look for Vulkan at all, and without one
+  it ignores CPU Vulkan drivers such as llvmpipe, which also kept Mesa's LLVM
+  in memory (around 40 MB on ARM handhelds).
 
 ## 1.2.0 (2026-11-24)
 

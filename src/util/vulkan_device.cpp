@@ -1976,8 +1976,7 @@ bool VulkanDevice::IsSuitableDefaultRenderer()
   const std::string& name = gpus.front().second.name;
   INFO_LOG("Using Vulkan GPU '{}' for automatic renderer check.", name);
 
-  // Any software rendering (LLVMpipe, SwiftShader).
-  if (StringUtil::StartsWithNoCase(name, "llvmpipe") || StringUtil::StartsWithNoCase(name, "SwiftShader"))
+  if (IsSoftwareAdapter(name))
   {
     INFO_LOG("Not using Vulkan for software renderer.");
     return false;

@@ -213,13 +213,6 @@ bool LibretroHost::InitializeConfig()
   FileSystem::EnsureDirectoryExists(EmuFolders::DataRoot.c_str(), true);
   EmuFolders::EnsureFoldersExist();
 
-#ifdef ENABLE_VULKAN
-  if (!GPUDevice::GetAdapterListForAPI(RenderAPI::Vulkan).empty())
-    GPUDevice::SetPreferredAPI(RenderAPI::Vulkan);
-  else
-    WARNING_LOG("No Vulkan device found; the core's OpenGL context may conflict with an OpenGL frontend.");
-#endif
-
   ImGuiManager::SetFontPathAndRange(std::string(), {0x0020, 0x00FF, 0, 0});
   return true;
 }
@@ -818,6 +811,19 @@ RETRO_API bool retro_load_game(const retro_game_info* game)
     s_loaded_renderer = Settings::GetRendererName(GPURenderer::Software);
     s_base_settings_interface->SetStringValue("GPU", "Renderer", s_loaded_renderer.c_str());
   }
+
+#ifdef ENABLE_VULKAN
+  const GPUDevice::AdapterInfoList vulkan_adapters = GPUDevice::GetAdapterListForAPI(RenderAPI::Vulkan);
+  if (std::any_of(vulkan_adapters.begin(), vulkan_adapters.end(),
+                  [](const GPUDevice::AdapterInfo& adapter) { return !GPUDevice::IsSoftwareAdapter(adapter.name); }))
+  {
+    GPUDevice::SetPreferredAPI(RenderAPI::Vulkan);
+  }
+  else
+  {
+    WARNING_LOG("No hardware Vulkan device found; the core's OpenGL context may conflict with an OpenGL frontend.");
+  }
+#endif
 
   if (!LibretroHost::BootGame())
   {

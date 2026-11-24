@@ -563,6 +563,9 @@ public:
   /// Returns a list of adapters for the given API.
   static AdapterInfoList GetAdapterListForAPI(RenderAPI api);
 
+  /// Returns true if the adapter renders on the CPU (LLVMpipe, SwiftShader).
+  static bool IsSoftwareAdapter(std::string_view adapter_name);
+
   /// Parses a fullscreen mode into its components (width * height @ refresh hz)
   static bool GetRequestedExclusiveFullscreenMode(u32* width, u32* height, float* refresh_rate);
 

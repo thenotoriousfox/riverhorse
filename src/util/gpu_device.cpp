@@ -309,6 +309,12 @@ bool GPUDevice::IsSameRenderAPI(RenderAPI lhs, RenderAPI rhs)
                          (rhs == RenderAPI::OpenGL || rhs == RenderAPI::OpenGLES)));
 }
 
+bool GPUDevice::IsSoftwareAdapter(std::string_view adapter_name)
+{
+  return (StringUtil::StartsWithNoCase(adapter_name, "llvmpipe") ||
+          StringUtil::StartsWithNoCase(adapter_name, "SwiftShader"));
+}
+
 GPUDevice::AdapterInfoList GPUDevice::GetAdapterListForAPI(RenderAPI api)
 {
   AdapterInfoList ret;
