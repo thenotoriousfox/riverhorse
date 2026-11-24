@@ -45,15 +45,22 @@ bool LibretroOpenGL::Setup(retro_environment_t environment, retro_hw_context_res
 
   environment(RETRO_ENVIRONMENT_SET_HW_SHARED_CONTEXT, nullptr);
 
-  s_hw_render = {};
-  s_hw_render.context_type = gles ? RETRO_HW_CONTEXT_OPENGLES3 : RETRO_HW_CONTEXT_OPENGL_CORE;
-  s_hw_render.version_major = 3;
-  s_hw_render.version_minor = gles ? 0 : 3;
-  s_hw_render.context_reset = context_reset;
-  s_hw_render.context_destroy = context_destroy;
-  s_hw_render.bottom_left_origin = true;
-  if (!environment(RETRO_ENVIRONMENT_SET_HW_RENDER, &s_hw_render))
-    return false;
+  const auto request_context = [&](bool use_gles) {
+    s_hw_render = {};
+    s_hw_render.context_type = use_gles ? RETRO_HW_CONTEXT_OPENGLES3 : RETRO_HW_CONTEXT_OPENGL_CORE;
+    s_hw_render.version_major = 3;
+    s_hw_render.version_minor = use_gles ? 0 : 3;
+    s_hw_render.context_reset = context_reset;
+    s_hw_render.context_destroy = context_destroy;
+    s_hw_render.bottom_left_origin = true;
+    return environment(RETRO_ENVIRONMENT_SET_HW_RENDER, &s_hw_render);
+  };
+  if (!request_context(gles))
+  {
+    if (gles || !request_context(true))
+      return false;
+    gles = true;
+  }
 
   OpenGLContext::SetHostContextFactory([gles](const WindowInfo& wi, Error* error) -> std::unique_ptr<OpenGLContext> {
     return std::make_unique<LibretroOpenGLContext>(wi, s_hw_render.get_proc_address, gles);

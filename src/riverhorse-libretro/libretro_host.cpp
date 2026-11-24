@@ -809,8 +809,15 @@ RETRO_API bool retro_load_game(const retro_game_info* game)
 
   s_game_path = game->path;
   s_video_output = VideoOutput::Readback;
-  if (s_loaded_renderer != Settings::GetRendererName(GPURenderer::Software) && LibretroHost::SetupHardwareOutput())
-    return true;
+  if (s_loaded_renderer != Settings::GetRendererName(GPURenderer::Software))
+  {
+    if (LibretroHost::SetupHardwareOutput())
+      return true;
+
+    WARNING_LOG("The frontend has no usable hardware context, using the software renderer.");
+    s_loaded_renderer = Settings::GetRendererName(GPURenderer::Software);
+    s_base_settings_interface->SetStringValue("GPU", "Renderer", s_loaded_renderer.c_str());
+  }
 
   if (!LibretroHost::BootGame())
   {

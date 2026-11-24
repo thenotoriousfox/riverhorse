@@ -39,6 +39,10 @@ libretro-build-linux-aarch64:
   extends:
     - .libretro-linux-cmake-aarch64
     - .core-defs
+  variables:
+    CORE_ARGS: >-
+      -DBUILD_QT_FRONTEND=OFF -DBUILD_LIBRETRO_CORE=ON -DENABLE_DESKTOP_INTEGRATION=OFF
+      -DUSE_BUNDLED_DEPENDENCIES=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
 
 libretro-build-windows-x64:
   extends:
