@@ -116,7 +116,7 @@ static bool s_nogui_mode = false;
 static bool s_start_fullscreen_ui = false;
 static std::optional<s32> s_netplay_host_port;
 static std::optional<std::pair<std::string, s32>> s_netplay_join_address;
-static std::string s_netplay_nickname = Netplay::DEFAULT_NICKNAME;
+static std::string s_netplay_nickname;
 static bool s_netplay_spectate = false;
 static bool s_start_fullscreen_ui_fullscreen = false;
 static bool s_run_setup_wizard = false;
@@ -2169,6 +2169,7 @@ void QtHost::PrintCommandLineHelp(const char* progname)
                        "    or at that address. A boot filename, if given, is used when it is the host's game.\n");
   std::fprintf(stderr, "  -netplaynick <name>: Name shown to other netplay players.\n");
   std::fprintf(stderr, "  -netplayspectate: With -netplayjoin, watch the session without playing.\n");
+  std::fprintf(stderr, "  -netplayevents: Prints netplay events on stdout, one per line (see README).\n");
   std::fprintf(stderr, "  -state <index>: Loads specified save state by index. If a boot\n"
                        "    filename is provided, a per-game state will be loaded, otherwise\n"
                        "    a global state will be loaded.\n");
@@ -2335,6 +2336,11 @@ bool QtHost::ParseCommandLineParametersAndInitializeConfig(QApplication& app,
       else if (CHECK_ARG_PARAM("-netplaynick"))
       {
         s_netplay_nickname = args[++i].toStdString();
+        continue;
+      }
+      else if (CHECK_ARG("-netplayevents"))
+      {
+        Netplay::SetPrintEvents(true);
         continue;
       }
       else if (CHECK_ARG("-netplayspectate"))
@@ -2534,6 +2540,9 @@ int main(int argc, char* argv[])
     g_emu_thread->bootSystem(std::move(autoboot));
   else if (!s_nogui_mode && !s_netplay_join_address.has_value())
     main_window->startupUpdateCheck();
+
+  if (s_netplay_nickname.empty())
+    s_netplay_nickname = Host::GetBaseStringSettingValue("Netplay", "Nickname", Netplay::DEFAULT_NICKNAME);
 
   if (s_netplay_host_port.has_value())
   {

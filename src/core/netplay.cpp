@@ -41,6 +41,8 @@
 
 #include <algorithm>
 #include <bitset>
+#include <cstdio>
+#include <initializer_list>
 #include <cinttypes>
 #include <deque>
 #include <span>
@@ -134,6 +136,7 @@ static void AttachRelay(bool is_hosting);
 static bool WaitForRelayRegistration();
 static std::optional<u16> ParseSessionCode(std::string_view text);
 static void PublishSessionListing();
+static void PrintEvent(std::string_view event, std::initializer_list<std::pair<std::string_view, std::string>> fields);
 static std::string PeerAddressString(const ENetPeer* peer);
 static void HandleEnetEvent(const ENetEvent* event);
 static void PollEnet(Common::Timer::Value until_time);
@@ -271,6 +274,7 @@ struct PendingJoin
 static std::vector<PendingJoin> s_pending_joins;
 static u32 s_next_pending_join_id = 0;
 static bool s_join_prompt_open = false;
+static bool s_print_events = false;
 static GGPOPlayerHandle s_local_handle = GGPO_INVALID_HANDLE;
 static s32 s_local_delay = 0;
 static GGPOSession* s_ggpo = nullptr;
@@ -483,6 +487,15 @@ bool Netplay::Start(bool is_hosting, std::string nickname, const std::string& re
     SetSettings(GetHostSettingsText());
     PublishSessionListing();
 
+    const std::optional<u16> session_code = NetplayRelay::GetVirtualPort();
+    PrintEvent("hosting", {{"port", std::to_string(port)},
+                           {"code", session_code.has_value() ? std::to_string(session_code.value()) : std::string()},
+                           {"serial", System::GetGameSerial()},
+                           {"title", System::GetGameTitle()},
+                           {"nick", s_local_nickname},
+                           {"players", std::to_string(s_max_players)},
+                           {"password", s_local_session_password.empty() ? "no" : "yes"}});
+
     INFO_LOG("Netplay session started as host on port {}.", port);
 
     // This is most likely called from within the host message pump.
@@ -541,6 +554,7 @@ void Netplay::CloseSession()
   Assert(IsActive() || s_state == SessionState::ClosingSession);
 
   const bool was_host = IsHost();
+  PrintEvent("stopped", {});
   s_resync_pending = false;
   s_pending_joins.clear();
   if (s_join_prompt_open)
@@ -831,6 +845,38 @@ std::optional<std::vector<Netplay::SessionListing>> Netplay::GetSessionList(Erro
   }
 
   return sessions;
+}
+
+void Netplay::SetPrintEvents(bool enabled)
+{
+  s_print_events = enabled;
+}
+
+void Netplay::PrintEvent(std::string_view event, std::initializer_list<std::pair<std::string_view, std::string>> fields)
+{
+  if (!s_print_events)
+    return;
+
+  std::string line = fmt::format("netplay {}", event);
+  for (const auto& [key, value] : fields)
+  {
+    line += fmt::format(" {}=", key);
+    for (const char ch : value)
+    {
+      if ((ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9') || ch == '-' || ch == '.' ||
+          ch == '_' || ch == '~' || ch == ':')
+      {
+        line += ch;
+      }
+      else
+      {
+        line += fmt::format("%{:02X}", static_cast<u8>(ch));
+      }
+    }
+  }
+  line += '\n';
+  std::fputs(line.c_str(), stdout);
+  std::fflush(stdout);
 }
 
 std::optional<u16> Netplay::ParseSessionCode(std::string_view text)
@@ -1702,6 +1748,7 @@ void Netplay::HandleJoinResponseMessage(s32 player_id, const ENetPacket* pkt)
 
   // Still need to wait for synchronization
   INFO_LOG("Connected to host, we were assigned player ID {}", msg->player_id);
+  PrintEvent("joined", {{"player", std::to_string(msg->player_id + 1)}});
   s_player_id = msg->player_id;
   SetSessionState(SessionState::Resetting);
   s_reset_players.reset();
@@ -2114,6 +2161,8 @@ void Netplay::NotifyPlayerJoined(s32 player_id)
 
   OnNetplayMessage(fmt::format(TRANSLATE_FS("Netplay", "{} is joining the session as player {}."),
                                GetNicknameForPlayer(player_id), player_id));
+  PrintEvent("player-joined",
+             {{"nick", std::string(GetNicknameForPlayer(player_id))}, {"player", std::to_string(player_id + 1)}});
 }
 
 void Netplay::HandlePlayerJoinedMessage(s32 player_id, const ENetPacket* pkt)
@@ -2131,6 +2180,8 @@ void Netplay::DropPlayer(s32 player_id, DropPlayerReason reason)
   DebugAssert(s_peers[player_id].peer);
 
   INFO_LOG("Dropping player {}", player_id);
+  PrintEvent("player-left",
+             {{"nick", std::string(GetNicknameForPlayer(player_id))}, {"player", std::to_string(player_id + 1)}});
 
   OnNetplayMessage(fmt::format(TRANSLATE_FS("Netplay", "{} left the session: {}"), GetNicknameForPlayer(player_id),
                                DropPlayerReasonToString(reason)));

@@ -3,6 +3,17 @@
 Changes since the DuckStation `v0.1-7371` base. Releases are tagged
 `vMAJOR.MINOR.PATCH`.
 
+## Unreleased
+
+### New
+- `-netplayevents` prints netplay events on stdout (hosting, players joining
+  and leaving, stopped) for frontends to read, also for sessions started from
+  the menus. The line format is in the README.
+
+### Fixes
+- Netplay started from the command line uses the Nickname setting when
+  `-netplaynick` isn't given, instead of "Player".
+
 ## 1.2.0 (2026-11-24)
 
 ### New

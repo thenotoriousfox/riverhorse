@@ -51,6 +51,9 @@ bool JoinSession(std::string nickname, const std::string& hostname, s32 port, st
 
 bool IsActive();
 
+/// Prints session events on stdout, one per line: "netplay <event> key=value ...", values percent-encoded.
+void SetPrintEvents(bool enabled);
+
 /// A session listed on the relay server by its host.
 struct SessionListing
 {

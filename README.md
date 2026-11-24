@@ -151,6 +151,22 @@ frontend, start Riverhorse with `-netplayhost <port> -- <game>` or
 the host's, otherwise the game list is searched), plus `-netplaynick <name>`
 and, to watch, `-netplayspectate`.
 
+With `-netplayevents`, Riverhorse prints netplay events on stdout for a
+frontend to read, one line each, whether the session was started from the
+command line or the menus: `netplay <event> key=value ...`, with values
+percent-encoded (anything other than letters, digits and `-._~:` becomes
+`%XX`) and empty when unknown. Events:
+
+- `hosting port=<udp port> code=<session code> serial=<game serial>
+  title=<game title> nick=<host nickname> players=<max players>
+  password=yes|no` when a hosted session starts (`code` is empty without
+  the relay)
+- `player-joined nick=<nickname> player=<n>` and `player-left
+  nick=<nickname> player=<n>`, with players numbered from 1 (the host)
+- `joined player=<n>` when this instance joins someone else's session
+- `stopped` when the session ends; a frontend should also treat the
+  process exiting as the end of the session
+
 Session codes come from a relay server, which introduces the players; they
 then connect directly, and only players whose routers block that keep going
 through the relay. Riverhorse uses a default relay; Settings > Essentials >
