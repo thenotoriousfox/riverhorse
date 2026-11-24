@@ -6,6 +6,7 @@
 
 #include "core/netplay.h"
 
+#include <QtWidgets/QCheckBox>
 #include <QtWidgets/QPushButton>
 
 CreateNetplaySessionDialog::CreateNetplaySessionDialog(QWidget* parent) : QDialog(parent)
@@ -15,9 +16,11 @@ CreateNetplaySessionDialog::CreateNetplaySessionDialog(QWidget* parent) : QDialo
     QString::fromStdString(Host::GetBaseStringSettingValue("Netplay", "Nickname", Netplay::DEFAULT_NICKNAME)));
   m_ui.port->setValue(Host::GetBaseIntSettingValue("Netplay", "Port", Netplay::DEFAULT_PORT));
   m_ui.inputDelay->setValue(Host::GetBaseIntSettingValue("Netplay", "InputDelay", 0));
+  m_ui.useRelay->setChecked(Host::GetBaseBoolSettingValue("Netplay", "UseRelay", true));
   m_ui.relayServer->setText(QString::fromStdString(Host::GetBaseStringSettingValue("Netplay", "RelayServer", "")));
 
   connect(m_ui.nickname, &QLineEdit::textChanged, this, &CreateNetplaySessionDialog::updateState);
+  connect(m_ui.useRelay, &QCheckBox::toggled, this, &CreateNetplaySessionDialog::updateState);
   connect(m_ui.buttonBox, &QDialogButtonBox::accepted, this, &CreateNetplaySessionDialog::accept);
   connect(m_ui.buttonBox, &QDialogButtonBox::rejected, this, &CreateNetplaySessionDialog::reject);
   updateState();
@@ -34,6 +37,7 @@ void CreateNetplaySessionDialog::accept()
   Host::SetBaseStringSettingValue("Netplay", "Nickname", nickname.toUtf8().constData());
   Host::SetBaseIntSettingValue("Netplay", "Port", m_ui.port->value());
   Host::SetBaseIntSettingValue("Netplay", "InputDelay", m_ui.inputDelay->value());
+  Host::SetBaseBoolSettingValue("Netplay", "UseRelay", m_ui.useRelay->isChecked());
   Host::SetBaseStringSettingValue("Netplay", "RelayServer", m_ui.relayServer->text().trimmed().toUtf8().constData());
   Host::CommitBaseSettingChanges();
 
@@ -49,6 +53,7 @@ bool CreateNetplaySessionDialog::validate() const
 
 void CreateNetplaySessionDialog::updateState()
 {
+  m_ui.relayServer->setEnabled(m_ui.useRelay->isChecked());
   m_ui.buttonBox->button(QDialogButtonBox::Ok)->setEnabled(validate());
 }
 
@@ -60,10 +65,12 @@ JoinNetplaySessionDialog::JoinNetplaySessionDialog(QWidget* parent) : QDialog(pa
   m_ui.hostname->setText(QString::fromStdString(Host::GetBaseStringSettingValue("Netplay", "LastHost", "")));
   m_ui.port->setValue(Host::GetBaseIntSettingValue("Netplay", "Port", Netplay::DEFAULT_PORT));
   m_ui.inputDelay->setValue(Host::GetBaseIntSettingValue("Netplay", "InputDelay", 0));
+  m_ui.useRelay->setChecked(Host::GetBaseBoolSettingValue("Netplay", "UseRelay", true));
   m_ui.relayServer->setText(QString::fromStdString(Host::GetBaseStringSettingValue("Netplay", "RelayServer", "")));
 
   connect(m_ui.nickname, &QLineEdit::textChanged, this, &JoinNetplaySessionDialog::updateState);
   connect(m_ui.hostname, &QLineEdit::textChanged, this, &JoinNetplaySessionDialog::updateState);
+  connect(m_ui.useRelay, &QCheckBox::toggled, this, &JoinNetplaySessionDialog::updateState);
   connect(m_ui.buttonBox, &QDialogButtonBox::accepted, this, &JoinNetplaySessionDialog::accept);
   connect(m_ui.buttonBox, &QDialogButtonBox::rejected, this, &JoinNetplaySessionDialog::reject);
   updateState();
@@ -82,6 +89,7 @@ void JoinNetplaySessionDialog::accept()
   Host::SetBaseStringSettingValue("Netplay", "LastHost", hostname.toUtf8().constData());
   Host::SetBaseIntSettingValue("Netplay", "Port", m_ui.port->value());
   Host::SetBaseIntSettingValue("Netplay", "InputDelay", m_ui.inputDelay->value());
+  Host::SetBaseBoolSettingValue("Netplay", "UseRelay", m_ui.useRelay->isChecked());
   Host::SetBaseStringSettingValue("Netplay", "RelayServer", m_ui.relayServer->text().trimmed().toUtf8().constData());
   Host::CommitBaseSettingChanges();
 
@@ -97,5 +105,6 @@ bool JoinNetplaySessionDialog::validate() const
 
 void JoinNetplaySessionDialog::updateState()
 {
+  m_ui.relayServer->setEnabled(m_ui.useRelay->isChecked());
   m_ui.buttonBox->button(QDialogButtonBox::Ok)->setEnabled(validate());
 }

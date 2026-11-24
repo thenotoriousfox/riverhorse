@@ -3335,7 +3335,7 @@ void FullscreenUI::DoHostNetplaySession()
 void FullscreenUI::DoJoinNetplaySession()
 {
   OpenInputStringDialog(
-    FSUI_ICONSTR(ICON_FA_GLOBE, "Join Netplay"), FSUI_STR("Enter the host's address (name or IP, optionally :port)."),
+    FSUI_ICONSTR(ICON_FA_GLOBE, "Join Netplay"), FSUI_STR("Enter the session code, or the host's address (name or IP, optionally :port)."),
     std::string(), FSUI_STR("Join"), [](std::string address) {
       address = StringUtil::StripWhitespace(address);
       if (address.empty())
@@ -3607,13 +3607,19 @@ void FullscreenUI::DrawEssentialsSettingsPage()
   DrawIntSpinBoxSetting(bsi, FSUI_ICONSTR(ICON_FA_GLOBE, "Port"),
                         FSUI_CSTR("UDP port used to host and join sessions. The host's port must be reachable."),
                         "Netplay", "Port", Netplay::DEFAULT_PORT, 1, 65535, 1, "%d");
+  DrawToggleSetting(bsi, FSUI_ICONSTR(ICON_FA_SERVER, "Use Relay Server"),
+                    FSUI_CSTR("Players join with a session code and connect even when their routers block direct "
+                              "connections. Off: players join with the host's address and port."),
+                    "Netplay", "UseRelay", true);
+  const bool use_relay = bsi->GetBoolValue("Netplay", "UseRelay", true);
   const std::string relay = bsi->GetStringValue("Netplay", "RelayServer", "");
-  if (MenuButtonWithValue(FSUI_ICONSTR(ICON_FA_SERVER, "Relay Server"),
-                          FSUI_CSTR("Address of a relay server, for players who can't reach each other directly. "
-                                    "Everyone in the session must use the same one. Empty connects directly."),
-                          relay.empty() ? FSUI_CSTR("None") : relay.c_str()))
+  if (MenuButtonWithValue(FSUI_ICONSTR(ICON_FA_SERVER, "Custom Relay Server"),
+                          FSUI_CSTR("Address of your own relay server. Everyone in the session must use the same "
+                                    "one. Empty uses the default relay."),
+                          relay.empty() ? FSUI_CSTR("Default") : relay.c_str(), use_relay))
   {
-    OpenInputStringDialog(FSUI_ICONSTR(ICON_FA_SERVER, "Relay Server"), FSUI_STR("host or host:port"), std::string(),
+    OpenInputStringDialog(FSUI_ICONSTR(ICON_FA_SERVER, "Custom Relay Server"), FSUI_STR("host or host:port"),
+                          std::string(),
                           FSUI_STR("OK"), [](std::string value) {
                             SettingsInterface* bsi = GetEditingSettingsInterface();
                             bsi->SetStringValue("Netplay", "RelayServer",

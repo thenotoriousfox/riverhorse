@@ -128,28 +128,27 @@ core.
 
 Up to four players can play over the network with rollback: the host starts
 a game and picks System > Host Netplay Session (or Host Netplay Session in
-the in-game panel); the others pick System > Join Netplay Session (or Start
-Game > Join Netplay) and enter the host's address. Everyone needs the same
-game in their game list, a BIOS with the same hash and the same Riverhorse
-version. For three or four players, the host turns on a multitap first
-(Settings > Controllers > Multitap, port 1 for most games); players then
-take slots 1A-1D in the order they joined. The host's UDP port (31200 by
-default, set under Settings > Essentials > Netplay) must be reachable, so
-forward it on the host's router when playing over the internet. From a
+the in-game panel) and is shown a session code; the others pick System >
+Join Netplay Session (or Start Game > Join Netplay) and enter that code.
+Everyone needs the same game in their game list, a BIOS with the same hash
+and the same Riverhorse version. For three or four players, the host turns
+on a multitap first (Settings > Controllers > Multitap, port 1 for most
+games); players then take slots 1A-1D in the order they joined. From a
 frontend, start Riverhorse with `-netplayhost <port> -- <game>` or
-`-netplayjoin <host:port> -- <game>` (the game is used when it matches the
-host's, otherwise the game list is searched), plus `-netplaynick <name>`
+`-netplayjoin <code|host:port> -- <game>` (the game is used when it matches
+the host's, otherwise the game list is searched), plus `-netplaynick <name>`
 and, to watch, `-netplayspectate`.
 
-When players can't reach each other directly, everyone sets the same Relay
-Server (Settings > Essentials > Netplay, or in the host and join dialogs,
-as `host` or `host:port`). The host is then shown the address to give the
-others, the relay's host name and a port it assigned. To run a relay, build
-with `-DBUILD_RELAY_SERVER=ON` and start `riverhorse-relay [port]` (UDP 31210
-by default) on a machine with that port open; it only forwards between
-players registered with it. Players behind ordinary home routers, or behind
-the same router, are connected directly after the relay introduces them;
-only those whose routers block that keep going through the relay.
+Session codes come from a relay server, which introduces the players; they
+then connect directly, and only players whose routers block that keep going
+through the relay. Riverhorse uses a default relay; Settings > Essentials >
+Netplay (or the host and join dialogs) can turn the relay off or set your
+own as Custom Relay Server (`host` or `host:port`, the same for everyone).
+Without a relay, or when it can't be reached, players join with the host's
+address and UDP port (31200 by default), which must be reachable, so the
+host forwards it on their router when playing over the internet. To run a
+relay, build with `-DBUILD_RELAY_SERVER=ON` and start `riverhorse-relay
+[port]` (UDP 31210 by default) on a machine with that port open.
 
 ---
 

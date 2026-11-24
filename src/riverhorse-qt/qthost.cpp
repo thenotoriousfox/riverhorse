@@ -2165,8 +2165,8 @@ void QtHost::PrintCommandLineHelp(const char* progname)
                        "    that game's resume state will be loaded, otherwise the most\n"
                        "    recent resume save state will be loaded.\n");
   std::fprintf(stderr, "  -netplayhost <port>: Boots the given game and hosts a netplay session on <port>.\n");
-  std::fprintf(stderr, "  -netplayjoin <host:port>: Joins the netplay session at <host:port>. A boot filename,\n"
-                       "    if given, is used when it is the host's game.\n");
+  std::fprintf(stderr, "  -netplayjoin <code|host[:port]>: Joins the netplay session with that session code,\n"
+                       "    or at that address. A boot filename, if given, is used when it is the host's game.\n");
   std::fprintf(stderr, "  -netplaynick <name>: Name shown to other netplay players.\n");
   std::fprintf(stderr, "  -netplayspectate: With -netplayjoin, watch the session without playing.\n");
   std::fprintf(stderr, "  -state <index>: Loads specified save state by index. If a boot\n"
@@ -2328,6 +2328,8 @@ bool QtHost::ParseCommandLineParametersAndInitializeConfig(QApplication& app,
                                          std::nullopt;
         if (port.has_value())
           s_netplay_join_address = std::make_pair(address.substr(0, colon), port.value());
+        else if (colon == std::string::npos)
+          s_netplay_join_address = std::make_pair(address, static_cast<s32>(Netplay::DEFAULT_PORT));
         continue;
       }
       else if (CHECK_ARG_PARAM("-netplaynick"))

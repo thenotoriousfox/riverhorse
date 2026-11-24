@@ -38,7 +38,7 @@
      <item row="1" column="0">
       <widget class="QLabel" name="hostnameLabel">
        <property name="text">
-        <string>Host Address:</string>
+        <string>Session Code or Host Address:</string>
        </property>
       </widget>
      </item>
@@ -100,20 +100,30 @@
        </property>
       </widget>
      </item>
-     <item row="6" column="0">
-      <widget class="QLabel" name="relayServerLabel">
+     <item row="6" column="0" colspan="2">
+      <widget class="QCheckBox" name="useRelay">
        <property name="text">
-        <string>Relay Server:</string>
+        <string>Use relay server</string>
+       </property>
+       <property name="toolTip">
+        <string>Players join with a session code and connect even when their routers block direct connections. Everyone in the session must use the same relay server.</string>
        </property>
       </widget>
      </item>
-     <item row="6" column="1">
+     <item row="7" column="0">
+      <widget class="QLabel" name="relayServerLabel">
+       <property name="text">
+        <string>Custom Relay Server:</string>
+       </property>
+      </widget>
+     </item>
+     <item row="7" column="1">
       <widget class="QLineEdit" name="relayServer">
        <property name="placeholderText">
-        <string>None (connect directly)</string>
+        <string>Default</string>
        </property>
        <property name="toolTip">
-        <string>Address of a relay server (host or host:port), for players who can't reach each other directly. Everyone in the session must use the same one.</string>
+        <string>Address of your own relay server (host or host:port). Leave empty to use the default relay.</string>
        </property>
       </widget>
      </item>

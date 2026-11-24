@@ -12,7 +12,7 @@
    <item>
     <widget class="QLabel" name="description">
      <property name="text">
-      <string>Opens the running game to a second player. They join with your address and the port below; the port must be reachable from their network. Set a password to choose who can join.</string>
+      <string>Opens the running game to other players. With the relay server they join with the session code shown on screen; without it, with your address and the port below, which must be reachable from their network. Set a password to choose who can join.</string>
      </property>
      <property name="wordWrap">
       <bool>true</bool>
@@ -83,20 +83,30 @@
        </property>
       </widget>
      </item>
-     <item row="4" column="0">
-      <widget class="QLabel" name="relayServerLabel">
+     <item row="4" column="0" colspan="2">
+      <widget class="QCheckBox" name="useRelay">
        <property name="text">
-        <string>Relay Server:</string>
+        <string>Use relay server</string>
+       </property>
+       <property name="toolTip">
+        <string>Players join with a session code and connect even when their routers block direct connections. Everyone in the session must use the same relay server.</string>
        </property>
       </widget>
      </item>
-     <item row="4" column="1">
+     <item row="5" column="0">
+      <widget class="QLabel" name="relayServerLabel">
+       <property name="text">
+        <string>Custom Relay Server:</string>
+       </property>
+      </widget>
+     </item>
+     <item row="5" column="1">
       <widget class="QLineEdit" name="relayServer">
        <property name="placeholderText">
-        <string>None (connect directly)</string>
+        <string>Default</string>
        </property>
        <property name="toolTip">
-        <string>Address of a relay server (host or host:port), for players who can't reach each other directly. Everyone in the session must use the same one.</string>
+        <string>Address of your own relay server (host or host:port). Leave empty to use the default relay.</string>
        </property>
       </widget>
      </item>

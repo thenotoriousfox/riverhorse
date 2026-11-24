@@ -37,6 +37,7 @@
 #include "imgui_internal.h"
 #include "imgui_stdlib.h"
 
+#include <algorithm>
 #include <bitset>
 #include <cinttypes>
 #include <deque>
@@ -125,7 +126,10 @@ static void RequestCloseSession(CloseSessionMessage::Reason reason);
 // ENet
 static bool InitializeEnet();
 static void ShutdownEnetHost();
-static bool WaitForRelayRegistration(std::string_view relay);
+static std::string GetRelayServer();
+static void AttachRelay(bool is_hosting);
+static bool WaitForRelayRegistration();
+static std::optional<u16> ParseSessionCode(std::string_view text);
 static std::string PeerAddressString(const ENetPeer* peer);
 static void HandleEnetEvent(const ENetEvent* event);
 static void PollEnet(Common::Timer::Value until_time);
@@ -434,18 +438,7 @@ bool Netplay::Start(bool is_hosting, std::string nickname, const std::string& re
     return false;
   }
 
-  if (const std::string relay = Host::GetBaseStringSettingValue("Netplay", "RelayServer"); !relay.empty())
-  {
-    Error error;
-    if (!NetplayRelay::Attach(s_enet_host, relay, &error))
-    {
-      ERROR_LOG("Failed to use relay server: {}", error.GetDescription());
-      return false;
-    }
-
-    if (is_hosting && !WaitForRelayRegistration(relay))
-      return false;
-  }
+  AttachRelay(is_hosting);
 
   s_host_player_id = 0;
   s_local_nickname = std::move(nickname);
@@ -481,11 +474,22 @@ bool Netplay::Start(bool is_hosting, std::string nickname, const std::string& re
   // for non-hosts, we don't know our player id yet until after we connect...
   s_player_id = -1;
 
-  s_host_address.port = static_cast<u16>(port);
-  if (enet_address_set_host(&s_host_address, remote_addr.c_str()) != 0)
+  if (const std::optional<u16> session_code = ParseSessionCode(remote_addr))
   {
-    ERROR_LOG("Failed to parse host: '{}'", remote_addr.c_str());
-    return false;
+    if (!NetplayRelay::GetSessionAddress(session_code.value(), &s_host_address))
+    {
+      ERROR_LOG("Joining with a session code needs the relay server, which is unavailable.");
+      return false;
+    }
+  }
+  else
+  {
+    s_host_address.port = static_cast<u16>(port);
+    if (enet_address_set_host(&s_host_address, remote_addr.c_str()) != 0)
+    {
+      ERROR_LOG("Failed to parse host: '{}'", remote_addr.c_str());
+      return false;
+    }
   }
 
   s_peers[s_host_player_id].peer =
@@ -680,7 +684,45 @@ bool Netplay::InitializeEnet()
   return true;
 }
 
-bool Netplay::WaitForRelayRegistration(std::string_view relay)
+std::string Netplay::GetRelayServer()
+{
+  if (!Host::GetBaseBoolSettingValue("Netplay", "UseRelay", true))
+    return {};
+
+  std::string relay = Host::GetBaseStringSettingValue("Netplay", "RelayServer");
+  return relay.empty() ? std::string(NetplayRelay::DEFAULT_SERVER) : relay;
+}
+
+void Netplay::AttachRelay(bool is_hosting)
+{
+  const std::string relay = GetRelayServer();
+  if (relay.empty())
+    return;
+
+  Error error;
+  if (!NetplayRelay::Attach(s_enet_host, relay, &error))
+    ERROR_LOG("Failed to use relay server: {}", error.GetDescription());
+  else if (!is_hosting || WaitForRelayRegistration())
+    return;
+
+  NetplayRelay::Detach();
+  if (is_hosting)
+  {
+    OnNetplayMessage(TRANSLATE_STR("Netplay", "The relay server is unavailable. Players join with your address "
+                                              "and port."));
+  }
+}
+
+std::optional<u16> Netplay::ParseSessionCode(std::string_view text)
+{
+  if (text.empty() || !std::all_of(text.begin(), text.end(), [](char ch) { return ch >= '0' && ch <= '9'; }))
+    return std::nullopt;
+
+  const std::optional<u16> code = StringUtil::FromChars<u16>(text);
+  return (code.has_value() && code.value() != 0) ? code : std::nullopt;
+}
+
+bool Netplay::WaitForRelayRegistration()
 {
   static constexpr float RELAY_REGISTER_TIMEOUT = 5.0f;
 
@@ -690,7 +732,7 @@ bool Netplay::WaitForRelayRegistration(std::string_view relay)
   {
     if (timer.GetTimeSeconds() >= RELAY_REGISTER_TIMEOUT)
     {
-      ERROR_LOG("Relay server {} did not answer.", relay);
+      ERROR_LOG("Relay server did not answer.");
       return false;
     }
 
@@ -698,8 +740,7 @@ bool Netplay::WaitForRelayRegistration(std::string_view relay)
     enet_host_service(s_enet_host, &event, 100);
   }
 
-  const std::string_view relay_host = relay.substr(0, relay.rfind(':'));
-  OnNetplayMessage(fmt::format(TRANSLATE_FS("Netplay", "Players join through the relay at {}:{}."), relay_host,
+  OnNetplayMessage(fmt::format(TRANSLATE_FS("Netplay", "Players join with session code {}."),
                                NetplayRelay::GetVirtualPort().value()));
   return true;
 }
@@ -2720,6 +2761,8 @@ void Netplay::DrawStats()
 
   SmallString text;
   text.format("Ping: {}\n", Netplay::GetPing());
+  if (const std::optional<u16> session_code = NetplayRelay::GetVirtualPort(); session_code.has_value() && IsHost())
+    text.append_format("Session Code: {}\n", session_code.value());
 
   const float scale = ImGuiManager::GetGlobalScale();
   const float shadow_offset = 1.0f * scale;

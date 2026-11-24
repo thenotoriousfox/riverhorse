@@ -3,6 +3,21 @@
 Changes since the DuckStation `v0.1-7371` base. Releases are tagged
 `vMAJOR.MINOR.PATCH`.
 
+## Unreleased
+
+### Changes
+- Netplay uses a relay server by default: the host is shown a session code
+  and the others join with it, without forwarding a port. Players still
+  connect directly when their routers allow it. Settings > Essentials >
+  Netplay and the host and join dialogs can turn the relay off or set a
+  custom one. When the relay can't be reached, the host is told and players
+  join with the host's address as before. `-netplayjoin` takes a session
+  code as well as `host:port`.
+
+### Fixes
+- With a relay server set, joining a host by its address failed: packets
+  to and from addresses other than the relay were dropped.
+
 ## 1.2.0 (2026-11-24)
 
 ### New

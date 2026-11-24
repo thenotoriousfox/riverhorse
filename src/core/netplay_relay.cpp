@@ -154,7 +154,7 @@ int ENET_CALLBACK NetplayRelay::SendThroughRelay(ENetHost* host, const ENetAddre
                                                  const ENetBuffer* buffers, size_t buffer_count)
 {
   if (address->host != s_relay_address.host)
-    return 0;
+    return enet_socket_send(host->socket, address, buffers, buffer_count);
 
   const auto [it, inserted] = s_peers.try_emplace(address->port);
   Peer& peer = it->second;
@@ -289,7 +289,7 @@ int ENET_CALLBACK NetplayRelay::ReceiveFromRelay(ENetHost* host, ENetEvent* even
   const u8* const data = host->receivedData;
   const size_t size = host->receivedDataLength;
   if (size < HEADER_SIZE || std::memcmp(data, MAGIC, sizeof(MAGIC)) != 0)
-    return 1;
+    return 0;
 
   return SameAddress(host->receivedAddress, s_relay_address) ? ReceiveFromRelayServer(host, data, size) :
                                                                ReceiveFromPeer(host, data, size);
@@ -322,7 +322,7 @@ bool NetplayRelay::Attach(ENetHost* host, std::string_view relay_address, Error*
     const std::optional<u16> port = StringUtil::FromChars<u16>(relay_address.substr(colon + 1));
     if (!port.has_value() || port.value() == 0)
     {
-      Error::SetStringFmt(error, "Invalid relay port in '{}'.", relay_address);
+      Error::SetStringView(error, "Invalid relay server port.");
       return false;
     }
 
@@ -334,7 +334,7 @@ bool NetplayRelay::Attach(ENetHost* host, std::string_view relay_address, Error*
   address.port = relay_port;
   if (enet_address_set_host(&address, std::string(relay_host).c_str()) != 0)
   {
-    Error::SetStringFmt(error, "Could not resolve relay server '{}'.", relay_host);
+    Error::SetStringView(error, "Could not resolve the relay server.");
     return false;
   }
 
@@ -402,4 +402,14 @@ void NetplayRelay::Poll()
 std::optional<u16> NetplayRelay::GetVirtualPort()
 {
   return s_virtual_port;
+}
+
+bool NetplayRelay::GetSessionAddress(u16 session_code, ENetAddress* address)
+{
+  if (!s_host)
+    return false;
+
+  *address = s_relay_address;
+  address->port = session_code;
+  return true;
 }
