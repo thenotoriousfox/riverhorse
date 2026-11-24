@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2023 Connor McLaughlin <stenzek@gmail.com> and contributors.
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #define IMGUI_DEFINE_MATH_OPERATORS
 
@@ -12,6 +12,7 @@
 #include "host.h"
 #include "imgui_overlays.h"
 #include "netplay_packets.h"
+#include "netplay_relay.h"
 #include "pad.h"
 #include "save_state_version.h"
 #include "settings.h"
@@ -68,7 +69,6 @@ struct Input
 static constexpr std::pair<const char*, const char*> s_synced_settings[] = {
   {"Console", "Region"},
   {"Console", "Enable8MBRAM"},
-  {"CPU", "ExecutionMode"},
   {"CPU", "OverclockEnable"},
   {"CPU", "OverclockNumerator"},
   {"CPU", "OverclockDenominator"},
@@ -94,6 +94,7 @@ static constexpr std::pair<const char*, const char*> s_synced_settings[] = {
   {"Hacks", "UseOldMDECRoutines"},
   {"Main", "DisableAllEnhancements"},
   {"Pad1", "Type"},
+  {"ControllerPorts", "MultitapMode"},
 };
 
 // TODO: Might be a bit generous... should we move this to config?
@@ -109,8 +110,10 @@ static bool NpOnEventCb(void* ctx, GGPOEvent* ev);
 
 static Input ReadLocalInput();
 static GGPOErrorCode AddLocalInput(Netplay::Input input);
-static GGPOErrorCode SyncInput(Input inputs[2], int* disconnect_flags);
-static void SetInputs(Input inputs[2]);
+static GGPOErrorCode SyncInput(Input inputs[MAX_PLAYERS], int* disconnect_flags);
+static void SetInputs(const Input inputs[MAX_PLAYERS]);
+static s32 GetPadForPlayer(s32 player_id);
+static s32 GetSessionMaxPlayers();
 
 static std::string GetHostSettingsText();
 static bool ImageMatchesGame(const std::string& path, std::string_view serial, u64 hash);
@@ -122,6 +125,7 @@ static void RequestCloseSession(CloseSessionMessage::Reason reason);
 // ENet
 static bool InitializeEnet();
 static void ShutdownEnetHost();
+static bool WaitForRelayRegistration(std::string_view relay);
 static std::string PeerAddressString(const ENetPeer* peer);
 static void HandleEnetEvent(const ENetEvent* event);
 static void PollEnet(Common::Timer::Value until_time);
@@ -224,6 +228,8 @@ static std::array<Peer, MAX_PLAYERS> s_peers;
 static s32 s_host_player_id = 0;
 static s32 s_player_id = 0;
 static s32 s_num_players = 0;
+static s32 s_max_players = MAX_PLAYERS;
+static std::array<s32, MAX_PLAYERS> s_player_pads;
 static u32 s_reset_cookie = 0;
 static std::bitset<MAX_PLAYERS> s_reset_players;
 static Common::Timer s_reset_start_time;
@@ -242,7 +248,6 @@ static std::string s_local_nickname;
 static std::string s_local_session_password;
 static GGPOPlayerHandle s_local_handle = GGPO_INVALID_HANDLE;
 static s32 s_local_delay = 0;
-static GGPONetworkStats s_last_net_stats{};
 static GGPOSession* s_ggpo = nullptr;
 
 static std::deque<SaveStateBuffer> s_save_buffer_pool;
@@ -427,6 +432,19 @@ bool Netplay::Start(bool is_hosting, std::string nickname, const std::string& re
   {
     ERROR_LOG("Failed to create enet host.");
     return false;
+  }
+
+  if (const std::string relay = Host::GetBaseStringSettingValue("Netplay", "RelayServer"); !relay.empty())
+  {
+    Error error;
+    if (!NetplayRelay::Attach(s_enet_host, relay, &error))
+    {
+      ERROR_LOG("Failed to use relay server: {}", error.GetDescription());
+      return false;
+    }
+
+    if (is_hosting && !WaitForRelayRegistration(relay))
+      return false;
   }
 
   s_host_player_id = 0;
@@ -662,6 +680,30 @@ bool Netplay::InitializeEnet()
   return true;
 }
 
+bool Netplay::WaitForRelayRegistration(std::string_view relay)
+{
+  static constexpr float RELAY_REGISTER_TIMEOUT = 5.0f;
+
+  Common::Timer timer;
+  ENetEvent event;
+  while (!NetplayRelay::GetVirtualPort().has_value())
+  {
+    if (timer.GetTimeSeconds() >= RELAY_REGISTER_TIMEOUT)
+    {
+      ERROR_LOG("Relay server {} did not answer.", relay);
+      return false;
+    }
+
+    NetplayRelay::Poll();
+    enet_host_service(s_enet_host, &event, 100);
+  }
+
+  const std::string_view relay_host = relay.substr(0, relay.rfind(':'));
+  OnNetplayMessage(fmt::format(TRANSLATE_FS("Netplay", "Players join through the relay at {}:{}."), relay_host,
+                               NetplayRelay::GetVirtualPort().value()));
+  return true;
+}
+
 void Netplay::ShutdownEnetHost()
 {
   if (!s_enet_host)
@@ -684,6 +726,7 @@ void Netplay::ShutdownEnetHost()
     s_spectators[i] = {};
   }
 
+  NetplayRelay::Detach();
   enet_host_destroy(s_enet_host);
   s_enet_host = nullptr;
 }
@@ -807,6 +850,8 @@ void Netplay::PollEnet(Common::Timer::Value until_time)
     // make sure s_enet_host exists
     Assert(s_enet_host);
 
+    NetplayRelay::Poll();
+
     // might need resending
     if (s_ggpo)
       ggpo_network_idle(s_ggpo);
@@ -868,7 +913,7 @@ bool Netplay::IsValidPlayerId(s32 player_id)
 
 s32 Netplay::GetFreePlayerId()
 {
-  for (s32 i = 0; i < MAX_PLAYERS; i++)
+  for (s32 i = 0; i < s_max_players; i++)
   {
     if (i != s_player_id && !s_peers[i].peer)
       return i;
@@ -931,7 +976,12 @@ void Netplay::CreateGGPOSession()
   {
     // slot filled?
     if (!s_peers[i].peer && i != s_player_id)
+    {
+      s_player_pads[i] = -1;
       continue;
+    }
+
+    s_player_pads[i] = GetPadForPlayer(i);
 
     GGPOPlayer player = {sizeof(GGPOPlayer)};
     GGPOErrorCode result;
@@ -950,7 +1000,7 @@ void Netplay::CreateGGPOSession()
       result = ggpo_add_player(s_ggpo, &player, &s_peers[i].ggpo_handle);
     }
 
-    INFO_LOG("Adding player: {}", i);
+    INFO_LOG("Adding player {} on pad {}", i, s_player_pads[i]);
     // It's a new session, this should always succeed...
     Assert(GGPO_SUCCEEDED(result));
   }
@@ -1048,8 +1098,10 @@ void Netplay::HandlePeerConnectionAsHost(ENetPeer* peer)
   auto pkt = NewControlPacket<ConnectResponseMessage>(
     sizeof(ConnectResponseMessage) + static_cast<u32>(game_serial.length()) + static_cast<u32>(game_title.length()) +
     static_cast<u32>(settings.length()));
+  pkt->protocol_version = PROTOCOL_VERSION;
+  pkt->save_state_version = SAVE_STATE_VERSION;
   pkt->num_players = s_num_players;
-  pkt->max_players = MAX_PLAYERS;
+  pkt->max_players = s_max_players;
   pkt->game_title_length = static_cast<u32>(game_title.length());
   pkt->game_serial_length = static_cast<u32>(game_serial.length());
   pkt->settings_length = static_cast<u32>(settings.length());
@@ -1082,6 +1134,12 @@ void Netplay::HandleConnectResponseMessage(s32 player_id, const ENetPacket* pkt)
   if (!msg->Validate())
   {
     CloseSessionWithError(TRANSLATE_SV("Netplay", "Cannot join session: Invalid details received."));
+    return;
+  }
+
+  if (msg->protocol_version != PROTOCOL_VERSION || msg->save_state_version != SAVE_STATE_VERSION)
+  {
+    CloseSessionWithError(TRANSLATE_SV("Netplay", "Cannot join session: the host runs a different Riverhorse version."));
     return;
   }
 
@@ -1349,6 +1407,13 @@ void Netplay::HandlePeerConnectionAsNonHost(ENetPeer* peer, s32 claimed_player_i
     return;
   }
 
+  if (const s32 known_player_id = GetPlayerIdForPeer(peer); known_player_id >= 0)
+  {
+    DEV_LOG("Connection complete with player {}{}", known_player_id,
+            (known_player_id == s_host_player_id) ? "[HOST]" : "");
+    return;
+  }
+
   VERBOSE_LOG(
     fmt::format("New peer connection from {} claiming player ID {}", PeerAddressString(peer), claimed_player_id)
       .c_str());
@@ -1361,14 +1426,10 @@ void Netplay::HandlePeerConnectionAsNonHost(ENetPeer* peer, s32 claimed_player_i
     return;
   }
 
-  // the peer should match up, unless we're the one receiving the connection
-  Assert(s_peers[claimed_player_id].peer == peer || claimed_player_id > s_player_id);
-  if (s_peers[claimed_player_id].peer == peer)
+  if (claimed_player_id < s_player_id)
   {
-    // WaitForPeerConnections handles this case.
-    // If this was the host, we still need to wait for the synchronization.
-    DEV_LOG("Connection complete with player {}{}", claimed_player_id,
-                  (claimed_player_id == s_host_player_id) ? "[HOST]" : "");
+    ERROR_LOG("Unexpected connection from lower player ID {}", claimed_player_id);
+    enet_peer_disconnect_now(peer, 0);
     return;
   }
 
@@ -1486,8 +1547,7 @@ void Netplay::Reset()
       continue;
     }
 
-    // TODO: This is wrong, so wrong....
-    header.players[i].controller_port = static_cast<s16>(i);
+    header.players[i].controller_port = static_cast<s16>(GetPadForPlayer(i));
     StringUtil::Strlcpy(header.players[i].nickname, s_peers[i].nickname, std::size(header.players[i].nickname));
 
     if (i == s_player_id)
@@ -1560,6 +1620,8 @@ void Netplay::HandleResetMessage(s32 player_id, const ENetPacket* pkt)
   Assert(msg->num_players > 1 || s_local_spectating);
   DEV_LOG("Checking connections");
   s_num_players = msg->num_players;
+  for (s32 i = 0; i < MAX_PLAYERS; i++)
+    s_player_pads[i] = msg->players[i].controller_port;
   for (s32 i = 0; i < MAX_PLAYERS; i++)
   {
     // We are already connected to the host as a spectator we dont need any other connections
@@ -1900,9 +1962,8 @@ void Netplay::SetRollbackSettings(SettingsInterface& si)
   si.SetBoolValue("Main", "LoadDevicesFromSaveStates", true);
   si.SetIntValue("Main", "RunaheadFrameCount", 0);
   si.SetBoolValue("Main", "RewindEnable", false);
-  si.SetBoolValue("CPU", "RecompilerBlockLinking", false);
+  si.SetStringValue("CPU", "ExecutionMode", Settings::GetCPUExecutionModeName(CPUExecutionMode::CachedInterpreter));
   si.SetBoolValue("CPU", "RecompilerInterpreterFallback", false);
-  si.SetStringValue("CPU", "FastmemMode", Settings::GetCPUFastmemModeName(CPUFastmemMode::Disabled));
   si.SetBoolValue("GPU", "UseSoftwareRendererForReadbacks", true);
   si.SetBoolValue("GPU", "UseHardwareThread", false);
   si.SetBoolValue("GPU", "PGXPCulling", false);
@@ -1962,12 +2023,10 @@ void Netplay::SetSettings(std::string_view host_settings)
                                                  Controller::GetControllerInfo(ControllerType::DigitalController)->name);
   for (u32 i = 0; i < NUM_CONTROLLER_AND_CARD_PORTS; i++)
   {
-    si.SetStringValue(Controller::GetSettingsSection(i).c_str(), "Type",
-                      (i < MAX_PLAYERS) ? pad_type.c_str() : Controller::GetControllerInfo(ControllerType::None)->name);
+    si.SetStringValue(Controller::GetSettingsSection(i).c_str(), "Type", pad_type.c_str());
     si.SetStringValue("MemoryCards", fmt::format("Card{}Type", i + 1).c_str(),
                       Settings::GetMemoryCardTypeName((i == 0) ? MemoryCardType::NonPersistent : MemoryCardType::None));
   }
-  si.SetStringValue("ControllerPorts", "MultitapMode", Settings::GetMultitapModeName(MultitapMode::Disabled));
   si.SetBoolValue("CDROM", "LoadImagePatches", false);
   si.SetBoolValue("Console", "EnableCheats", false);
   si.SetBoolValue("PCDrv", "Enabled", false);
@@ -2133,9 +2192,9 @@ void Netplay::SendChatMessage(const std::string_view& msg)
   ShowChatMessage(s_player_id, msg);
 }
 
-GGPOErrorCode Netplay::SyncInput(Netplay::Input inputs[2], int* disconnect_flags)
+GGPOErrorCode Netplay::SyncInput(Netplay::Input inputs[MAX_PLAYERS], int* disconnect_flags)
 {
-  return ggpo_synchronize_input(s_ggpo, inputs, sizeof(Netplay::Input) * 2, disconnect_flags);
+  return ggpo_synchronize_input(s_ggpo, inputs, sizeof(Netplay::Input) * MAX_PLAYERS, disconnect_flags);
 }
 
 GGPOErrorCode Netplay::AddLocalInput(Netplay::Input input)
@@ -2145,9 +2204,18 @@ GGPOErrorCode Netplay::AddLocalInput(Netplay::Input input)
 
 s32 Netplay::GetPing()
 {
-  const int handle = s_local_handle == 1 ? 2 : 1;
-  ggpo_get_network_stats(s_ggpo, handle, &s_last_net_stats);
-  return s_last_net_stats.network.ping;
+  s32 ping = 0;
+  for (s32 i = 0; i < MAX_PLAYERS; i++)
+  {
+    if (i == s_player_id || !s_peers[i].peer || s_peers[i].ggpo_handle == GGPO_INVALID_HANDLE)
+      continue;
+
+    GGPONetworkStats stats = {};
+    ggpo_get_network_stats(s_ggpo, s_peers[i].ggpo_handle, &stats);
+    ping = std::max(ping, stats.network.ping);
+  }
+
+  return ping;
 }
 
 u32 Netplay::GetMaxPrediction()
@@ -2155,11 +2223,40 @@ u32 Netplay::GetMaxPrediction()
   return MAX_ROLLBACK_FRAMES;
 }
 
-void Netplay::SetInputs(Netplay::Input inputs[2])
+s32 Netplay::GetPadForPlayer(s32 player_id)
 {
-  for (u32 i = 0; i < MAX_PLAYERS; i++)
+  s32 index = 0;
+  for (const u32 pad : Controller::PortOrder)
   {
-    Controller* const controller = Pad::GetController(i);
+    const auto [port, slot] = Controller::ConvertPadToPortAndSlot(pad);
+    if (Controller::PortAndSlotIsMultitap(port, slot) && !g_settings.IsMultitapPortEnabled(port))
+      continue;
+
+    if (index++ == player_id)
+      return static_cast<s32>(pad);
+  }
+
+  return -1;
+}
+
+s32 Netplay::GetSessionMaxPlayers()
+{
+  s32 count = 0;
+  while (count < MAX_PLAYERS && GetPadForPlayer(count) >= 0)
+    count++;
+  return count;
+}
+
+void Netplay::SetInputs(const Netplay::Input inputs[MAX_PLAYERS])
+{
+  u32 input_index = 0;
+  for (s32 player_id = 0; player_id < MAX_PLAYERS; player_id++)
+  {
+    if (s_player_pads[player_id] < 0)
+      continue;
+
+    const Netplay::Input& input = inputs[input_index++];
+    Controller* const controller = Pad::GetController(static_cast<u32>(s_player_pads[player_id]));
     const Controller::ControllerInfo* cinfo =
       controller ? Controller::GetControllerInfo(controller->GetType()) : nullptr;
     if (!cinfo)
@@ -2171,13 +2268,13 @@ void Netplay::SetInputs(Netplay::Input inputs[2])
     {
       if (bi.type == InputBindingInfo::Type::Button && button < 32)
       {
-        controller->SetBindState(bi.bind_index, ((inputs[i].button_data >> button) & 1u) ? 1.0f : 0.0f);
+        controller->SetBindState(bi.bind_index, ((input.button_data >> button) & 1u) ? 1.0f : 0.0f);
         button++;
       }
       else if ((bi.type == InputBindingInfo::Type::HalfAxis || bi.type == InputBindingInfo::Type::Axis) &&
                axis < MAX_INPUT_AXES)
       {
-        const float normalized = static_cast<float>(inputs[i].axes[axis++]) / 255.0f;
+        const float normalized = static_cast<float>(input.axes[axis++]) / 255.0f;
         controller->SetBindState(bi.bind_index,
                                  (bi.type == InputBindingInfo::Type::Axis) ? (normalized * 2.0f - 1.0f) : normalized);
       }
@@ -2188,6 +2285,7 @@ void Netplay::SetInputs(Netplay::Input inputs[2])
 bool Netplay::CreateSession(std::string nickname, s32 port, s32 max_players, std::string password, int inputdelay)
 {
   s_local_session_password = std::move(password);
+  s_max_players = std::clamp(max_players, 1, GetSessionMaxPlayers());
 
   if (!Netplay::Start(true, std::move(nickname), std::string(), port, inputdelay))
   {
@@ -2293,7 +2391,7 @@ bool Netplay::WaitUntilFrameAdvanced(bool has_presented)
     // run game
     auto result = GGPO_OK;
     int disconnect_flags = 0;
-    Netplay::Input inputs[2] = {};
+    Netplay::Input inputs[MAX_PLAYERS] = {};
     // add local input
     if (s_local_handle != GGPO_INVALID_HANDLE)
     {
@@ -2377,7 +2475,7 @@ void Netplay::RunFrame()
   // run game
   auto result = GGPO_OK;
   int disconnect_flags = 0;
-  Netplay::Input inputs[2] = {};
+  Netplay::Input inputs[MAX_PLAYERS] = {};
   // add local input
   if (s_local_handle != GGPO_INVALID_HANDLE)
   {
@@ -2431,7 +2529,7 @@ void Netplay::FrameDone()
 
 bool Netplay::NpAdvFrameCb(void* ctx, int flags)
 {
-  Netplay::Input inputs[2] = {};
+  Netplay::Input inputs[MAX_PLAYERS] = {};
   int disconnect_flags;
   Netplay::SyncInput(inputs, &disconnect_flags);
 #if 0

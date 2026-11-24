@@ -345,6 +345,9 @@ typedef enet_uint32 (ENET_CALLBACK * ENetChecksumCallback) (const ENetBuffer * b
 
 /** Callback for intercepting received raw UDP packets. Should return 1 to intercept, 0 to ignore, or -1 to propagate an error. */
 typedef int (ENET_CALLBACK * ENetInterceptCallback) (struct _ENetHost * host, struct _ENetEvent * event);
+
+/** Callback for sending raw UDP packets instead of the host's socket. Returns bytes sent or -1, like enet_socket_send. */
+typedef int (ENET_CALLBACK * ENetSendCallback) (struct _ENetHost * host, const ENetAddress * address, const ENetBuffer * buffers, size_t bufferCount);
  
 /** An ENet host for communicating with peers.
   *
@@ -395,6 +398,7 @@ typedef struct _ENetHost
    enet_uint32          totalReceivedData;           /**< total data received, user should reset to 0 as needed to prevent overflow */
    enet_uint32          totalReceivedPackets;        /**< total UDP packets received, user should reset to 0 as needed to prevent overflow */
    ENetInterceptCallback intercept;                  /**< callback the user can set to intercept received raw UDP packets */
+   ENetSendCallback     send;                        /**< callback the user can set to send raw UDP packets */
    size_t               connectedPeers;
    size_t               bandwidthLimitedPeers;
    size_t               duplicatePeers;              /**< optional number of allowed peers from duplicate IPs, defaults to ENET_PROTOCOL_MAXIMUM_PEER_ID */

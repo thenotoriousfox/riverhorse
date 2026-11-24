@@ -5,7 +5,32 @@ Changes since the DuckStation `v0.1-7371` base. Releases are tagged
 
 ## Unreleased
 
+### New
+- Netplay for up to four players. Players 3 and 4 need a multitap in the
+  host's controller settings; players take the slots in the order they join.
+- Netplay through a relay server, for players who can't reach each other
+  directly: set the same Relay Server in Settings > Essentials > Netplay (or
+  in the host and join dialogs). The relay is a separate program,
+  `riverhorse-relay` (build with `-DBUILD_RELAY_SERVER=ON`).
+- Joining a session from a different Riverhorse version is refused with a
+  message instead of failing while loading the host's state.
+
+### Changes
+- Netplay sessions run the CPU on the cached interpreter. With the
+  recompilers, players who rolled back drifted out of sync.
+- Spyro 2 and Spyro 3 always use 1x CD-ROM read speedup: with speedup on,
+  cutscene sound drops out or the cutscene stops loading.
+- Gran Turismo 1 turns the widescreen hack off: it has no effect there and the
+  picture was only stretched.
+
 ### Fixes
+- Multitap slots now use the controllers set up for them. Before, with a
+  multitap on port 1 the controller configured as "Port 1B" played as slot C
+  and port 2 took the "Port 1D" controller; with "Port 2 only", slots 2B-2D
+  had no controller.
+- Netplay desyncs: a peer that had loaded a state saved one more timing event
+  than the others, so states compared as different.
+- A third netplay player no longer crashes on joining.
 - The Linux AppImage starts again without `RIVERHORSE_X11=1`: it failed with
   "Could not find the Qt platform plugin" unless forced onto X11. It now runs
   on Wayland when the session has it and falls back to X11 otherwise.

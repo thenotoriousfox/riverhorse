@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2023 Connor McLaughlin <stenzek@gmail.com> and contributors.
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #pragma once
 
@@ -56,10 +56,15 @@ struct ControlMessageHeader
   u32 size;
 };
 
+// Bump when any packet layout or session behaviour changes; peers must match.
+static constexpr u32 PROTOCOL_VERSION = 2;
+
 struct ConnectResponseMessage
 {
   ControlMessageHeader header;
 
+  u32 protocol_version;
+  u32 save_state_version;
   s32 num_players;
   s32 max_players;
   u64 game_hash;

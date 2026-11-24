@@ -1715,7 +1715,10 @@ enet_protocol_send_outgoing_commands (ENetHost * host, ENetEvent * event, int ch
 
         currentPeer -> lastSendTime = host -> serviceTime;
 
-        sentLength = enet_socket_send (host -> socket, & currentPeer -> address, host -> buffers, host -> bufferCount);
+        if (host -> send != NULL)
+          sentLength = host -> send (host, & currentPeer -> address, host -> buffers, host -> bufferCount);
+        else
+          sentLength = enet_socket_send (host -> socket, & currentPeer -> address, host -> buffers, host -> bufferCount);
 
         enet_protocol_remove_sent_unreliable_commands (currentPeer, & sentUnreliableCommands);
 

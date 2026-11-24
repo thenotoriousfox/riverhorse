@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2023 Connor McLaughlin <stenzek@gmail.com> and contributors.
-// SPDX-License-Identifier: (GPL-3.0 OR CC-BY-NC-ND-4.0)
+// SPDX-License-Identifier: GPL-3.0-only
 
 #pragma once
 
@@ -12,8 +12,8 @@ namespace Netplay {
 
 enum : s32
 {
-  // Maximum number of emulated controllers.
-  MAX_PLAYERS = 2,
+  // Maximum number of players. Players 3 and 4 need a multitap in the host's controller settings.
+  MAX_PLAYERS = 4,
 
   // Maximum number of spectators allowed to watch the session.
   MAX_SPECTATORS = 4,

@@ -3607,6 +3607,21 @@ void FullscreenUI::DrawEssentialsSettingsPage()
   DrawIntSpinBoxSetting(bsi, FSUI_ICONSTR(ICON_FA_GLOBE, "Port"),
                         FSUI_CSTR("UDP port used to host and join sessions. The host's port must be reachable."),
                         "Netplay", "Port", Netplay::DEFAULT_PORT, 1, 65535, 1, "%d");
+  const std::string relay = bsi->GetStringValue("Netplay", "RelayServer", "");
+  if (MenuButtonWithValue(FSUI_ICONSTR(ICON_FA_SERVER, "Relay Server"),
+                          FSUI_CSTR("Address of a relay server, for players who can't reach each other directly. "
+                                    "Everyone in the session must use the same one. Empty connects directly."),
+                          relay.empty() ? FSUI_CSTR("None") : relay.c_str()))
+  {
+    OpenInputStringDialog(FSUI_ICONSTR(ICON_FA_SERVER, "Relay Server"), FSUI_STR("host or host:port"), std::string(),
+                          FSUI_STR("OK"), [](std::string value) {
+                            SettingsInterface* bsi = GetEditingSettingsInterface();
+                            bsi->SetStringValue("Netplay", "RelayServer",
+                                                std::string(StringUtil::StripWhitespace(value)).c_str());
+                            SetSettingsChanged(bsi);
+                          },
+                          relay);
+  }
   DrawIntRangeSetting(bsi, FSUI_ICONSTR(ICON_FA_STOPWATCH, "Input Delay"),
                       FSUI_CSTR("Frames to delay your own input by. Higher values mean fewer rollbacks on slow "
                                 "connections."),

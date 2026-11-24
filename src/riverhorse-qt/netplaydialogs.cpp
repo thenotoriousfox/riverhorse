@@ -15,6 +15,7 @@ CreateNetplaySessionDialog::CreateNetplaySessionDialog(QWidget* parent) : QDialo
     QString::fromStdString(Host::GetBaseStringSettingValue("Netplay", "Nickname", Netplay::DEFAULT_NICKNAME)));
   m_ui.port->setValue(Host::GetBaseIntSettingValue("Netplay", "Port", Netplay::DEFAULT_PORT));
   m_ui.inputDelay->setValue(Host::GetBaseIntSettingValue("Netplay", "InputDelay", 0));
+  m_ui.relayServer->setText(QString::fromStdString(Host::GetBaseStringSettingValue("Netplay", "RelayServer", "")));
 
   connect(m_ui.nickname, &QLineEdit::textChanged, this, &CreateNetplaySessionDialog::updateState);
   connect(m_ui.buttonBox, &QDialogButtonBox::accepted, this, &CreateNetplaySessionDialog::accept);
@@ -33,6 +34,7 @@ void CreateNetplaySessionDialog::accept()
   Host::SetBaseStringSettingValue("Netplay", "Nickname", nickname.toUtf8().constData());
   Host::SetBaseIntSettingValue("Netplay", "Port", m_ui.port->value());
   Host::SetBaseIntSettingValue("Netplay", "InputDelay", m_ui.inputDelay->value());
+  Host::SetBaseStringSettingValue("Netplay", "RelayServer", m_ui.relayServer->text().trimmed().toUtf8().constData());
   Host::CommitBaseSettingChanges();
 
   QDialog::accept();
@@ -58,6 +60,7 @@ JoinNetplaySessionDialog::JoinNetplaySessionDialog(QWidget* parent) : QDialog(pa
   m_ui.hostname->setText(QString::fromStdString(Host::GetBaseStringSettingValue("Netplay", "LastHost", "")));
   m_ui.port->setValue(Host::GetBaseIntSettingValue("Netplay", "Port", Netplay::DEFAULT_PORT));
   m_ui.inputDelay->setValue(Host::GetBaseIntSettingValue("Netplay", "InputDelay", 0));
+  m_ui.relayServer->setText(QString::fromStdString(Host::GetBaseStringSettingValue("Netplay", "RelayServer", "")));
 
   connect(m_ui.nickname, &QLineEdit::textChanged, this, &JoinNetplaySessionDialog::updateState);
   connect(m_ui.hostname, &QLineEdit::textChanged, this, &JoinNetplaySessionDialog::updateState);
@@ -79,6 +82,7 @@ void JoinNetplaySessionDialog::accept()
   Host::SetBaseStringSettingValue("Netplay", "LastHost", hostname.toUtf8().constData());
   Host::SetBaseIntSettingValue("Netplay", "Port", m_ui.port->value());
   Host::SetBaseIntSettingValue("Netplay", "InputDelay", m_ui.inputDelay->value());
+  Host::SetBaseStringSettingValue("Netplay", "RelayServer", m_ui.relayServer->text().trimmed().toUtf8().constData());
   Host::CommitBaseSettingChanges();
 
   QDialog::accept();

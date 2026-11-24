@@ -91,6 +91,8 @@ add_library(core
   netplay.cpp
   netplay.h
   netplay_packets.h
+  netplay_relay.cpp
+  netplay_relay.h
   negcon_rumble.cpp
   negcon_rumble.h
   pad.cpp

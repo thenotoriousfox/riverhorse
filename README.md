@@ -50,7 +50,7 @@ The current release is 1.1.0; downloads are on the [Releases](https://github.com
 
 ### Play
 
-- Rollback netplay for two players and up to four spectators
+- Rollback netplay for up to four players and four spectators, direct or through a relay server
 - Patch database with widescreen, 60 FPS and fix patches per game
 - About 66,000 cheats for 1,900+ games, including libretro-database
 - Cheats that replace instructions without writing RAM, for games that check their own code
@@ -126,17 +126,28 @@ core.
 
 ## 🌐 Netplay
 
-Two players can play over the network with rollback: the host starts a
-game and picks System > Host Netplay Session (or Host Netplay Session in
-the in-game panel); the other player picks System > Join Netplay Session
-(or Start Game > Join Netplay) and enters the host's address. The joining
-player needs the same game in their game list and a BIOS with the same
-hash. The host's UDP port (31200 by default, set under Settings >
-Essentials > Netplay) must be reachable, so forward it on the host's
-router when playing over the internet. From a frontend, start Riverhorse
-with `-netplayhost <port> -- <game>` or `-netplayjoin <host:port> -- <game>`
-(the game is used when it matches the host's, otherwise the game list is
-searched), plus `-netplaynick <name>` and, to watch, `-netplayspectate`.
+Up to four players can play over the network with rollback: the host starts
+a game and picks System > Host Netplay Session (or Host Netplay Session in
+the in-game panel); the others pick System > Join Netplay Session (or Start
+Game > Join Netplay) and enter the host's address. Everyone needs the same
+game in their game list, a BIOS with the same hash and the same Riverhorse
+version. For three or four players, the host turns on a multitap first
+(Settings > Controllers > Multitap, port 1 for most games); players then
+take slots 1A-1D in the order they joined. The host's UDP port (31200 by
+default, set under Settings > Essentials > Netplay) must be reachable, so
+forward it on the host's router when playing over the internet. From a
+frontend, start Riverhorse with `-netplayhost <port> -- <game>` or
+`-netplayjoin <host:port> -- <game>` (the game is used when it matches the
+host's, otherwise the game list is searched), plus `-netplaynick <name>`
+and, to watch, `-netplayspectate`.
+
+When players can't reach each other directly, everyone sets the same Relay
+Server (Settings > Essentials > Netplay, or in the host and join dialogs,
+as `host` or `host:port`). The host is then shown the address to give the
+others, the relay's host name and a port it assigned. To run a relay, build
+with `-DBUILD_RELAY_SERVER=ON` and start `riverhorse-relay [port]` (UDP 31210
+by default) on a machine with that port open; it only forwards between
+players registered with it.
 
 ---
 

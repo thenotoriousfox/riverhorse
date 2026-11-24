@@ -7,6 +7,7 @@ option(BUILD_REGTEST "Build regression test runner" OFF)
 option(BUILD_LIBRETRO_CORE "Build the libretro core" OFF)
 option(LINK_SHADER_COMPILERS "Link static shaderc and SPIRV-Cross instead of loading them at run time" ${BUILD_LIBRETRO_CORE})
 option(BUILD_TESTS "Build unit tests" OFF)
+option(BUILD_RELAY_SERVER "Build the netplay relay server (Linux)" OFF)
 
 if(LINUX OR BSD)
   option(ENABLE_X11 "Support X11 window system" ON)

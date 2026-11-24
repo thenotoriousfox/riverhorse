@@ -114,7 +114,6 @@ static void ResetDeviceTransferState();
 
 static bool DoStateController(StateWrapper& sw, u32 i);
 static bool DoStateMemcard(StateWrapper& sw, u32 i, bool is_memory_state);
-static MemoryCard* GetDummyMemcard();
 static void BackupMemoryCardState();
 static void RestoreMemoryCardState();
 
@@ -140,7 +139,6 @@ static bool s_transmit_buffer_full = false;
 
 static u32 s_last_memory_card_transfer_frame = 0;
 static DynamicHeapArray<u8> s_memory_card_backup;
-static std::unique_ptr<MemoryCard> s_dummy_card;
 
 } // namespace Pad
 
@@ -254,6 +252,7 @@ bool Pad::DoStateMemcard(StateWrapper& sw, u32 i, bool is_memory_state)
   }
 
   MemoryCard* card_ptr = s_memory_cards[i].get();
+  std::unique_ptr<MemoryCard> dummy_card;
   if (card_present_in_state)
   {
     if (sw.IsReading() && !g_settings.load_devices_from_save_states)
@@ -261,7 +260,8 @@ bool Pad::DoStateMemcard(StateWrapper& sw, u32 i, bool is_memory_state)
       // load memcard into a temporary: If the card datas match, take the one from the savestate
       // since it has other useful non-data state information. Otherwise take the user's card
       // and perform a re-plugging.
-      card_ptr = GetDummyMemcard();
+      dummy_card = MemoryCard::Create();
+      card_ptr = dummy_card.get();
     }
 
     if (!sw.DoMarker("MemoryCard") || !card_ptr->DoState(sw))
@@ -330,13 +330,6 @@ bool Pad::DoStateMemcard(StateWrapper& sw, u32 i, bool is_memory_state)
   }
 
   return true;
-}
-
-MemoryCard* Pad::GetDummyMemcard()
-{
-  if (!s_dummy_card)
-    s_dummy_card = MemoryCard::Create();
-  return s_dummy_card.get();
 }
 
 void Pad::BackupMemoryCardState()
@@ -427,12 +420,12 @@ bool Pad::DoState(StateWrapper& sw, bool is_memory_state)
     // Still have to parse through the data if it's present.
     if (state_has_memcards)
     {
-      MemoryCard* dummy_card = process_memcard_state ? nullptr : GetDummyMemcard();
+      const std::unique_ptr<MemoryCard> dummy_card = process_memcard_state ? nullptr : MemoryCard::Create();
       for (u32 i = 0; i < NUM_CONTROLLER_AND_CARD_PORTS; i++)
       {
         if (s_memory_cards[i])
         {
-          MemoryCard* const mc = process_memcard_state ? s_memory_cards[i].get() : dummy_card;
+          MemoryCard* const mc = process_memcard_state ? s_memory_cards[i].get() : dummy_card.get();
           mc->DoState(sw);
         }
       }

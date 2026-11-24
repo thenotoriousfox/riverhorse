@@ -72,6 +72,8 @@ static u32 s_rollback_replay_until = 0;
 static u32 s_rollback_input_seed = 1;
 static u32 s_rollback_count = 0;
 static bool s_rollback_failed = false;
+static bool s_rollback_mispredict = false;
+static bool s_rollback_mispredicting = false;
 
 bool RegTestHost::SetFolders()
 {
@@ -384,7 +386,11 @@ void RegTestHost::RollbackTestFrameDone()
   const u64 hash = XXH3_64bits(state.state_data.data(), state.state_size);
 
   const bool replaying = (frame <= s_rollback_replay_until);
-  if (replaying)
+  if (replaying && s_rollback_mispredicting)
+  {
+    s_frames_remaining++;
+  }
+  else if (replaying)
   {
     s_frames_remaining++;
     if (s_rollback_hashes[frame] != hash)
@@ -447,7 +453,10 @@ void RegTestHost::RollbackTestFrameDone()
   }
 
   u32 next_frame = frame + 1;
-  if (!replaying && s_rollback_frames.size() > s_rollback_interval && (frame % s_rollback_interval) == 0)
+  const bool start_rollback =
+    !replaying && s_rollback_frames.size() > s_rollback_interval && (frame % s_rollback_interval) == 0;
+  const bool end_misprediction = s_rollback_mispredicting && frame == s_rollback_replay_until;
+  if (start_rollback || end_misprediction)
   {
     const RollbackTestFrame& target = s_rollback_frames.front();
     if (!System::LoadMemoryState(target.state))
@@ -455,8 +464,12 @@ void RegTestHost::RollbackTestFrameDone()
       ERROR_LOG("Rollback test: failed to load state at frame {}", frame);
       std::abort();
     }
-    s_rollback_replay_until = frame;
-    s_rollback_count++;
+    if (start_rollback)
+    {
+      s_rollback_replay_until = frame;
+      s_rollback_count++;
+    }
+    s_rollback_mispredicting = start_rollback && s_rollback_mispredict;
     next_frame = System::GetFrameNumber() + 1;
   }
 
@@ -466,7 +479,7 @@ void RegTestHost::RollbackTestFrameDone()
   if (!cinfo)
     return;
 
-  const u32 input = s_rollback_inputs[next_frame];
+  const u32 input = s_rollback_mispredicting ? ~s_rollback_inputs[next_frame] : s_rollback_inputs[next_frame];
   u32 button = 0;
   for (const Controller::ControllerBindingInfo& bi : cinfo->bindings)
   {
@@ -653,6 +666,8 @@ void RegTestHost::PrintCommandLineHelp(const char* progname)
   std::fprintf(stderr, "  -statetest: Saves and reloads a state after every dumped frame.\n");
   std::fprintf(stderr, "  -rollbacktest <frames>: Every <frames> frames, goes back that many frames and replays\n"
                        "    them with the same random pad input, exiting with code 2 if the state differs.\n");
+  std::fprintf(stderr, "  -mispredict: With -rollbacktest, runs the frames once with different input before\n"
+                       "    going back again and replaying, like a netplay rollback after a wrong prediction.\n");
   std::fprintf(stderr, "  -fastsw: Uses the fast software rasterizer.\n");
   std::fprintf(stderr, "  -hwthread: Runs the hardware renderer on its own thread.\n");
   std::fprintf(stderr, "  -runahead <frames>: Runs ahead by the given number of frames.\n");
@@ -726,6 +741,11 @@ bool RegTestHost::ParseCommandLineParameters(int argc, char* argv[], std::option
       {
         s_rollback_interval = StringUtil::FromChars<u32>(argv[++i]).value_or(0);
         Netplay::SetRollbackSettings(*s_base_settings_interface);
+        continue;
+      }
+      else if (CHECK_ARG("-mispredict"))
+      {
+        s_rollback_mispredict = true;
         continue;
       }
       else if (CHECK_ARG_PARAM("-frames"))

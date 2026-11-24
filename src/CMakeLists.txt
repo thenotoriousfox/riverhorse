@@ -19,6 +19,10 @@ if(BUILD_REGTEST)
   add_subdirectory(riverhorse-regtest)
 endif()
 
+if(BUILD_RELAY_SERVER)
+  add_subdirectory(riverhorse-relay)
+endif()
+
 if(BUILD_LIBRETRO_CORE)
   add_subdirectory(riverhorse-libretro)
 endif()
