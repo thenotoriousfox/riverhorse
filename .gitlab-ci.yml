@@ -16,6 +16,10 @@ include:
     file: '/windows-cmake-mingw.yml'
   - project: 'libretro-infrastructure/ci-templates'
     file: '/android-cmake.yml'
+  - project: 'libretro-infrastructure/ci-templates'
+    file: 'osx-cmake-x86.yml'
+  - project: 'libretro-infrastructure/ci-templates'
+    file: 'osx-cmake-arm64.yml'
 
 stages:
   - build-prepare
@@ -49,4 +53,16 @@ android-arm64-v8a:
 android-x86_64:
   extends:
     - .libretro-android-cmake-x86_64
+    - .core-defs
+
+libretro-build-osx-x64:
+  extends:
+    - .libretro-osx-cmake-x86_64
+    - .core-defs
+  variables:
+    MACOSX_DEPLOYMENT_TARGET: "10.15"
+
+libretro-build-osx-arm64:
+  extends:
+    - .libretro-osx-cmake-arm64
     - .core-defs
