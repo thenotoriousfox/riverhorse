@@ -3580,7 +3580,7 @@ void System::UpdateSpeedLimiterState()
         s_target_speed = ratio;
 
         // When syncing to host and using vsync, we don't need to sleep.
-        s_syncing_to_host_with_vsync = g_settings.display_vsync;
+        s_syncing_to_host_with_vsync = (g_settings.display_vsync && s_host_refresh_multiple == 1);
         if (s_syncing_to_host_with_vsync)
         {
           INFO_LOG("Using host vsync for throttling.");
@@ -6132,17 +6132,14 @@ void System::PresentBlackFrame()
 
 void System::PresentSubframes()
 {
-  if (!s_syncing_to_host_with_vsync || s_host_refresh_multiple <= 1 || IsExecutionInterrupted())
+  if (!s_syncing_to_host || s_host_refresh_multiple <= 1 || !g_settings.display_vsync ||
+      !g_settings.display_black_frame_insertion || IsExecutionInterrupted())
+  {
     return;
+  }
 
   for (u32 i = 1; i < s_host_refresh_multiple; i++)
   {
-    if (!g_settings.display_black_frame_insertion)
-    {
-      PresentDisplay(false, false);
-      continue;
-    }
-
     WaitForPendingPresent();
     if (GPUDevice::HasDeviceThread())
     {
