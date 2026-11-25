@@ -83,6 +83,8 @@
     <ClCompile Include="playstation_mouse.cpp" />
     <ClCompile Include="psf_loader.cpp" />
     <ClCompile Include="settings.cpp" />
+    <ClCompile Include="save_sync.cpp" />
+    <ClCompile Include="save_sync_backends.cpp" />
     <ClCompile Include="sio.cpp" />
     <ClCompile Include="spu.cpp" />
     <ClCompile Include="system.cpp" />
@@ -168,6 +170,8 @@
     <ClInclude Include="playstation_mouse.h" />
     <ClInclude Include="psf_loader.h" />
     <ClInclude Include="save_state_version.h" />
+    <ClInclude Include="save_sync.h" />
+    <ClInclude Include="save_sync_backends.h" />
     <ClInclude Include="settings.h" />
     <ClInclude Include="shader_cache_version.h" />
     <ClInclude Include="sio.h" />

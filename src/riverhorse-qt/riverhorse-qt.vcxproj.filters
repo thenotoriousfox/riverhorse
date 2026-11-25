@@ -38,6 +38,7 @@
     <ClCompile Include="controllerbindingwidgets.cpp" />
     <ClCompile Include="gamelistrefreshthread.cpp" />
     <ClCompile Include="foldersettingswidget.cpp" />
+    <ClCompile Include="savesyncsettingswidget.cpp" />
     <ClCompile Include="gamesummarywidget.cpp" />
     <ClCompile Include="qttranslations.cpp" />
     <ClCompile Include="coverdownloaddialog.cpp" />
@@ -106,6 +107,9 @@
       <Filter>moc</Filter>
     </ClCompile>
     <ClCompile Include="$(IntDir)moc_foldersettingswidget.cpp">
+      <Filter>moc</Filter>
+    </ClCompile>
+    <ClCompile Include="$(IntDir)moc_savesyncsettingswidget.cpp">
       <Filter>moc</Filter>
     </ClCompile>
     <ClCompile Include="$(IntDir)moc_gamelistmodel.cpp">
@@ -235,6 +239,7 @@
     <QtMoc Include="gamelistrefreshthread.h" />
     <QtMoc Include="gamesummarywidget.h" />
     <QtMoc Include="foldersettingswidget.h" />
+    <QtMoc Include="savesyncsettingswidget.h" />
     <QtMoc Include="coverdownloaddialog.h" />
     <QtMoc Include="colorpickerbutton.h" />
     <QtMoc Include="setupwizarddialog.h" />
@@ -272,6 +277,7 @@
     <QtUi Include="gamelistwidget.ui" />
     <QtUi Include="gamesummarywidget.ui" />
     <QtUi Include="foldersettingswidget.ui" />
+    <QtUi Include="savesyncsettingswidget.ui" />
     <QtUi Include="controllerbindingwidget_analog_joystick.ui" />
     <QtUi Include="controllerbindingwidget_negcon.ui" />
     <QtUi Include="controllerbindingwidget_guncon.ui" />

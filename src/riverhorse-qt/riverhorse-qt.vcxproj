@@ -22,6 +22,7 @@
     <ClCompile Include="debuggermodels.cpp" />
     <ClCompile Include="debuggerwindow.cpp" />
     <ClCompile Include="foldersettingswidget.cpp" />
+    <ClCompile Include="savesyncsettingswidget.cpp" />
     <ClCompile Include="gamelistmodel.cpp" />
     <ClCompile Include="interfacesettingswidget.cpp" />
     <ClCompile Include="graphicssettingswidget.cpp" />
@@ -105,6 +106,7 @@
     <QtMoc Include="mainwindow.h" />
     <QtMoc Include="qthost.h" />
     <QtMoc Include="foldersettingswidget.h" />
+    <QtMoc Include="savesyncsettingswidget.h" />
     <ClInclude Include="qtutils.h" />
     <QtMoc Include="settingswindow.h" />
   </ItemGroup>
@@ -217,6 +219,9 @@
     <QtUi Include="foldersettingswidget.ui">
       <FileType>Document</FileType>
     </QtUi>
+    <QtUi Include="savesyncsettingswidget.ui">
+      <FileType>Document</FileType>
+    </QtUi>
     <QtUi Include="coverdownloaddialog.ui">
       <FileType>Document</FileType>
     </QtUi>
@@ -246,6 +251,7 @@
     <ClCompile Include="$(IntDir)moc_displaywidget.cpp" />
     <ClCompile Include="$(IntDir)moc_emulationsettingswidget.cpp" />
     <ClCompile Include="$(IntDir)moc_foldersettingswidget.cpp" />
+    <ClCompile Include="$(IntDir)moc_savesyncsettingswidget.cpp" />
     <ClCompile Include="$(IntDir)moc_gamelistmodel.cpp" />
     <ClCompile Include="$(IntDir)moc_gamelistrefreshthread.cpp" />
     <ClCompile Include="$(IntDir)moc_gamelistsettingswidget.cpp" />

@@ -18,6 +18,8 @@
     <ClCompile Include="mdec.cpp" />
     <ClCompile Include="memory_card.cpp" />
     <ClCompile Include="settings.cpp" />
+    <ClCompile Include="save_sync.cpp" />
+    <ClCompile Include="save_sync_backends.cpp" />
     <ClCompile Include="gpu_commands.cpp" />
     <ClCompile Include="gpu_sw.cpp" />
     <ClCompile Include="gpu_hw_shadergen.cpp" />
@@ -72,6 +74,8 @@
   <ItemGroup>
     <ClInclude Include="types.h" />
     <ClInclude Include="save_state_version.h" />
+    <ClInclude Include="save_sync.h" />
+    <ClInclude Include="save_sync_backends.h" />
     <ClInclude Include="system.h" />
     <ClInclude Include="cpu_core.h" />
     <ClInclude Include="cpu_types.h" />
