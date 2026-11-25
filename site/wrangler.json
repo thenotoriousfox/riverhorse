@@ -1,0 +1,13 @@
+{
+	"name": "riverhorse-site",
+	"compatibility_date": "2026-11-25",
+	"assets": {
+		"directory": "./dist",
+		"html_handling": "drop-trailing-slash",
+		"not_found_handling": "404-page"
+	},
+	"routes": [
+		{"pattern": "riverhorse.app", "custom_domain": true},
+		{"pattern": "www.riverhorse.app", "custom_domain": true}
+	]
+}

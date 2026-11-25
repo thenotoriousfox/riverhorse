@@ -1,0 +1,8 @@
+---
+import Page from './Page.astro';
+
+const {frontmatter} = Astro.props;
+---
+<Page title={frontmatter.title} description={frontmatter.description} wide>
+	<div class="prose wide-tables"><slot /></div>
+</Page>

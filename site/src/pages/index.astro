@@ -1,9 +1,13 @@
+---
+import Page from '../layouts/Page.astro';
+---
+<Page wide>
 <section class="hero">
-  <img src="riverhorse.png" alt="Riverhorse" width="160" height="160">
+  <img src="/riverhorse.png" alt="Riverhorse" width="160" height="160">
   <h1>Riverhorse</h1>
   <p class="tagline">A PlayStation emulator that starts straight into the game.</p>
   <p class="lede">Accurate PS1 emulation for Linux, Windows, macOS and RetroArch, with rollback netplay, save sync between devices and an interface you can drive with a controller. It runs well on low-end ARM handhelds too.</p>
-  <p class="cta"><a class="button primary" href="#download">Download</a> <a class="button" href="docs.html">Get started</a></p>
+  <p class="cta"><a class="button primary" href="#download">Download</a> <a class="button" href="/docs">Get started</a></p>
 </section>
 
 <section class="features">
@@ -35,7 +39,7 @@
 
 <section id="download" class="download">
   <h2>Download</h2>
-  <p>The latest release is on <a href="https://github.com/thenotoriousfox/riverhorse/releases/latest">GitHub</a>. You also need a BIOS dumped from your own console; see <a href="docs.html#bios">BIOS</a>.</p>
+  <p>The latest release is on <a href="https://github.com/thenotoriousfox/riverhorse/releases/latest">GitHub</a>. You also need a BIOS dumped from your own console; see <a href="/docs#bios">BIOS</a>.</p>
   <div class="platforms">
     <div class="platform">
       <h3>Linux</h3>
@@ -55,7 +59,8 @@
     </div>
     <div class="platform">
       <h3>libretro core</h3>
-      <p>For RetroArch and other libretro frontends, on Linux, Windows, Android and macOS. Pick your platform from the <a href="https://github.com/thenotoriousfox/riverhorse/releases/latest">release page</a> (<code>riverhorse_libretro-&lt;platform&gt;.zip</code>) and see <a href="docs.html#libretro-core">installing the core</a>.</p>
+      <p>For RetroArch and other libretro frontends, on Linux, Windows, Android and macOS. Pick your platform from the <a href="https://github.com/thenotoriousfox/riverhorse/releases/latest">release page</a> (<code>riverhorse_libretro-&lt;platform&gt;.zip</code>) and see <a href="/docs#libretro-core">installing the core</a>.</p>
     </div>
   </div>
 </section>
+</Page>

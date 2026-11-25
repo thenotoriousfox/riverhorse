@@ -1,3 +1,9 @@
+---
+layout: ../layouts/Markdown.astro
+title: Privacy
+description: What Riverhorse sends online, when, and what the netplay relay keeps.
+---
+
 # Privacy
 
 Riverhorse has no accounts, no analytics, no telemetry and no adverts. It only

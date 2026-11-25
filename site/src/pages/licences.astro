@@ -1,0 +1,12 @@
+---
+import Page from '../layouts/Page.astro';
+import {readRepoFile, renderMarkdown} from '../lib/repo-markdown';
+
+const intro = 'Riverhorse is free software under the [GNU General Public License v3.0](LICENSE). '
+	+ 'The source code of every release is on [GitHub](https://github.com/thenotoriousfox/riverhorse).\n\n';
+const notice = await readRepoFile('NOTICE.md');
+const html = await renderMarkdown(notice.replace(/^# Notice\n\n/, `# Licences\n\n${intro}`));
+---
+<Page title="Licences" description="Riverhorse's licence, and the licences of the code and libraries it ships." wide>
+	<div class="prose wide-tables"><Fragment set:html={html} /></div>
+</Page>

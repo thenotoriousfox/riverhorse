@@ -1,0 +1,53 @@
+---
+import '../styles.css';
+
+interface Props {
+	title?: string;
+	description?: string;
+	wide?: boolean;
+}
+
+const {
+	title,
+	description = 'Riverhorse is a free PlayStation emulator for Linux, Windows, macOS and RetroArch, with rollback netplay, save sync and a controller-friendly interface.',
+	wide = false,
+} = Astro.props;
+const fullTitle = title ? `${title} · Riverhorse` : 'Riverhorse: a PlayStation emulator';
+const canonical = new URL(Astro.url.pathname, Astro.site);
+const path = Astro.url.pathname;
+---
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<title>{fullTitle}</title>
+	<meta name="description" content={description} />
+	<link rel="canonical" href={canonical} />
+	<link rel="icon" type="image/png" href="/riverhorse.png" />
+	<link rel="sitemap" href="/sitemap-index.xml" />
+	<meta property="og:type" content="website" />
+	<meta property="og:url" content={canonical} />
+	<meta property="og:title" content={fullTitle} />
+	<meta property="og:description" content={description} />
+	<meta property="og:image" content={new URL('/riverhorse.png', Astro.site)} />
+	<meta name="theme-color" content="#16131d" />
+</head>
+<body>
+	<header class="bar">
+		<a class="brand" href="/"><img src="/riverhorse.png" alt="" width="32" height="32" />Riverhorse</a>
+		<nav aria-label="Main">
+			<a href="/#download">Download</a>
+			<a href="/docs" aria-current={path.startsWith('/docs') ? 'page' : undefined}>Docs</a>
+			<a href="https://github.com/thenotoriousfox/riverhorse">GitHub</a>
+		</nav>
+	</header>
+	<main class:list={[{prose: !wide}]}>
+		<slot />
+	</main>
+	<footer>
+		<p>Riverhorse is free software under the GNU GPL v3. It is not affiliated with Sony Interactive Entertainment or the DuckStation project.</p>
+		<p><a href="/privacy">Privacy</a> · <a href="/licences">Licences</a> · <a href="https://github.com/thenotoriousfox/riverhorse/issues">Report a problem</a> · <a href="https://hippos-linux.org/discord">Discord</a></p>
+	</footer>
+</body>
+</html>

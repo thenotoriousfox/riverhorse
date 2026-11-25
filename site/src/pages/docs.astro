@@ -1,0 +1,12 @@
+---
+import Page from '../layouts/Page.astro';
+import {readmeSections, renderMarkdown} from '../lib/repo-markdown';
+
+const html = await renderMarkdown('# Documentation\n\n' + await readmeSections([
+	'BIOS', 'libretro core', 'Netplay', 'Save sync', 'Wayland and X11', 'User directory',
+	'Building on Linux', 'Building on Windows',
+]));
+---
+<Page title="Documentation" description="Setting up Riverhorse: BIOS, the libretro core, netplay, save sync and building from source.">
+	<Fragment set:html={html} />
+</Page>

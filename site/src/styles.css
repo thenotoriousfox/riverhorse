@@ -50,7 +50,7 @@ a:hover { color: #fff; }
 .bar nav { display: flex; gap: 1.4rem; }
 .bar nav a { color: var(--muted); text-decoration: none; font-weight: 500; }
 .bar nav a:hover { color: var(--text); }
-.page-docs .bar nav a[data-page="docs"] { color: var(--text); }
+.bar nav a[aria-current="page"] { color: var(--text); }
 
 main {
   max-width: 68rem;
@@ -58,8 +58,8 @@ main {
   padding: 2rem clamp(1rem, 4vw, 3rem) 4rem;
 }
 
-.page-docs main { max-width: 52rem; }
-.page-privacy main, .page-licences main { max-width: 64rem; }
+main.prose { max-width: 52rem; }
+.wide-tables { max-width: 64rem; margin: 0 auto; }
 
 h1, h2, h3 { line-height: 1.25; }
 h2 { margin-top: 2.5rem; }
