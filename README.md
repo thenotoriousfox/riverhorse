@@ -5,6 +5,7 @@
 </div>
 
 <div align="center">
+  <a href="https://riverhorse.app"><img src="https://img.shields.io/badge/website-riverhorse.app-8b5cf6?style=for-the-badge" alt="Website" /></a>
   <a href="https://github.com/thenotoriousfox/riverhorse/releases"><img src="https://img.shields.io/github/v/release/thenotoriousfox/riverhorse?style=for-the-badge&logo=github&label=release" alt="Release" /></a>
   <a href="https://github.com/thenotoriousfox/riverhorse/stargazers"><img src="https://img.shields.io/github/stars/thenotoriousfox/riverhorse?style=for-the-badge&logo=github" alt="Stars" /></a>
   <a href="https://github.com/thenotoriousfox/riverhorse/commits/main"><img src="https://img.shields.io/github/last-commit/thenotoriousfox/riverhorse?style=for-the-badge&logo=github" alt="Last commit" /></a>
@@ -27,7 +28,7 @@ It is based on [DuckStation](https://github.com/stenzek/duckstation) `v0.1-7371`
 
 ## 🚧 Status
 
-The current release is 1.3.0; downloads are on the [Releases](https://github.com/thenotoriousfox/riverhorse/releases) page. Releases are tagged `vMAJOR.MINOR.PATCH`; the upstream tag `v0.1-7371` marks the base. Settings files use the same format and keys as the base. See [CHANGELOG.md](CHANGELOG.md) for everything changed since.
+The current release is 1.3.0; downloads are on [riverhorse.app](https://riverhorse.app) and the [Releases](https://github.com/thenotoriousfox/riverhorse/releases) page. Releases are tagged `vMAJOR.MINOR.PATCH`; the upstream tag `v0.1-7371` marks the base. Settings files use the same format and keys as the base. See [CHANGELOG.md](CHANGELOG.md) for everything changed since.
 
 | Platform | Build |
 |---|---|
