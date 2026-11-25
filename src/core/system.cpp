@@ -2251,7 +2251,10 @@ void System::SetThrottleFrequency(float frequency)
     return;
 
   s_throttle_frequency = frequency;
-  UpdateThrottlePeriod();
+  if (g_settings.sync_to_host_refresh_rate && IsValid())
+    UpdateSpeedLimiterState();
+  else
+    UpdateThrottlePeriod();
 }
 
 void System::UpdateThrottlePeriod()
