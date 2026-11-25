@@ -27,6 +27,8 @@ Changes since the DuckStation `v0.1-7371` base. Releases are tagged
 - libretro core: Widescreen Patch and 60 FPS Patch options apply the game's
   patch from Riverhorse's patch database (the first one of that kind for the
   game), so RetroArch users get the database too.
+- libretro core: options are grouped (Video, PGXP, Patches, Console, CD-ROM,
+  Input, Memory Cards) in frontends that support option categories.
 - Texture filters: MMPX (Pixel Art), which keeps the look of pixel art while
   smoothing its diagonals at higher resolutions, and Cubic, a sharper
   alternative to bilinear that doesn't overshoot at edges. Also in the
