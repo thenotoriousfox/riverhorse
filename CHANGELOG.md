@@ -62,6 +62,8 @@ Changes since the DuckStation `v0.1-7371` base. Releases are tagged
   by default. Listings now carry the host's Riverhorse version.
 
 ### Fixes
+- PGXP CPU mode: instructions that write to the zero register no longer give it
+  precise coordinates, which later copies from it could carry into geometry.
 - 32-bit ARM builds: the recompiler crashed on its first far call (its
   trampoline area was never set up), and the GPU assembly and flash cartridge
   code didn't build.
