@@ -3,7 +3,7 @@
 Changes since the DuckStation `v0.1-7371` base. Releases are tagged
 `vMAJOR.MINOR.PATCH`.
 
-## Unreleased
+## 1.3.0 (2026-11-25)
 
 ### New
 - Save sync: memory cards, save states and per-game settings stay the same on
