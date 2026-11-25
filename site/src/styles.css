@@ -20,7 +20,7 @@ body {
   font: 17px/1.6 Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
-a { color: var(--accent-text); }
+a { color: var(--accent-text); overflow-wrap: anywhere; }
 a:hover { color: #fff; }
 
 .bar {
@@ -93,7 +93,7 @@ h2 { margin-top: 2.5rem; }
 
 .features {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(16rem, 100%), 1fr));
   gap: 1rem;
   margin-top: 2rem;
 }
@@ -113,7 +113,7 @@ h2 { margin-top: 2.5rem; }
 
 .platforms {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(14rem, 100%), 1fr));
   gap: 1rem;
 }
 
@@ -122,6 +122,7 @@ h2 { margin-top: 2.5rem; }
 .platform p { margin: 0; color: var(--muted); font-size: 0.95rem; }
 
 code {
+  overflow-wrap: anywhere;
   padding: 0.1em 0.35em;
   background: var(--surface-light);
   border-radius: 5px;
@@ -136,7 +137,7 @@ pre {
   border-radius: 10px;
 }
 
-pre code { padding: 0; background: none; }
+pre code { padding: 0; background: none; overflow-wrap: normal; }
 
 table {
   display: block;
@@ -169,7 +170,7 @@ footer p { margin: 0.4rem 0; }
 
 .shots {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(22rem, 100%), 1fr));
   gap: 1.25rem;
   margin-top: 2rem;
 }
@@ -216,8 +217,16 @@ footer p { margin: 0.4rem 0; }
 .docs-body { max-width: 48rem; }
 
 @media (max-width: 52rem) {
-  .docs { grid-template-columns: 1fr; gap: 0; }
-  .docs-nav { position: static; flex-direction: row; flex-wrap: wrap; padding-top: 0; }
+  .docs { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .docs-nav {
+    position: static;
+    flex-direction: row;
+    padding: 0.5rem 0;
+    overflow-x: auto;
+    white-space: nowrap;
+    border-bottom: 1px solid var(--line);
+    scrollbar-width: none;
+  }
 }
 
 .doc-list { list-style: none; padding: 0; }
@@ -252,3 +261,34 @@ footer p { margin: 0.4rem 0; }
 .bar nav { flex-wrap: wrap; justify-content: flex-end; }
 #games td:nth-child(2) code { white-space: nowrap; }
 #games { display: table; width: 100%; }
+
+@media (max-width: 40rem) {
+  body { font-size: 16px; }
+
+  .bar {
+    position: static;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.4rem;
+    padding-bottom: 0.4rem;
+  }
+  .bar nav {
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    gap: 1.1rem;
+    overflow-x: auto;
+    white-space: nowrap;
+    scrollbar-width: none;
+  }
+  .bar nav a { padding: 0.35rem 0; }
+
+  main { padding-top: 1rem; }
+  .hero { padding-top: 1.5rem; }
+
+  #games, #games tbody, #games tr, #games td { display: block; width: 100%; }
+  #games thead { display: none; }
+  #games tr { padding: 0.75rem 0; border-bottom: 1px solid var(--line); }
+  #games td { padding: 0.1rem 0; border: none; }
+  #games td:first-child { font-weight: 600; }
+  #games tr[hidden] { display: none; }
+}
