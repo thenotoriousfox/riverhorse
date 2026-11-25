@@ -8,6 +8,7 @@ target_compile_definitions(psx_gpu PRIVATE GPU_NEON TEXTURE_CACHE_4BPP TEXTURE_C
 if(CPU_ARCH_ARM32)
   enable_language(ASM)
   target_sources(psx_gpu PRIVATE plugins/gpu_neon/psx_gpu/psx_gpu_arm_neon.S)
+  target_include_directories(psx_gpu PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include")
   target_compile_definitions(psx_gpu PRIVATE NEON_BUILD)
 elseif(CPU_ARCH_X64 OR CPU_ARCH_ARM64)
   target_sources(psx_gpu PRIVATE plugins/gpu_neon/psx_gpu/psx_gpu_simd.c)

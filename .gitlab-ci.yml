@@ -49,6 +49,11 @@ libretro-build-windows-x64:
     - .libretro-windows-cmake-x86_64
     - .core-defs
 
+android-armeabi-v7a:
+  extends:
+    - .libretro-android-cmake-armeabi-v7a
+    - .core-defs
+
 android-arm64-v8a:
   extends:
     - .libretro-android-cmake-arm64-v8a

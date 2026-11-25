@@ -6,6 +6,8 @@ Changes since the DuckStation `v0.1-7371` base. Releases are tagged
 ## Unreleased
 
 ### New
+- libretro core for 32-bit ARM: Android armeabi-v7a and Linux armhf, with the
+  ARMv7 recompiler.
 - `-netplayevents` prints netplay events on stdout (hosting, players joining
   and leaving, stopped) for frontends to read, also for sessions started from
   the menus. The line format is in the README.
@@ -60,6 +62,10 @@ Changes since the DuckStation `v0.1-7371` base. Releases are tagged
   by default. Listings now carry the host's Riverhorse version.
 
 ### Fixes
+- 32-bit ARM builds: the recompiler crashed on its first far call (its
+  trampoline area was never set up), and the GPU assembly and flash cartridge
+  code didn't build.
+- A missing libEGL no longer crashes on startup.
 - Netplay started from the command line uses the Nickname setting when
   `-netplaynick` isn't given, instead of "Player".
 - libretro core: frontends' default controller (RetroPad) is now the DualShock;

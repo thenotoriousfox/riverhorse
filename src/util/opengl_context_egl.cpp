@@ -459,26 +459,26 @@ GPUTexture::Format OpenGLContextEGL::GetSurfaceTextureFormat() const
 
 void OpenGLContextEGL::DestroyContext()
 {
+  if (m_context == EGL_NO_CONTEXT)
+    return;
+
   if (eglGetCurrentContext() == m_context)
     eglMakeCurrent(m_display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
 
-  if (m_context != EGL_NO_CONTEXT)
-  {
-    eglDestroyContext(m_display, m_context);
-    m_context = EGL_NO_CONTEXT;
-  }
+  eglDestroyContext(m_display, m_context);
+  m_context = EGL_NO_CONTEXT;
 }
 
 void OpenGLContextEGL::DestroySurface()
 {
+  if (m_surface == EGL_NO_SURFACE)
+    return;
+
   if (eglGetCurrentSurface(EGL_DRAW) == m_surface)
     eglMakeCurrent(m_display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
 
-  if (m_surface != EGL_NO_SURFACE)
-  {
-    eglDestroySurface(m_display, m_surface);
-    m_surface = EGL_NO_SURFACE;
-  }
+  eglDestroySurface(m_display, m_surface);
+  m_surface = EGL_NO_SURFACE;
 }
 
 bool OpenGLContextEGL::CreateContext(const Version& version, EGLContext share_context)

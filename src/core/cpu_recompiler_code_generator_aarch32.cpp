@@ -299,15 +299,12 @@ u32 CPU::CodeCache::EmitASMFunctions(void* code, u32 code_size)
 
   armAsm->FinalizeCode();
 
-#if 0
-  // TODO: align?
   s_trampoline_targets.clear();
   s_trampoline_start_ptr = static_cast<u8*>(code) + armAsm->GetCursorOffset();
   s_trampoline_used = 0;
-#endif
 
 #undef PTR
-  return static_cast<u32>(armAsm->GetCursorOffset()) /* + TRAMPOLINE_AREA_SIZE*/;
+  return static_cast<u32>(armAsm->GetCursorOffset()) + TRAMPOLINE_AREA_SIZE;
 }
 
 // Macros aren't used with old-rec.

@@ -444,8 +444,10 @@ jobs:
             ./artifacts/linux-arm64-appimage-qt/Riverhorse-arm64.AppImage
             ./artifacts/linux-x64-libretro/riverhorse_libretro-linux-x64.zip
             ./artifacts/linux-arm64-libretro/riverhorse_libretro-linux-arm64.zip
+            ./artifacts/linux-armhf-libretro/riverhorse_libretro-linux-armhf.zip
             ./artifacts/windows-x64-libretro/riverhorse_libretro-windows-x64.zip
             ./artifacts/android-arm64-v8a-libretro/riverhorse_libretro-android-arm64-v8a.zip
+            ./artifacts/android-armeabi-v7a-libretro/riverhorse_libretro-android-armeabi-v7a.zip
             ./artifacts/android-x86_64-libretro/riverhorse_libretro-android-x86_64.zip
             ./artifacts/macos-arm64-libretro/riverhorse_libretro-macos-arm64.zip
             ./artifacts/macos-x86_64-libretro/riverhorse_libretro-macos-x86_64.zip

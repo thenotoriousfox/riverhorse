@@ -49,7 +49,7 @@ public:
   void Write(u32 offset, u8 value);
 
 private:
-  static constexpr u32 PAGE_SIZE = 256;
+  static constexpr u32 FLASH_PAGE_SIZE = 256;
   static constexpr u32 BYTE_LOAD_CYCLES = 5080;
   static constexpr std::array<u8, 2> ID = {0x1F, 0xA4};
 
@@ -362,12 +362,12 @@ void ParallelPort::AT29C040A::ExecuteEraseCommand(u8 command)
 
 void ParallelPort::AT29C040A::LoadByte(u32 offset, u8 value)
 {
-  const u32 page = offset / PAGE_SIZE;
+  const u32 page = offset / FLASH_PAGE_SIZE;
   if (m_load_count == 0)
   {
     m_load_page = page;
-    std::memset(&m_data[page * PAGE_SIZE], 0xFF, PAGE_SIZE);
-    m_used_size = std::max(m_used_size, (page + 1) * PAGE_SIZE);
+    std::memset(&m_data[page * FLASH_PAGE_SIZE], 0xFF, FLASH_PAGE_SIZE);
+    m_used_size = std::max(m_used_size, (page + 1) * FLASH_PAGE_SIZE);
     m_modified = true;
   }
 
@@ -376,9 +376,9 @@ void ParallelPort::AT29C040A::LoadByte(u32 offset, u8 value)
   if (page == m_load_page)
     m_data[offset] = value;
   else
-    WARNING_LOG("Flash page load to 0x{:05X} is outside page 0x{:05X}", offset, m_load_page * PAGE_SIZE);
+    WARNING_LOG("Flash page load to 0x{:05X} is outside page 0x{:05X}", offset, m_load_page * FLASH_PAGE_SIZE);
 
-  if (++m_load_count == PAGE_SIZE)
+  if (++m_load_count == FLASH_PAGE_SIZE)
     EndLoad();
 }
 
