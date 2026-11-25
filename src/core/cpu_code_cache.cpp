@@ -66,6 +66,9 @@ static void AllocateLUTs();
 static void DeallocateLUTs();
 static void AssignLUTTables();
 static void DetachRAMMirrorLUTTables();
+static void DeferMirrorLUTTables();
+static bool AttachMirrorLUTTable(u32 pc);
+static CodeLUT GetPendingCodeLUT();
 static void ResetCodeLUT();
 static void SetCodeLUT(u32 pc, const void* function);
 static void InvalidateBlock(Block* block, BlockState new_state);
@@ -306,6 +309,23 @@ static constexpr u32 GetLUTSlotCount(bool include_unreachable)
 
   return tables * LUT_TABLE_SIZE;
 }
+
+static constexpr bool IsMirrorLUTSlot(u32 slot)
+{
+  return (slot < (0x80000000u >> LUT_TABLE_SHIFT) ||
+          (slot >= (0xA0000000u >> LUT_TABLE_SHIFT) && slot < (0xC0000000u >> LUT_TABLE_SHIFT)));
+}
+
+namespace {
+struct DeferredLUTTable
+{
+  u32 slot;
+  CodeLUT code_table;
+  Block** block_table;
+};
+} // namespace
+
+static std::vector<DeferredLUTTable> s_deferred_lut_tables;
 } // namespace CPU::CodeCache
 
 CPU::CodeCache::CodeLUT CPU::CodeCache::DecodeCodeLUTPointer(u32 slot, CodeLUT ptr)
@@ -335,7 +355,7 @@ CPU::CodeCache::CodeLUT CPU::CodeCache::OffsetCodeLUTPointer(CodeLUT fake_ptr, u
 
 void CPU::CodeCache::AllocateLUTs()
 {
-  constexpr u32 num_code_slots = GetLUTSlotCount(true);
+  constexpr u32 num_code_slots = GetLUTSlotCount(true) + LUT_TABLE_SIZE;
   constexpr u32 num_block_slots = GetLUTSlotCount(false);
 
   Assert(!s_lut_code_pointers && !s_lut_block_pointers);
@@ -394,8 +414,45 @@ void CPU::CodeCache::DetachRAMMirrorLUTTables()
   }
 }
 
+CPU::CodeCache::CodeLUT CPU::CodeCache::GetPendingCodeLUT()
+{
+  return s_lut_code_pointers.get() + GetLUTSlotCount(true);
+}
+
+void CPU::CodeCache::DeferMirrorLUTTables()
+{
+  s_deferred_lut_tables.clear();
+  for (u32 slot = 0; slot < LUT_TABLE_COUNT; slot++)
+  {
+    if (!IsMirrorLUTSlot(slot) || !s_block_lut[slot])
+      continue;
+
+    s_deferred_lut_tables.push_back(
+      DeferredLUTTable{slot, DecodeCodeLUTPointer(slot, g_code_lut[slot]), s_block_lut[slot]});
+    g_code_lut[slot] = EncodeCodeLUTPointer(slot, GetPendingCodeLUT());
+    s_block_lut[slot] = nullptr;
+  }
+}
+
+bool CPU::CodeCache::AttachMirrorLUTTable(u32 pc)
+{
+  const u32 slot = pc >> LUT_TABLE_SHIFT;
+  const auto it = std::find_if(s_deferred_lut_tables.begin(), s_deferred_lut_tables.end(),
+                               [slot](const DeferredLUTTable& table) { return table.slot == slot; });
+  if (it == s_deferred_lut_tables.end())
+    return false;
+
+  MemsetPtrs(it->code_table, g_compile_or_revalidate_block, LUT_TABLE_SIZE);
+  std::fill_n(it->block_table, LUT_TABLE_SIZE, nullptr);
+  g_code_lut[slot] = EncodeCodeLUTPointer(slot, it->code_table);
+  s_block_lut[slot] = it->block_table;
+  s_deferred_lut_tables.erase(it);
+  return true;
+}
+
 void CPU::CodeCache::DeallocateLUTs()
 {
+  s_deferred_lut_tables.clear();
   s_lut_block_pointers.reset();
   s_lut_code_pointers.reset();
 }
@@ -407,14 +464,16 @@ void CPU::CodeCache::ResetCodeLUT()
 
   AssignLUTTables();
   DetachRAMMirrorLUTTables();
+  DeferMirrorLUTTables();
 
   // Make the unreachable table jump to the invalid code callback.
-  MemsetPtrs(s_lut_code_pointers.get(), g_interpret_block, LUT_TABLE_COUNT);
+  MemsetPtrs(s_lut_code_pointers.get(), g_interpret_block, LUT_TABLE_SIZE);
+  MemsetPtrs(GetPendingCodeLUT(), g_compile_or_revalidate_block, LUT_TABLE_SIZE);
 
   for (u32 i = 0; i < LUT_TABLE_COUNT; i++)
   {
     CodeLUT ptr = DecodeCodeLUTPointer(i, g_code_lut[i]);
-    if (ptr == s_lut_code_pointers.get())
+    if (ptr == s_lut_code_pointers.get() || ptr == GetPendingCodeLUT())
       continue;
 
     MemsetPtrs(ptr, g_compile_or_revalidate_block, LUT_TABLE_SIZE);
@@ -838,7 +897,7 @@ template<PGXPMode pgxp_mode>
       const u32 pc = g_state.pc;
       const u32 table = pc >> LUT_TABLE_SHIFT;
       Block* block;
-      if (s_block_lut[table])
+      if (s_block_lut[table] || AttachMirrorLUTTable(pc))
       {
         const u32 idx = (pc & 0xFFFF) >> 2;
         block = s_block_lut[table][idx];
@@ -1389,6 +1448,9 @@ void CPU::CodeCache::CompileOrRevalidateBlock(u32 start_pc)
   // TODO: this doesn't currently handle when the cache overflows...
   DebugAssert(IsUsingAnyRecompiler());
   MemMap::BeginCodeWrite();
+
+  if (!s_block_lut[start_pc >> LUT_TABLE_SHIFT])
+    AttachMirrorLUTTable(start_pc);
 
   Block* block = LookupBlock(start_pc);
   if (block)
