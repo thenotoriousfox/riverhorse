@@ -6,6 +6,18 @@ Changes since the DuckStation `v0.1-7371` base. Releases are tagged
 ## Unreleased
 
 ### New
+- libretro core:
+  - Native cheats: the cheat database's codes for the loaded game are core
+    options in a Cheats category, and work alongside RetroArch's cheats.
+  - Riverhorse's notices (disc changes, applied patches, memory card saves,
+    warnings) show as RetroArch notifications; On-Screen Messages turns them off.
+  - Frameskip option: Auto leaves frames out while RetroArch's audio buffer runs
+    low, for slow devices. While fast-forwarding, the core sends no more frames
+    than the display shows.
+  - Options from the standalone app: Disable Interlacing, Force NTSC Timings,
+    Chroma Smoothing (24-Bit), PGXP Vertex Cache, PGXP Geometry Tolerance,
+    Enable 8 MB RAM, and Memory Cards (per game or shared).
+  - The DualShock's analog light is sent to RetroArch's LED interface.
 - libretro core for 32-bit ARM: Android armeabi-v7a and Linux armhf, with the
   ARMv7 recompiler.
 - `-netplayevents` prints netplay events on stdout (hosting, players joining

@@ -1,11 +1,17 @@
 add_library(riverhorse_libretro SHARED
+  libretro_cheats.cpp
+  libretro_cheats.h
   libretro_core_options.cpp
   libretro_core_options.h
   libretro_crosshair.cpp
   libretro_crosshair.h
+  libretro_frameskip.cpp
+  libretro_frameskip.h
   libretro_host.cpp
   libretro_input.cpp
   libretro_input.h
+  libretro_messages.cpp
+  libretro_messages.h
   libretro_resources.cpp
   libretro_resources.h
   libretro_rumble.cpp
@@ -60,7 +66,7 @@ if(ENABLE_VULKAN)
 endif()
 
 target_include_directories(riverhorse_libretro PRIVATE "${CMAKE_SOURCE_DIR}/dep/libretro/include" "${CMAKE_CURRENT_BINARY_DIR}")
-target_link_libraries(riverhorse_libretro PRIVATE core common scmversion)
+target_link_libraries(riverhorse_libretro PRIVATE core common scmversion xxhash)
 set_target_properties(riverhorse_libretro PROPERTIES PREFIX "" CXX_VISIBILITY_PRESET hidden VISIBILITY_INLINES_HIDDEN ON)
 
 if(MINGW)

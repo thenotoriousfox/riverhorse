@@ -65,6 +65,7 @@ static bool AddImGuiFonts(bool fullscreen_fonts);
 static ImFont* AddTextFont(float size);
 static ImFont* AddFixedFont(float size);
 static bool AddIconFonts(float size);
+static void PostOSDMessage(std::string key, const char* icon, std::string message, float duration);
 static void AcquirePendingOSDMessages(Common::Timer::Value current_time);
 static void DrawOSDMessages(Common::Timer::Value current_time);
 static void CreateSoftwareCursorTextures();
@@ -106,6 +107,7 @@ static std::deque<OSDMessage> s_osd_active_messages;
 static std::deque<OSDMessage> s_osd_posted_messages;
 static std::mutex s_osd_messages_lock;
 static bool s_show_osd_messages = true;
+static OSDMessageSink s_osd_message_sink = nullptr;
 static bool s_scale_changed = false;
 
 static std::array<ImGuiManager::SoftwareCursor, InputManager::MAX_SOFTWARE_CURSORS> s_software_cursors = {};
@@ -154,6 +156,11 @@ void ImGuiManager::SetShowOSDMessages(bool enable)
   s_show_osd_messages = enable;
   if (!enable)
     Host::ClearOSDMessages();
+}
+
+void ImGuiManager::SetOSDMessageSink(OSDMessageSink sink)
+{
+  s_osd_message_sink = sink;
 }
 
 bool ImGuiManager::Initialize(float global_scale, bool show_osd_messages, Error* error)
@@ -682,13 +689,32 @@ void Host::AddOSDMessage(std::string message, float duration /*= 2.0f*/)
 
 void Host::AddKeyedOSDMessage(std::string key, std::string message, float duration /* = 2.0f */)
 {
+  ImGuiManager::PostOSDMessage(std::move(key), nullptr, std::move(message), duration);
+}
+
+void Host::AddIconOSDMessage(std::string key, const char* icon, std::string message, float duration /* = 2.0f */)
+{
+  ImGuiManager::PostOSDMessage(std::move(key), icon, std::move(message), duration);
+}
+
+void ImGuiManager::PostOSDMessage(std::string key, const char* icon, std::string message, float duration)
+{
   if (!key.empty())
     INFO_LOG("OSD [{}]: {}", key, message);
   else
     INFO_LOG("OSD: {}", message);
 
+  if (s_osd_message_sink)
+  {
+    const std::string text = StripIconCharacters(message);
+    s_osd_message_sink(key, StringUtil::StripWhitespace(text), duration);
+  }
+
   if (!ImGuiManager::s_show_osd_messages)
     return;
+
+  if (icon)
+    message = fmt::format("{}  {}", icon, message);
 
   const Common::Timer::Value current_time = Common::Timer::GetCurrentValue();
 
@@ -703,11 +729,6 @@ void Host::AddKeyedOSDMessage(std::string key, std::string message, float durati
 
   std::unique_lock<std::mutex> lock(ImGuiManager::s_osd_messages_lock);
   ImGuiManager::s_osd_posted_messages.push_back(std::move(msg));
-}
-
-void Host::AddIconOSDMessage(std::string key, const char* icon, std::string message, float duration /* = 2.0f */)
-{
-  return AddKeyedOSDMessage(std::move(key), fmt::format("{}  {}", icon, message), duration);
 }
 
 void Host::RemoveKeyedOSDMessage(std::string key)

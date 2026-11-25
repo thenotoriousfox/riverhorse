@@ -69,6 +69,8 @@ static std::vector<unsigned> s_analog_button_combo;
 static std::array<bool, PORT_COUNT> s_analog_button_held = {};
 static retro_input_poll_t s_input_poll;
 static retro_input_state_t s_input_state;
+static retro_set_led_state_t s_set_led_state;
+static std::array<bool, PORT_COUNT> s_analog_leds_lit = {};
 static std::array<unsigned, PORT_COUNT> s_port_devices = {RETRO_DEVICE_JOYPAD, RETRO_DEVICE_JOYPAD, RETRO_DEVICE_JOYPAD,
                                                           RETRO_DEVICE_JOYPAD, RETRO_DEVICE_JOYPAD, RETRO_DEVICE_JOYPAD,
                                                           RETRO_DEVICE_JOYPAD, RETRO_DEVICE_JOYPAD};
@@ -80,6 +82,7 @@ static void UpdateNeGcon(u32 port, Controller* controller);
 static void UpdateLightGun(u32 port, Controller* controller, u32 trigger, u32 shoot_offscreen,
                            std::span<const std::pair<unsigned, u32>> buttons);
 static void UpdateMouse(u32 port, Controller* controller);
+static void UpdateAnalogLED(u32 port, const Controller* controller);
 
 } // namespace LibretroInput
 
@@ -116,6 +119,10 @@ ControllerType LibretroInput::GetControllerType(unsigned device)
 
 void LibretroInput::RegisterControllers(retro_environment_t environment)
 {
+  retro_led_interface led_interface = {};
+  s_set_led_state =
+    environment(RETRO_ENVIRONMENT_GET_LED_INTERFACE, &led_interface) ? led_interface.set_led_state : nullptr;
+
   static constexpr retro_controller_description types[] = {
     {"DualShock", RETRO_DEVICE_JOYPAD},    {"Digital Controller", RETRO_DEVICE_DIGITAL},
     {"NeGcon", RETRO_DEVICE_NEGCON},       {"GunCon", RETRO_DEVICE_GUNCON},
@@ -313,6 +320,16 @@ std::span<const LibretroInput::Crosshair> LibretroInput::GetCrosshairs()
   return s_crosshairs;
 }
 
+void LibretroInput::UpdateAnalogLED(u32 port, const Controller* controller)
+{
+  const bool lit = controller && controller->InAnalogMode();
+  if (!s_set_led_state || s_analog_leds_lit[port] == lit)
+    return;
+
+  s_analog_leds_lit[port] = lit;
+  s_set_led_state(static_cast<int>(port), lit ? 1 : 0);
+}
+
 void LibretroInput::Update()
 {
   s_input_poll();
@@ -321,6 +338,7 @@ void LibretroInput::Update()
   for (u32 port = 0; port < PORT_COUNT; port++)
   {
     Controller* controller = Pad::GetController(port);
+    UpdateAnalogLED(port, controller);
     if (!controller)
       continue;
 

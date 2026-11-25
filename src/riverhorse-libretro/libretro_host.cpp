@@ -31,9 +31,12 @@
 #include "common/string_util.h"
 
 #include "libretro.h"
+#include "libretro_cheats.h"
 #include "libretro_core_options.h"
 #include "libretro_crosshair.h"
+#include "libretro_frameskip.h"
 #include "libretro_input.h"
+#include "libretro_messages.h"
 #include "libretro_resources.h"
 #include "libretro_rumble.h"
 #ifdef ENABLE_OPENGL
@@ -59,10 +62,10 @@ static void SendVideoFrame();
 static void SendAudio();
 static retro_game_geometry GetGeometry();
 static void UpdateGeometry();
+static void ApplyFrontendSettings(SettingsInterface& si);
 static void ApplyCoreOptions();
 static void RegisterDiscControl();
 static void RegisterMemoryMaps();
-static void UpdateCheats();
 static void UpdateGamePatches();
 static bool BootGame();
 static bool SetupHardwareOutput();
@@ -106,9 +109,6 @@ enum class VideoOutput
 static VideoOutput s_video_output = VideoOutput::Readback;
 static std::string s_game_path;
 static std::vector<u8> s_context_lost_state;
-
-static std::vector<std::string> s_cheat_codes;
-static std::vector<bool> s_cheat_enabled;
 
 static constexpr u32 AUDIO_BUFFER_MS = 200;
 static constexpr u32 POINTER_WINDOW_WIDTH = 640;
@@ -165,7 +165,6 @@ bool LibretroHost::InitializeConfig()
   g_settings.Save(si, false);
   si.SetStringValue("BIOS", "SearchDirectory", s_system_directory.c_str());
   si.SetStringValue("MemoryCards", "Directory", s_save_directory.c_str());
-  si.SetStringValue("MemoryCards", "Card1Type", Settings::GetMemoryCardTypeName(MemoryCardType::PerGameTitle));
   si.SetStringValue("Audio", "Backend", AudioStream::GetBackendName(AudioBackend::Null));
   si.SetUIntValue("Audio", "BufferMS", AUDIO_BUFFER_MS);
   si.SetStringValue("Audio", "StretchMode", AudioStream::GetStretchModeName(AudioStretchMode::Off));
@@ -183,8 +182,7 @@ bool LibretroHost::InitializeConfig()
   for (u32 i = 0; i < static_cast<u32>(InputSourceType::Count); i++)
     si.SetBoolValue("InputSources", InputManager::InputSourceToString(static_cast<InputSourceType>(i)), false);
 
-  LibretroCoreOptions::Apply(s_environment, si);
-  LibretroInput::ApplyPortDevices(si);
+  ApplyFrontendSettings(si);
   s_loaded_renderer = si.GetStringValue("GPU", "Renderer");
 
   EmuFolders::LoadConfig(si);
@@ -213,19 +211,28 @@ void LibretroHost::UpdateGeometry()
   s_environment(RETRO_ENVIRONMENT_SET_GEOMETRY, &geometry);
 }
 
+void LibretroHost::ApplyFrontendSettings(SettingsInterface& si)
+{
+  LibretroCoreOptions::Apply(s_environment, si);
+  LibretroInput::ApplyPortDevices(si);
+  LibretroFrameSkip::SetAutomatic(si.GetStringValue("Libretro", "FrameSkip") == "Auto");
+}
+
 void LibretroHost::ApplyCoreOptions()
 {
   const u32 old_scale = g_settings.gpu_resolution_scale;
+  const float old_frame_rate = System::IsValid() ? System::GetThrottleFrequency() : 0.0f;
 
   SettingsInterface& si = *s_base_settings_interface;
-  LibretroCoreOptions::Apply(s_environment, si);
-  LibretroInput::ApplyPortDevices(si);
+  ApplyFrontendSettings(si);
   if (System::IsValid())
     UpdateGamePatches();
   si.SetStringValue("GPU", "Renderer", s_loaded_renderer.c_str());
   System::ApplySettings(false);
+  LibretroCheats::Apply(s_environment);
 
-  if (g_settings.gpu_resolution_scale != old_scale)
+  const float frame_rate = System::IsValid() ? System::GetThrottleFrequency() : 0.0f;
+  if (g_settings.gpu_resolution_scale != old_scale || frame_rate != old_frame_rate)
   {
     retro_system_av_info av_info;
     retro_get_system_av_info(&av_info);
@@ -292,42 +299,14 @@ void LibretroHost::RegisterDiscControl()
   s_environment(RETRO_ENVIRONMENT_SET_DISK_CONTROL_EXT_INTERFACE, const_cast<retro_disk_control_ext_callback*>(&callbacks));
 }
 
-void LibretroHost::UpdateCheats()
-{
-  if (!System::IsValid())
-    return;
-
-  std::unique_ptr<CheatList> list = std::make_unique<CheatList>();
-  for (size_t i = 0; i < s_cheat_codes.size(); i++)
-  {
-    if (!s_cheat_enabled[i] || s_cheat_codes[i].empty())
-      continue;
-
-    std::string instructions = s_cheat_codes[i];
-    std::replace(instructions.begin(), instructions.end(), '+', '\n');
-
-    CheatCode code;
-    code.description = fmt::format("Cheat {}", i + 1);
-    code.enabled = true;
-    if (!code.SetInstructionsFromString(instructions))
-    {
-      WARNING_LOG("Ignoring cheat {}: '{}' is not a GameShark code.", i + 1, s_cheat_codes[i]);
-      continue;
-    }
-
-    list->AddCode(std::move(code));
-  }
-
-  System::SetCheatList(list->GetCodeCount() > 0 ? std::move(list) : nullptr);
-}
-
 void LibretroHost::RegisterMemoryMaps()
 {
   static retro_memory_descriptor descriptors[] = {
-    {RETRO_MEMDESC_SYSTEM_RAM, nullptr, 0, 0x00000000, 0, 0, Bus::RAM_2MB_SIZE, "RAM"},
+    {RETRO_MEMDESC_SYSTEM_RAM, nullptr, 0, 0x00000000, 0, 0, 0, "RAM"},
     {0, nullptr, 0, 0x1F800000, 0, 0, CPU::SCRATCHPAD_SIZE, "SCRATCH"},
   };
   descriptors[0].ptr = Bus::g_unprotected_ram;
+  descriptors[0].len = g_settings.enable_8mb_ram ? Bus::RAM_8MB_SIZE : Bus::RAM_2MB_SIZE;
   descriptors[1].ptr = CPU::g_state.scratchpad.data();
 
   retro_memory_map map = {descriptors, static_cast<unsigned>(std::size(descriptors))};
@@ -347,6 +326,8 @@ bool LibretroHost::BootGame()
 
   UpdateGamePatches();
   System::ApplySettings(false);
+  LibretroCheats::LoadGame(s_environment, System::GetGameSerial());
+  LibretroCheats::Apply(s_environment);
   return true;
 }
 
@@ -589,10 +570,14 @@ RETRO_API void retro_init(void)
   s_can_dupe_frames = false;
   s_environment(RETRO_ENVIRONMENT_GET_CAN_DUPE, &s_can_dupe_frames);
   LibretroRumble::Initialize(s_environment);
+  LibretroMessages::Initialize(s_environment);
+  LibretroFrameSkip::Initialize(s_environment, s_can_dupe_frames);
 }
 
 RETRO_API void retro_deinit(void)
 {
+  LibretroFrameSkip::Shutdown();
+  LibretroMessages::Shutdown();
   LibretroRumble::Shutdown();
   Log::UnregisterCallback(&LibretroHost::LogCallback, nullptr);
 }
@@ -624,11 +609,14 @@ RETRO_API void retro_run(void)
 
   LibretroInput::Update();
   System::ExecuteFrame();
-  if (s_video_output == VideoOutput::Readback)
+  if (LibretroFrameSkip::ShouldSkipFrame())
+    s_video_refresh(nullptr, s_video_width, s_video_height, 0);
+  else if (s_video_output == VideoOutput::Readback)
     LibretroHost::SendVideoFrame();
   else
     LibretroHost::SendHardwareFrame();
   LibretroHost::SendAudio();
+  LibretroMessages::Flush(s_base_settings_interface->GetBoolValue("Libretro", "OSDMessages", true));
 }
 
 RETRO_API size_t retro_serialize_size(void)
@@ -662,22 +650,14 @@ RETRO_API bool retro_unserialize(const void* data, size_t size)
 
 RETRO_API void retro_cheat_reset(void)
 {
-  s_cheat_codes.clear();
-  s_cheat_enabled.clear();
-  LibretroHost::UpdateCheats();
+  LibretroCheats::ClearFrontendCodes();
+  LibretroCheats::Apply(s_environment);
 }
 
 RETRO_API void retro_cheat_set(unsigned index, bool enabled, const char* code)
 {
-  if (index >= s_cheat_codes.size())
-  {
-    s_cheat_codes.resize(index + 1);
-    s_cheat_enabled.resize(index + 1);
-  }
-
-  s_cheat_codes[index] = code ? code : "";
-  s_cheat_enabled[index] = enabled;
-  LibretroHost::UpdateCheats();
+  LibretroCheats::SetFrontendCode(index, enabled, code);
+  LibretroCheats::Apply(s_environment);
 }
 
 RETRO_API bool retro_load_game(const retro_game_info* game)
@@ -766,6 +746,7 @@ RETRO_API void retro_unload_game(void)
   System::Internal::CPUThreadShutdown();
   System::Internal::ProcessShutdown();
   s_base_settings_interface.reset();
+  LibretroCheats::UnloadGame(s_environment);
 }
 
 RETRO_API unsigned retro_get_region(void)
@@ -780,7 +761,7 @@ RETRO_API void* retro_get_memory_data(unsigned id)
 
 RETRO_API size_t retro_get_memory_size(unsigned id)
 {
-  return (id == RETRO_MEMORY_SYSTEM_RAM && System::IsValid()) ? Bus::RAM_2MB_SIZE : 0;
+  return (id == RETRO_MEMORY_SYSTEM_RAM && System::IsValid()) ? Bus::g_ram_size : 0;
 }
 
 void Host::ReportFatalError(std::string_view title, std::string_view message)

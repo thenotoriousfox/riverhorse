@@ -40,6 +40,10 @@ void SetGlobalScale(float global_scale);
 /// Changes whether OSD messages are silently dropped.
 void SetShowOSDMessages(bool enable);
 
+/// Receives every OSD message's key and text, without icons, for hosts that show messages themselves.
+using OSDMessageSink = void (*)(std::string_view key, std::string_view message, float duration);
+void SetOSDMessageSink(OSDMessageSink sink);
+
 /// Initializes ImGui, creates fonts, etc.
 bool Initialize(float global_scale, bool show_osd_messages, Error* error);
 

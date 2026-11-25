@@ -35,8 +35,10 @@ struct Option
 static void ApplyOverclock(retro_environment_t environment, SettingsInterface& si, const char* percent);
 static void ApplyForceAnalog(retro_environment_t environment, SettingsInterface& si, const char* value);
 static void ApplyCropMode(retro_environment_t environment, SettingsInterface& si, const char* value);
+static void ApplyMemoryCard2(retro_environment_t environment, SettingsInterface& si, const char* value);
 
 static const std::vector<OptionValue> s_on_off = {{"true", "Enabled"}, {"false", "Disabled"}};
+static std::vector<CheatOption> s_cheat_options;
 
 static const std::vector<Option> s_options = {
   {"video",
@@ -76,6 +78,18 @@ static const std::vector<Option> s_options = {
     {"MMPX", "MMPX (Pixel Art)"},
     {"Cubic", "Cubic"}},
    "Nearest"},
+  {"video",
+   "riverhorse_frameskip",
+   "Frameskip",
+   "Auto leaves frames out when the device can't keep up, so sound doesn't crackle. Needs the frontend's Audio "
+   "Buffer Status support.",
+   "Libretro",
+   "FrameSkip",
+   {{"Disabled", "Disabled"}, {"Auto", "Auto"}},
+   "Disabled"},
+  {"video", "riverhorse_osd_messages", "On-Screen Messages",
+   "Shows notices such as disc changes and applied patches through the frontend.", "Libretro", "OSDMessages", s_on_off,
+   "true"},
   {"video", "riverhorse_true_color", "True Color (24-Bit)", "Renders with full colour instead of 16-bit dithering.",
    "GPU", "TrueColor", s_on_off, "false"},
   {"video", "riverhorse_scaled_dithering", "Scaled Dithering",
@@ -92,6 +106,19 @@ static const std::vector<Option> s_options = {
    "Sorts geometry with a depth buffer. Needs PGXP; slower.", "GPU", "PGXPDepthBuffer", s_on_off, "false"},
   {"pgxp", "riverhorse_pgxp_cpu", "PGXP CPU Mode", "Tracks precision through all CPU instructions. Needs PGXP; slow.",
    "GPU", "PGXPCPU", s_on_off, "false"},
+  {"pgxp", "riverhorse_pgxp_vertex_cache", "PGXP Vertex Cache",
+   "Finds precise positions for geometry the game copies through memory. Fixes PGXP in some games, breaks it in "
+   "others. Needs PGXP.",
+   "GPU", "PGXPVertexCache", s_on_off, "false"},
+  {"pgxp",
+   "riverhorse_pgxp_tolerance",
+   "PGXP Geometry Tolerance",
+   "Falls back to the console's positions when the precise ones are this many pixels away, which removes stretched "
+   "polygons in some games. Needs PGXP.",
+   "GPU",
+   "PGXPTolerance",
+   {{"-1", "Disabled"}, {"0.5", "0.5 Pixels"}, {"1", "1 Pixel"}, {"2", "2 Pixels"}, {"4", "4 Pixels"}},
+   "-1"},
   {"video",
    "riverhorse_aspect_ratio",
    "Aspect Ratio",
@@ -117,6 +144,13 @@ static const std::vector<Option> s_options = {
    "DeinterlacingMode",
    {{"Adaptive", "Adaptive"}, {"Weave", "Weave"}, {"Blend", "Blend"}, {"Disabled", "Disabled"}},
    "Adaptive"},
+  {"video", "riverhorse_disable_interlacing", "Disable Interlacing",
+   "Renders interlaced games progressively, without flicker. A few games need interlacing to show correctly.", "GPU",
+   "DisableInterlacing", s_on_off, "true"},
+  {"video", "riverhorse_force_ntsc_timings", "Force NTSC Timings",
+   "Runs PAL games at 60 Hz. Most games then run faster than intended.", "GPU", "ForceNTSCTimings", s_on_off, "false"},
+  {"video", "riverhorse_chroma_smoothing", "Chroma Smoothing (24-Bit)",
+   "Smooths the colour blockiness of full-motion videos.", "GPU", "ChromaSmoothing24Bit", s_on_off, "false"},
   {"console",
    "riverhorse_region",
    "Console Region",
@@ -126,6 +160,10 @@ static const std::vector<Option> s_options = {
    {{"Auto", "Auto-Detect"}, {"NTSC-U", "NTSC-U/C"}, {"NTSC-J", "NTSC-J"}, {"PAL", "PAL"}},
    "Auto"},
   {"console", "riverhorse_fast_boot", "Fast Boot", "Skips the BIOS logo.", "BIOS", "PatchFastBoot", s_on_off, "false"},
+  {"console", "riverhorse_8mb_ram", "Enable 8 MB RAM (restart)",
+   "Gives the console the 8 MB of the development units, which some hacks and translations need. Takes effect when "
+   "content is loaded.",
+   "Console", "Enable8MBRAM", s_on_off, "false"},
   {"patches", "riverhorse_widescreen_patch", "Widescreen Patch",
    "Applies the game's 16:9 widescreen patch from Riverhorse's patch database, if it has one, and shows the game at "
    "16:9 while Aspect Ratio is Game Native.",
@@ -185,13 +223,22 @@ static const std::vector<Option> s_options = {
   {"input", "riverhorse_crosshair", "Light Gun Crosshair",
    "Draws a crosshair where each GunCon or Justifier is aiming.", "Libretro", "Crosshair", s_on_off, "true"},
   {"memory_cards",
+   "riverhorse_memory_card_mode",
+   "Memory Cards",
+   "Per Game gives each game its own cards, named after the game. Shared uses the same cards for every game.",
+   "MemoryCards",
+   "Card1Type",
+   {{"PerGameTitle", "Per Game"}, {"Shared", "Shared"}},
+   "PerGameTitle"},
+  {"memory_cards",
    "riverhorse_memory_card_2",
    "Memory Card 2",
-   "Adds a second per-game memory card.",
-   "MemoryCards",
-   "Card2Type",
+   "Adds a second memory card.",
+   nullptr,
+   nullptr,
    {{"None", "Disabled"}, {"PerGameTitle", "Enabled"}},
-   "None"},
+   "None",
+   &ApplyMemoryCard2},
   {"input",
    "riverhorse_multitap",
    "Multitap",
@@ -214,6 +261,17 @@ static void FillDefinition(Definition* definition, const Option& option)
     definition->values[i] = {option.values[i].value, option.values[i].label};
 }
 
+template<typename Definition>
+static void FillDefinition(Definition* definition, const CheatOption& option)
+{
+  definition->key = option.key.c_str();
+  definition->desc = option.description.c_str();
+  definition->info = option.info.empty() ? nullptr : option.info.c_str();
+  definition->default_value = "false";
+  for (size_t i = 0; i < s_on_off.size(); i++)
+    definition->values[i] = {s_on_off[i].value, s_on_off[i].label};
+}
+
 void Register(retro_environment_t environment)
 {
   unsigned version = 0;
@@ -226,18 +284,26 @@ void Register(retro_environment_t environment)
       {"console", "Console", "Region, BIOS and CPU."},
       {"cdrom", "CD-ROM", "Disc reading speed and preloading."},
       {"input", "Input", "Controllers and the Multitap."},
-      {"memory_cards", "Memory Cards", "Per-game memory cards."},
+      {"memory_cards", "Memory Cards", "Per-game or shared memory cards."},
+      {"cheats", "Cheats", "Codes from Riverhorse's cheat database for the loaded game."},
       {nullptr, nullptr, nullptr},
     };
 
     static std::vector<retro_core_option_v2_definition> definitions;
     definitions.clear();
-    definitions.reserve(s_options.size() + 1);
+    definitions.reserve(s_options.size() + s_cheat_options.size() + 1);
     for (const Option& option : s_options)
     {
       retro_core_option_v2_definition definition = {};
       FillDefinition(&definition, option);
       definition.category_key = option.category;
+      definitions.push_back(definition);
+    }
+    for (const CheatOption& option : s_cheat_options)
+    {
+      retro_core_option_v2_definition definition = {};
+      FillDefinition(&definition, option);
+      definition.category_key = "cheats";
       definitions.push_back(definition);
     }
     definitions.push_back({});
@@ -251,8 +317,14 @@ void Register(retro_environment_t environment)
 
   static std::vector<retro_core_option_definition> definitions;
   definitions.clear();
-  definitions.reserve(s_options.size() + 1);
+  definitions.reserve(s_options.size() + s_cheat_options.size() + 1);
   for (const Option& option : s_options)
+  {
+    retro_core_option_definition definition = {};
+    FillDefinition(&definition, option);
+    definitions.push_back(definition);
+  }
+  for (const CheatOption& option : s_cheat_options)
   {
     retro_core_option_definition definition = {};
     FillDefinition(&definition, option);
@@ -261,6 +333,12 @@ void Register(retro_environment_t environment)
   definitions.push_back({});
 
   environment(RETRO_ENVIRONMENT_SET_CORE_OPTIONS, definitions.data());
+}
+
+void SetCheatOptions(retro_environment_t environment, std::vector<CheatOption> options)
+{
+  s_cheat_options = std::move(options);
+  Register(environment);
 }
 
 void ApplyCropMode(retro_environment_t environment, SettingsInterface& si, const char* value)
@@ -279,6 +357,12 @@ void ApplyOverclock(retro_environment_t environment, SettingsInterface& si, cons
   si.SetBoolValue("CPU", "OverclockEnable", std::strcmp(percent, "100") != 0);
   si.SetStringValue("CPU", "OverclockNumerator", percent);
   si.SetIntValue("CPU", "OverclockDenominator", 100);
+}
+
+void ApplyMemoryCard2(retro_environment_t environment, SettingsInterface& si, const char* value)
+{
+  si.SetStringValue("MemoryCards", "Card2Type",
+                    (std::strcmp(value, "None") == 0) ? value : si.GetStringValue("MemoryCards", "Card1Type").c_str());
 }
 
 void ApplyForceAnalog(retro_environment_t environment, SettingsInterface& si, const char* value)
