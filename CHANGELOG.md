@@ -26,6 +26,8 @@ Changes since the DuckStation `v0.1-7371` base. Releases are tagged
   light gun input; shooting off-screen reloads.
 - libretro core: describes the console's RAM and scratchpad to the frontend
   as memory maps, so RetroAchievements can read the scratchpad too.
+- libretro core: the Crop option's new default, Frontend Setting, follows the
+  frontend's Crop Overscan setting (RetroArch crops by default, as before).
 
 ### Changes
 - Hosted sessions are only listed when the host turns on "List in the

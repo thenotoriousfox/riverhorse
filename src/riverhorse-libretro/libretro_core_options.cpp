@@ -26,13 +26,14 @@ struct Option
   const char* setting;
   std::vector<OptionValue> values;
   const char* default_value;
-  void (*apply)(SettingsInterface& si, const char* value) = nullptr;
+  void (*apply)(retro_environment_t environment, SettingsInterface& si, const char* value) = nullptr;
 };
 
 } // namespace
 
-static void ApplyOverclock(SettingsInterface& si, const char* percent);
-static void ApplyForceAnalog(SettingsInterface& si, const char* value);
+static void ApplyOverclock(retro_environment_t environment, SettingsInterface& si, const char* percent);
+static void ApplyForceAnalog(retro_environment_t environment, SettingsInterface& si, const char* value);
+static void ApplyCropMode(retro_environment_t environment, SettingsInterface& si, const char* value);
 
 static const std::vector<OptionValue> s_on_off = {{"true", "Enabled"}, {"false", "Disabled"}};
 
@@ -78,8 +79,11 @@ static const std::vector<Option> s_options = {
   {"riverhorse_aspect_ratio", "Aspect Ratio", "Shape of the picture sent to the frontend.", "Display", "AspectRatio",
    {{"Auto (Game Native)", "Game Native"}, {"4:3", "4:3"}, {"16:9", "16:9"}, {"PAR 1:1", "Square Pixels"}},
    "Auto (Game Native)"},
-  {"riverhorse_crop_mode", "Crop", "Removes the overscan area or all borders.", "Display", "CropMode",
-   {{"Overscan", "Overscan Area"}, {"None", "None"}, {"Borders", "All Borders"}}, "Overscan"},
+  {"riverhorse_crop_mode", "Crop",
+   "Removes the overscan area or all borders. Frontend Setting follows the frontend's Crop Overscan setting.", nullptr,
+   nullptr,
+   {{"Frontend", "Frontend Setting"}, {"Overscan", "Overscan Area"}, {"None", "None"}, {"Borders", "All Borders"}},
+   "Frontend", &ApplyCropMode},
   {"riverhorse_deinterlacing", "Deinterlacing", "How interlaced video is shown.", "Display", "DeinterlacingMode",
    {{"Adaptive", "Adaptive"}, {"Weave", "Weave"}, {"Blend", "Blend"}, {"Disabled", "Disabled"}}, "Adaptive"},
   {"riverhorse_region", "Console Region", "Region of the emulated console.", "Console", "Region",
@@ -132,14 +136,25 @@ void Register(retro_environment_t environment)
   environment(RETRO_ENVIRONMENT_SET_CORE_OPTIONS, definitions.data());
 }
 
-void ApplyOverclock(SettingsInterface& si, const char* percent)
+void ApplyCropMode(retro_environment_t environment, SettingsInterface& si, const char* value)
+{
+  if (std::strcmp(value, "Frontend") == 0)
+  {
+    bool show_overscan = false;
+    value = (environment(RETRO_ENVIRONMENT_GET_OVERSCAN, &show_overscan) && show_overscan) ? "None" : "Overscan";
+  }
+
+  si.SetStringValue("Display", "CropMode", value);
+}
+
+void ApplyOverclock(retro_environment_t environment, SettingsInterface& si, const char* percent)
 {
   si.SetBoolValue("CPU", "OverclockEnable", std::strcmp(percent, "100") != 0);
   si.SetStringValue("CPU", "OverclockNumerator", percent);
   si.SetIntValue("CPU", "OverclockDenominator", 100);
 }
 
-void ApplyForceAnalog(SettingsInterface& si, const char* value)
+void ApplyForceAnalog(retro_environment_t environment, SettingsInterface& si, const char* value)
 {
   si.SetStringValue("Pad1", "ForceAnalogOnReset", value);
   si.SetStringValue("Pad2", "ForceAnalogOnReset", value);
@@ -154,7 +169,7 @@ void Apply(retro_environment_t environment, SettingsInterface& si)
       (environment(RETRO_ENVIRONMENT_GET_VARIABLE, &variable) && variable.value) ? variable.value : option.default_value;
 
     if (option.apply)
-      option.apply(si, value);
+      option.apply(environment, si, value);
     else
       si.SetStringValue(option.section, option.setting, value);
   }
