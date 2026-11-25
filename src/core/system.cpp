@@ -131,6 +131,7 @@ struct SaveStateBuffer
 
 static void CheckCacheLineSize();
 static void LogStartupInformation();
+static bool LoadGamePatchList(const std::string& serial, CheatList* list);
 
 static void LoadInputBindings(SettingsInterface& si, std::unique_lock<std::mutex>& lock);
 
@@ -4438,11 +4439,34 @@ void System::ApplyCheatCode(const CheatCode& code)
   code.Apply();
 }
 
+std::string System::GetUserGamePatchFileName(std::string_view serial)
+{
+  return Path::Combine(EmuFolders::Patches, fmt::format("{}.cht", Path::SanitizeFileName(serial)));
+}
+
+bool System::LoadGamePatchList(const std::string& serial, CheatList* list)
+{
+  if (serial.empty())
+    return false;
+
+  list->LoadFromPackage(serial, "patches.txt");
+
+  const std::string user_filename = GetUserGamePatchFileName(serial);
+  CheatList user_list;
+  if (FileSystem::FileExists(user_filename.c_str()) && user_list.LoadFromPCSXRFile(user_filename.c_str()))
+  {
+    for (u32 i = 0; i < user_list.GetCodeCount(); i++)
+      list->AddCode(std::move(user_list.GetCode(i)));
+  }
+
+  return list->GetCodeCount() > 0;
+}
+
 std::vector<std::string> System::GetGamePatchNames(const std::string& serial)
 {
   std::vector<std::string> names;
   CheatList list;
-  if (!serial.empty() && list.LoadFromPackage(serial, "patches.txt"))
+  if (LoadGamePatchList(serial, &list))
   {
     for (u32 i = 0; i < list.GetCodeCount(); i++)
       names.push_back(list.GetCode(i).description);
@@ -4466,7 +4490,7 @@ void System::UpdateGamePatches()
     return;
 
   std::unique_ptr<CheatList> list = std::make_unique<CheatList>();
-  if (!list->LoadFromPackage(s_running_game_serial, "patches.txt"))
+  if (!LoadGamePatchList(s_running_game_serial, list.get()))
     return;
 
   for (u32 i = list->GetCodeCount(); i > 0; i--)

@@ -59,12 +59,13 @@ SettingsWindow::SettingsWindow(const std::string& path, const std::string& seria
             QStringLiteral("file-list-line"),
             tr("<strong>Summary</strong><hr>This page shows information about the selected game, and allows you to "
                "validate your disc was dumped correctly."));
-  if (std::vector<std::string> patch_names = System::GetGamePatchNames(serial); !patch_names.empty())
+  if (!serial.empty())
   {
-    addWidget(new GamePatchSettingsWidget(std::move(patch_names), this, m_ui.settingsContainer), tr("Patches"),
+    addWidget(new GamePatchSettingsWidget(serial, this, m_ui.settingsContainer), tr("Patches"),
               QStringLiteral("cheats-line"),
-              tr("<strong>Patches</strong><hr>Changes to the game from Riverhorse's patch database, such as widescreen "
-                 "or 60 FPS. Tick a patch to apply it when the game starts."));
+              tr("<strong>Patches</strong><hr>Changes to the game from Riverhorse's patch database or your own, such "
+                 "as widescreen or 60 FPS. Tick a patch to apply it when the game starts; add your own with Add "
+                 "Patch."));
   }
   addPages();
   connectUi();

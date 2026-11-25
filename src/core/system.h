@@ -285,6 +285,9 @@ bool LoadStateFromMemory(std::span<const u8> buffer, Error* error);
 
 std::vector<std::string> GetGamePatchNames(const std::string& serial);
 
+/// Returns the file holding the player's own patches for a game.
+std::string GetUserGamePatchFileName(std::string_view serial);
+
 void SingleStepCPU();
 
 /// Sets target emulation speed.

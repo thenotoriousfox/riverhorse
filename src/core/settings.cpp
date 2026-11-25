@@ -1885,6 +1885,7 @@ std::string EmuFolders::GameIcons;
 std::string EmuFolders::GameSettings;
 std::string EmuFolders::InputProfiles;
 std::string EmuFolders::MemoryCards;
+std::string EmuFolders::Patches;
 std::string EmuFolders::Resources;
 std::string EmuFolders::SaveStates;
 std::string EmuFolders::Screenshots;
@@ -1905,6 +1906,7 @@ void EmuFolders::SetDefaults()
   GameSettings = Path::Combine(DataRoot, "gamesettings");
   InputProfiles = Path::Combine(DataRoot, "inputprofiles");
   MemoryCards = Path::Combine(DataRoot, "memcards");
+  Patches = Path::Combine(DataRoot, "patches");
   SaveStates = Path::Combine(DataRoot, "savestates");
   Screenshots = Path::Combine(DataRoot, "screenshots");
   Shaders = Path::Combine(DataRoot, "shaders");
@@ -1937,6 +1939,7 @@ void EmuFolders::LoadConfig(SettingsInterface& si)
   GameSettings = LoadPathFromSettings(si, DataRoot, "Folders", "GameSettings", "gamesettings");
   InputProfiles = LoadPathFromSettings(si, DataRoot, "Folders", "InputProfiles", "inputprofiles");
   MemoryCards = LoadPathFromSettings(si, DataRoot, "MemoryCards", "Directory", "memcards");
+  Patches = LoadPathFromSettings(si, DataRoot, "Folders", "Patches", "patches");
   SaveStates = LoadPathFromSettings(si, DataRoot, "Folders", "SaveStates", "savestates");
   Screenshots = LoadPathFromSettings(si, DataRoot, "Folders", "Screenshots", "screenshots");
   Shaders = LoadPathFromSettings(si, DataRoot, "Folders", "Shaders", "shaders");
@@ -1948,6 +1951,7 @@ void EmuFolders::LoadConfig(SettingsInterface& si)
   DEV_LOG("BIOS Directory: {}", Bios);
   DEV_LOG("Cache Directory: {}", Cache);
   DEV_LOG("Cheats Directory: {}", Cheats);
+  DEV_LOG("Patches Directory: {}", Patches);
   DEV_LOG("Covers Directory: {}", Covers);
   DEV_LOG("Dumps Directory: {}", Dumps);
   DEV_LOG("Game Icons Directory: {}", GameIcons);
@@ -1970,6 +1974,7 @@ void EmuFolders::Save(SettingsInterface& si)
   si.SetStringValue("BIOS", "SearchDirectory", Path::MakeRelative(Bios, DataRoot).c_str());
   si.SetStringValue("Folders", "Cache", Path::MakeRelative(Cache, DataRoot).c_str());
   si.SetStringValue("Folders", "Cheats", Path::MakeRelative(Cheats, DataRoot).c_str());
+  si.SetStringValue("Folders", "Patches", Path::MakeRelative(Patches, DataRoot).c_str());
   si.SetStringValue("Folders", "Covers", Path::MakeRelative(Covers, DataRoot).c_str());
   si.SetStringValue("Folders", "Dumps", Path::MakeRelative(Dumps, DataRoot).c_str());
   si.SetStringValue("Folders", "GameIcons", Path::MakeRelative(GameIcons, DataRoot).c_str());
@@ -2011,6 +2016,7 @@ bool EmuFolders::EnsureFoldersExist()
   result = FileSystem::EnsureDirectoryExists(Cache.c_str(), false) && result;
   result = FileSystem::EnsureDirectoryExists(Path::Combine(Cache, "achievement_images").c_str(), false) && result;
   result = FileSystem::EnsureDirectoryExists(Cheats.c_str(), false) && result;
+  result = FileSystem::EnsureDirectoryExists(Patches.c_str(), false) && result;
   result = FileSystem::EnsureDirectoryExists(Covers.c_str(), false) && result;
   result = FileSystem::EnsureDirectoryExists(Dumps.c_str(), false) && result;
   result = FileSystem::EnsureDirectoryExists(Path::Combine(Dumps, "audio").c_str(), false) && result;

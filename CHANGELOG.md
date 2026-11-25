@@ -14,6 +14,9 @@ Changes since the DuckStation `v0.1-7371` base. Releases are tagged
   number as the relay), optionally `?version=<Riverhorse version>`, so any
   frontend can show open games; see the README. `-netplaypublic` lists a
   session started from the command line.
+- Your own patches: Game Properties > Patches has Add Patch, Edit and Remove.
+  Patches you add are kept per game in the new `patches` folder (same code
+  format as cheats) and are ticked on and off like the built-in ones.
 - libretro core for Windows (x64), Android (arm64-v8a, x86_64), macOS (arm64,
   x86_64) and Linux arm64 on every release, built from the bundled
   dependencies. The core is also submitted to libretro's buildbot, so
