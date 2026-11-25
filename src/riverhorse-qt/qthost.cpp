@@ -1399,6 +1399,17 @@ void EmuThread::dumpSPURAM(const QString& filename)
     Host::ReportErrorAsync("Error", fmt::format("Failed to dump SPU RAM to '{}'", filename_str));
 }
 
+void EmuThread::openRewindTimeline()
+{
+  if (!isOnThread())
+  {
+    QMetaObject::invokeMethod(this, "openRewindTimeline", Qt::QueuedConnection);
+    return;
+  }
+
+  FullscreenUI::OpenRewindTimeline();
+}
+
 void EmuThread::saveScreenshot()
 {
   if (!isOnThread())

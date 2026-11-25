@@ -1845,6 +1845,7 @@ void MainWindow::updateEmulationActions(bool starting, bool running, bool cheevo
   m_ui.actionCheats->setDisabled(cheevos_challenge_mode || netplay);
   m_ui.actionCheatsToolbar->setDisabled(cheevos_challenge_mode || netplay);
   m_ui.actionScreenshot->setDisabled(starting || !running);
+  m_ui.actionRewindTimeline->setDisabled(starting || !running || cheevos_challenge_mode || netplay);
   m_ui.menuChangeDisc->setDisabled(starting || !running || netplay);
   m_ui.menuCheats->setDisabled(cheevos_challenge_mode || netplay);
   m_ui.actionCPUDebugger->setDisabled(cheevos_challenge_mode);
@@ -2093,6 +2094,10 @@ void MainWindow::connectSignals()
   connect(m_ui.actionReset, &QAction::triggered, this, []() { g_emu_thread->resetSystem(true); });
   connect(m_ui.actionPause, &QAction::toggled, this, [](bool active) { g_emu_thread->setSystemPaused(active); });
   connect(m_ui.actionScreenshot, &QAction::triggered, g_emu_thread, &EmuThread::saveScreenshot);
+  connect(m_ui.actionRewindTimeline, &QAction::triggered, this, [this]() {
+    focusDisplayWidget();
+    g_emu_thread->openRewindTimeline();
+  });
   connect(m_ui.actionScanForNewGames, &QAction::triggered, this, [this]() { refreshGameList(false); });
   connect(m_ui.actionRescanAllGames, &QAction::triggered, this, [this]() { refreshGameList(true); });
   connect(m_ui.actionLoadState, &QAction::triggered, this, [this]() { m_ui.menuLoadState->exec(QCursor::pos()); });

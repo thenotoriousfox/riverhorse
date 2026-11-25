@@ -195,6 +195,7 @@ public Q_SLOTS:
   void dumpVRAM(const QString& filename);
   void dumpSPURAM(const QString& filename);
   void saveScreenshot();
+  void openRewindTimeline();
   void redrawDisplayWindow();
   void toggleFullscreen();
   void setFullscreen(bool fullscreen, bool allow_render_to_main);

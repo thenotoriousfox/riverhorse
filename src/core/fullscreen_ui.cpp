@@ -12,6 +12,7 @@
 #include "netplay.h"
 #include "gpu.h"
 #include "host.h"
+#include "rewind_timeline.h"
 #include "save_sync.h"
 #include "settings.h"
 #include "system.h"
@@ -646,7 +647,7 @@ bool FullscreenUI::HasActiveWindow()
 
 bool FullscreenUI::AreAnyDialogsOpen()
 {
-  return (s_save_state_selector_open || s_about_window_open ||
+  return (s_save_state_selector_open || RewindTimeline::IsOpen() || s_about_window_open ||
           s_input_binding_type != InputBindingInfo::Type::Unknown || ImGuiFullscreen::IsChoiceDialogOpen() ||
           ImGuiFullscreen::IsFileSelectorOpen());
 }
@@ -682,7 +683,9 @@ void FullscreenUI::OnSystemPaused()
 void FullscreenUI::OnSystemResumed()
 {
   // get rid of pause menu if we unpaused another way
-  if (s_current_main_window == MainWindowType::PauseMenu)
+  if (RewindTimeline::IsOpen())
+    RewindTimeline::Close();
+  else if (s_current_main_window == MainWindowType::PauseMenu)
     ClosePauseMenu();
 }
 
@@ -690,6 +693,9 @@ void FullscreenUI::OnSystemDestroyed()
 {
   if (!IsInitialized())
     return;
+
+  if (RewindTimeline::IsOpen())
+    RewindTimeline::Close();
 
   s_pause_menu_was_open = false;
   s_was_paused_on_quick_menu_open = false;
@@ -731,6 +737,39 @@ void FullscreenUI::OpenPauseMenu()
   s_current_main_window = MainWindowType::PauseMenu;
   s_current_pause_submenu = PauseSubMenu::None;
   QueueResetFocus(FocusResetType::WindowChanged);
+  ForceKeyNavEnabled();
+  FixStateIfPaused();
+}
+
+void FullscreenUI::OpenRewindTimeline()
+{
+  if (!System::IsValid() || !Initialize() || RewindTimeline::IsOpen())
+    return;
+
+  const bool from_pause_menu = (s_current_main_window == MainWindowType::PauseMenu);
+  if (!from_pause_menu && s_current_main_window != MainWindowType::None)
+    return;
+
+  if (!g_settings.rewind_enable)
+  {
+    ShowToast({}, FSUI_STR("Rewind is not enabled. Turn it on in Settings > Emulation."));
+    return;
+  }
+  if (Netplay::IsActive() || Achievements::IsHardcoreModeActive())
+  {
+    ShowToast({}, FSUI_STR("The rewind timeline is not available during netplay or in hardcore mode."));
+    return;
+  }
+  if (!RewindTimeline::Open())
+  {
+    ShowToast({}, FSUI_STR("No rewind snapshots have been saved yet."));
+    return;
+  }
+
+  if (!from_pause_menu)
+    PauseForMenuOpen(false);
+
+  s_current_main_window = MainWindowType::None;
   ForceKeyNavEnabled();
   FixStateIfPaused();
 }
@@ -849,6 +888,9 @@ void FullscreenUI::Render()
     else
       DrawSaveStateSelector(s_save_state_selector_loading);
   }
+
+  if (RewindTimeline::IsOpen())
+    RewindTimeline::Draw();
 
   if (s_about_window_open)
     DrawAboutWindow();
@@ -6133,7 +6175,7 @@ void FullscreenUI::DrawPauseMenu()
                             ImVec2(10.0f, 10.0f), ImGuiWindowFlags_NoBackground))
   {
     static constexpr u32 submenu_item_count[] = {
-      14, // None
+      15, // None
       4,  // Exit
       3,  // Achievements
       4,  // Graphics
@@ -6173,6 +6215,13 @@ void FullscreenUI::DrawPauseMenu()
         {
           if (OpenSaveStateSelector(false))
             s_current_main_window = MainWindowType::None;
+        }
+
+        if (ActiveButton(FSUI_ICONSTR(ICON_FA_HISTORY, "Rewind Timeline"), false,
+                         has_game && g_settings.rewind_enable && !Netplay::IsActive() &&
+                           !Achievements::IsHardcoreModeActive()))
+        {
+          OpenRewindTimeline();
         }
 
         if (ActiveButton(FSUI_ICONSTR(ICON_FA_FROWN_OPEN, "Cheat List"), false,
@@ -8024,6 +8073,7 @@ TRANSLATE_NOOP("FullscreenUI", "%d Frames");
 TRANSLATE_NOOP("FullscreenUI", "%d frames");
 TRANSLATE_NOOP("FullscreenUI", "%d ms");
 TRANSLATE_NOOP("FullscreenUI", "%d sectors");
+TRANSLATE_NOOP("FullscreenUI", ", password");
 TRANSLATE_NOOP("FullscreenUI", "-");
 TRANSLATE_NOOP("FullscreenUI", "1 Frame");
 TRANSLATE_NOOP("FullscreenUI", "10 Frames");
@@ -8088,6 +8138,7 @@ TRANSLATE_NOOP("FullscreenUI", "900% [540 FPS (NTSC) / 450 FPS (PAL)]");
 TRANSLATE_NOOP("FullscreenUI", "9x");
 TRANSLATE_NOOP("FullscreenUI", "9x (18x Speed)");
 TRANSLATE_NOOP("FullscreenUI", "9x (for 4K)");
+TRANSLATE_NOOP("FullscreenUI", "A PNG image drawn around the game, such as a console or TV bezel. The game is shown in the transparent middle of the image.");
 TRANSLATE_NOOP("FullscreenUI", "A resume save state created at %s was found.\n\nDo you want to load this save and continue?");
 TRANSLATE_NOOP("FullscreenUI", "About");
 TRANSLATE_NOOP("FullscreenUI", "About Riverhorse");
@@ -8099,14 +8150,16 @@ TRANSLATE_NOOP("FullscreenUI", "Achievements Settings");
 TRANSLATE_NOOP("FullscreenUI", "Achievements are not enabled.");
 TRANSLATE_NOOP("FullscreenUI", "Add Search Directory");
 TRANSLATE_NOOP("FullscreenUI", "Add Shader");
+TRANSLATE_NOOP("FullscreenUI", "Address of your own relay server. Everyone in the session must use the same one. Empty uses the default relay.");
 TRANSLATE_NOOP("FullscreenUI", "Adds a new directory to the game search list.");
 TRANSLATE_NOOP("FullscreenUI", "Adds a new shader to the chain.");
 TRANSLATE_NOOP("FullscreenUI", "Adds additional precision to PGXP data post-projection. May improve visuals in some games.");
-TRANSLATE_NOOP("FullscreenUI", "Adjusts the emulation speed so the console's refresh rate matches the host when VSync is enabled.");
+TRANSLATE_NOOP("FullscreenUI", "Adjusts the emulation speed so the console's refresh rate matches the host when VSync is enabled. Also works at two, three or four times the console's rate, such as 120 Hz.");
 TRANSLATE_NOOP("FullscreenUI", "Advanced");
 TRANSLATE_NOOP("FullscreenUI", "Advanced Settings");
 TRANSLATE_NOOP("FullscreenUI", "All Time: {}");
 TRANSLATE_NOOP("FullscreenUI", "Allow Booting Without SBI File");
+TRANSLATE_NOOP("FullscreenUI", "Allow Image Writes");
 TRANSLATE_NOOP("FullscreenUI", "Allows loading protected games without subchannel information.");
 TRANSLATE_NOOP("FullscreenUI", "An error occurred while deleting empty game settings:\n{}");
 TRANSLATE_NOOP("FullscreenUI", "An error occurred while saving game settings:\n{}");
@@ -8114,6 +8167,7 @@ TRANSLATE_NOOP("FullscreenUI", "Applied when the game starts.");
 TRANSLATE_NOOP("FullscreenUI", "Applies modern dithering techniques to further smooth out gradients when true color is enabled.");
 TRANSLATE_NOOP("FullscreenUI", "Apply Image Patches");
 TRANSLATE_NOOP("FullscreenUI", "Are you sure you want to clear the current post-processing chain? All configuration will be lost.");
+TRANSLATE_NOOP("FullscreenUI", "Ask Before Players Join");
 TRANSLATE_NOOP("FullscreenUI", "Aspect Ratio");
 TRANSLATE_NOOP("FullscreenUI", "Attempts to detect one pixel high/wide lines that rely on non-upscaled rasterization behavior, filling in gaps introduced by upscaling.");
 TRANSLATE_NOOP("FullscreenUI", "Attempts to map the selected port to a chosen controller.");
@@ -8141,6 +8195,8 @@ TRANSLATE_NOOP("FullscreenUI", "Back To Pause Menu");
 TRANSLATE_NOOP("FullscreenUI", "Backend Settings");
 TRANSLATE_NOOP("FullscreenUI", "Based on DuckStation v0.1-7371 by Connor McLaughlin and contributors.");
 TRANSLATE_NOOP("FullscreenUI", "Behavior");
+TRANSLATE_NOOP("FullscreenUI", "Black Frame Insertion");
+TRANSLATE_NOOP("FullscreenUI", "Border Overlay");
 TRANSLATE_NOOP("FullscreenUI", "Borderless Fullscreen");
 TRANSLATE_NOOP("FullscreenUI", "Buffer Size");
 TRANSLATE_NOOP("FullscreenUI", "CD-ROM Emulation");
@@ -8148,11 +8204,14 @@ TRANSLATE_NOOP("FullscreenUI", "CPU Emulation");
 TRANSLATE_NOOP("FullscreenUI", "CPU Mode");
 TRANSLATE_NOOP("FullscreenUI", "Cancel");
 TRANSLATE_NOOP("FullscreenUI", "Capture");
+TRANSLATE_NOOP("FullscreenUI", "Cartridge Switch On");
 TRANSLATE_NOOP("FullscreenUI", "Change Disc");
+TRANSLATE_NOOP("FullscreenUI", "Change Discs Automatically");
 TRANSLATE_NOOP("FullscreenUI", "Change Page");
 TRANSLATE_NOOP("FullscreenUI", "Change Selection");
 TRANSLATE_NOOP("FullscreenUI", "Change View");
 TRANSLATE_NOOP("FullscreenUI", "Changes the aspect ratio used to display the console's output to the screen.");
+TRANSLATE_NOOP("FullscreenUI", "Changes the disc of a multi-disc game when the game stops the disc and waits for it to be changed, trying each disc in turn until the game accepts one.");
 TRANSLATE_NOOP("FullscreenUI", "Cheat List");
 TRANSLATE_NOOP("FullscreenUI", "Chooses controller types and maps buttons.");
 TRANSLATE_NOOP("FullscreenUI", "Chooses the backend to use for rendering the console/game visuals.");
@@ -8167,6 +8226,7 @@ TRANSLATE_NOOP("FullscreenUI", "Clears the mask/transparency bit in VRAM write d
 TRANSLATE_NOOP("FullscreenUI", "Close");
 TRANSLATE_NOOP("FullscreenUI", "Close Game");
 TRANSLATE_NOOP("FullscreenUI", "Close Menu");
+TRANSLATE_NOOP("FullscreenUI", "Close the game first.");
 TRANSLATE_NOOP("FullscreenUI", "Compatibility Rating");
 TRANSLATE_NOOP("FullscreenUI", "Compatibility: ");
 TRANSLATE_NOOP("FullscreenUI", "Completely exits the application, returning you to your desktop.");
@@ -8193,6 +8253,7 @@ TRANSLATE_NOOP("FullscreenUI", "Copies the global controller configuration to th
 TRANSLATE_NOOP("FullscreenUI", "Copy Global Settings");
 TRANSLATE_NOOP("FullscreenUI", "Copy Settings");
 TRANSLATE_NOOP("FullscreenUI", "Could not find any CD/DVD-ROM devices. Please ensure you have a drive connected and sufficient permissions to access it.");
+TRANSLATE_NOOP("FullscreenUI", "Could not get the session list: {}");
 TRANSLATE_NOOP("FullscreenUI", "Cover Settings");
 TRANSLATE_NOOP("FullscreenUI", "Covers Directory");
 TRANSLATE_NOOP("FullscreenUI", "Create");
@@ -8201,6 +8262,7 @@ TRANSLATE_NOOP("FullscreenUI", "Create Save State Backups");
 TRANSLATE_NOOP("FullscreenUI", "Crop Mode");
 TRANSLATE_NOOP("FullscreenUI", "Culling Correction");
 TRANSLATE_NOOP("FullscreenUI", "Current Game");
+TRANSLATE_NOOP("FullscreenUI", "Custom Relay Server");
 TRANSLATE_NOOP("FullscreenUI", "Debugging Settings");
 TRANSLATE_NOOP("FullscreenUI", "Default");
 TRANSLATE_NOOP("FullscreenUI", "Default Boot");
@@ -8230,7 +8292,11 @@ TRANSLATE_NOOP("FullscreenUI", "Determines the rotation of the simulated TV scre
 TRANSLATE_NOOP("FullscreenUI", "Determines the size of screenshots created by Riverhorse.");
 TRANSLATE_NOOP("FullscreenUI", "Determines whether a prompt will be displayed to confirm shutting down the emulator/game when the hotkey is pressed.");
 TRANSLATE_NOOP("FullscreenUI", "Determines which algorithm is used to convert interlaced frames to progressive for display on your system.");
+TRANSLATE_NOOP("FullscreenUI", "Device");
+TRANSLATE_NOOP("FullscreenUI", "Device Name");
 TRANSLATE_NOOP("FullscreenUI", "Device Settings");
+TRANSLATE_NOOP("FullscreenUI", "Dim Light in Digital Mode");
+TRANSLATE_NOOP("FullscreenUI", "Dims a controller's light while the DualShock it plays as is in digital mode.");
 TRANSLATE_NOOP("FullscreenUI", "Disable All Enhancements");
 TRANSLATE_NOOP("FullscreenUI", "Disable Interlacing");
 TRANSLATE_NOOP("FullscreenUI", "Disable Mailbox Presentation");
@@ -8283,8 +8349,9 @@ TRANSLATE_NOOP("FullscreenUI", "Enables the replacement of background textures i
 TRANSLATE_NOOP("FullscreenUI", "Encore Mode");
 TRANSLATE_NOOP("FullscreenUI", "Ensures every frame generated is displayed for optimal pacing. Enable for variable refresh displays, such as GSync/FreeSync. Disable if you are having speed or sound issues.");
 TRANSLATE_NOOP("FullscreenUI", "Enter Value");
-TRANSLATE_NOOP("FullscreenUI", "Enter the host's address (name or IP, optionally :port).");
+TRANSLATE_NOOP("FullscreenUI", "Enter a Session Code or Address");
 TRANSLATE_NOOP("FullscreenUI", "Enter the name of the input profile you wish to create.");
+TRANSLATE_NOOP("FullscreenUI", "Enter the session code, or the host's address (name or IP, optionally :port).");
 TRANSLATE_NOOP("FullscreenUI", "Error");
 TRANSLATE_NOOP("FullscreenUI", "Essentials");
 TRANSLATE_NOOP("FullscreenUI", "Execution Mode");
@@ -8320,6 +8387,7 @@ TRANSLATE_NOOP("FullscreenUI", "Forces the use of FIFO over Mailbox presentation
 TRANSLATE_NOOP("FullscreenUI", "Forcibly mutes both CD-DA and XA audio from the CD-ROM. Can be used to disable background music in some games.");
 TRANSLATE_NOOP("FullscreenUI", "Frame Time Buffer");
 TRANSLATE_NOOP("FullscreenUI", "Frames to delay your own input by. Higher values mean fewer rollbacks on slow connections.");
+TRANSLATE_NOOP("FullscreenUI", "Frameskip");
 TRANSLATE_NOOP("FullscreenUI", "From File...");
 TRANSLATE_NOOP("FullscreenUI", "Fullscreen Resolution");
 TRANSLATE_NOOP("FullscreenUI", "GPU Adapter");
@@ -8361,6 +8429,7 @@ TRANSLATE_NOOP("FullscreenUI", "How many saves will be kept for rewinding. Highe
 TRANSLATE_NOOP("FullscreenUI", "How often a rewind state will be created. Higher frequencies have greater system requirements.");
 TRANSLATE_NOOP("FullscreenUI", "Identifies any new files added to the game directories.");
 TRANSLATE_NOOP("FullscreenUI", "If not enabled, the current post processing chain will be ignored.");
+TRANSLATE_NOOP("FullscreenUI", "Image Path");
 TRANSLATE_NOOP("FullscreenUI", "Increase Timer Resolution");
 TRANSLATE_NOOP("FullscreenUI", "Increases the field of view from 4:3 to the chosen display aspect ratio in 3D games.");
 TRANSLATE_NOOP("FullscreenUI", "Increases the precision of polygon culling, reducing the number of holes in geometry.");
@@ -8377,6 +8446,7 @@ TRANSLATE_NOOP("FullscreenUI", "Interface Size");
 TRANSLATE_NOOP("FullscreenUI", "Internal Resolution");
 TRANSLATE_NOOP("FullscreenUI", "Join");
 TRANSLATE_NOOP("FullscreenUI", "Join Netplay");
+TRANSLATE_NOOP("FullscreenUI", "Keeps memory cards, save states and game settings the same on all your devices, through a folder another program syncs or a WebDAV server.");
 TRANSLATE_NOOP("FullscreenUI", "Large");
 TRANSLATE_NOOP("FullscreenUI", "Last Played");
 TRANSLATE_NOOP("FullscreenUI", "Last Played: %s");
@@ -8387,9 +8457,11 @@ TRANSLATE_NOOP("FullscreenUI", "Launch a game by selecting a file/disc image.");
 TRANSLATE_NOOP("FullscreenUI", "Leaderboard Notifications");
 TRANSLATE_NOOP("FullscreenUI", "Leaderboards");
 TRANSLATE_NOOP("FullscreenUI", "Leaderboards are not enabled.");
+TRANSLATE_NOOP("FullscreenUI", "Leaves up to three frames in a row undisplayed when the system can't keep up. Not used with Optimal Frame Pacing or syncing to host refresh.");
 TRANSLATE_NOOP("FullscreenUI", "Lets a frame that misses the refresh be shown straight away with a tear, instead of waiting a whole refresh. Applies when vsync is used for timing or mailbox presentation is disabled, with Vulkan and OpenGL.");
 TRANSLATE_NOOP("FullscreenUI", "Library");
 TRANSLATE_NOOP("FullscreenUI", "Line Detection");
+TRANSLATE_NOOP("FullscreenUI", "List Hosted Sessions");
 TRANSLATE_NOOP("FullscreenUI", "List Settings");
 TRANSLATE_NOOP("FullscreenUI", "Load Devices From Save States");
 TRANSLATE_NOOP("FullscreenUI", "Load Global State");
@@ -8413,6 +8485,7 @@ TRANSLATE_NOOP("FullscreenUI", "Logs messages to riverhorse.log in the user dire
 TRANSLATE_NOOP("FullscreenUI", "Logs messages to the console window.");
 TRANSLATE_NOOP("FullscreenUI", "Logs messages to the debug console where supported.");
 TRANSLATE_NOOP("FullscreenUI", "Logs out of RetroAchievements.");
+TRANSLATE_NOOP("FullscreenUI", "Looking for open sessions...");
 TRANSLATE_NOOP("FullscreenUI", "Macro {} Buttons");
 TRANSLATE_NOOP("FullscreenUI", "Macro {} Frequency");
 TRANSLATE_NOOP("FullscreenUI", "Macro {} Press To Toggle");
@@ -8447,15 +8520,18 @@ TRANSLATE_NOOP("FullscreenUI", "No cheats found for {}.");
 TRANSLATE_NOOP("FullscreenUI", "No games found. Add a folder with your games in Settings > Game List.");
 TRANSLATE_NOOP("FullscreenUI", "No input profiles available.");
 TRANSLATE_NOOP("FullscreenUI", "No resume save state found.");
+TRANSLATE_NOOP("FullscreenUI", "No rewind snapshots have been saved yet.");
 TRANSLATE_NOOP("FullscreenUI", "No save present in this slot.");
 TRANSLATE_NOOP("FullscreenUI", "No save states found.");
 TRANSLATE_NOOP("FullscreenUI", "No, resume the game.");
+TRANSLATE_NOOP("FullscreenUI", "None");
 TRANSLATE_NOOP("FullscreenUI", "None (Double Speed)");
 TRANSLATE_NOOP("FullscreenUI", "None (Normal Speed)");
 TRANSLATE_NOOP("FullscreenUI", "Normal");
 TRANSLATE_NOOP("FullscreenUI", "Normalize Depth Scale");
 TRANSLATE_NOOP("FullscreenUI", "Not Logged In");
 TRANSLATE_NOOP("FullscreenUI", "Not Scanning Subdirectories");
+TRANSLATE_NOOP("FullscreenUI", "Not Set");
 TRANSLATE_NOOP("FullscreenUI", "Not played yet");
 TRANSLATE_NOOP("FullscreenUI", "OK");
 TRANSLATE_NOOP("FullscreenUI", "OSD Scale");
@@ -8474,7 +8550,9 @@ TRANSLATE_NOOP("FullscreenUI", "Overlays or replaces normal triangle drawing wit
 TRANSLATE_NOOP("FullscreenUI", "PGXP (Precision Geometry Transform Pipeline)");
 TRANSLATE_NOOP("FullscreenUI", "PGXP Depth Buffer");
 TRANSLATE_NOOP("FullscreenUI", "PGXP Geometry Correction");
+TRANSLATE_NOOP("FullscreenUI", "Parallel Port");
 TRANSLATE_NOOP("FullscreenUI", "Parent Directory");
+TRANSLATE_NOOP("FullscreenUI", "Password");
 TRANSLATE_NOOP("FullscreenUI", "Patches");
 TRANSLATE_NOOP("FullscreenUI", "Patches the BIOS to skip the boot animation. Safe to enable.");
 TRANSLATE_NOOP("FullscreenUI", "Path");
@@ -8490,9 +8568,12 @@ TRANSLATE_NOOP("FullscreenUI", "Performance enhancement - jumps directly between
 TRANSLATE_NOOP("FullscreenUI", "Perspective Correct Colors");
 TRANSLATE_NOOP("FullscreenUI", "Perspective Correct Textures");
 TRANSLATE_NOOP("FullscreenUI", "Play a game hosted by another player over the network.");
+TRANSLATE_NOOP("FullscreenUI", "Players join with a session code and connect even when their routers block direct connections. Off: players join with the host's address and port.");
 TRANSLATE_NOOP("FullscreenUI", "Plays sound effects for events such as achievement unlocks and leaderboard submissions.");
+TRANSLATE_NOOP("FullscreenUI", "Plugs a device into the console's parallel port. The Xplorer/Xploder cheat cartridge needs a dump of its flash memory.");
 TRANSLATE_NOOP("FullscreenUI", "Port");
 TRANSLATE_NOOP("FullscreenUI", "Port {} Controller Type");
+TRANSLATE_NOOP("FullscreenUI", "Position of the switch on the cartridge. Most cartridge firmware only starts when the switch is on.");
 TRANSLATE_NOOP("FullscreenUI", "Post-Processing Settings");
 TRANSLATE_NOOP("FullscreenUI", "Post-processing chain cleared.");
 TRANSLATE_NOOP("FullscreenUI", "Post-processing shaders reloaded.");
@@ -8523,6 +8604,7 @@ TRANSLATE_NOOP("FullscreenUI", "Relaxed VSync");
 TRANSLATE_NOOP("FullscreenUI", "Release Date: %s");
 TRANSLATE_NOOP("FullscreenUI", "Reload Shaders");
 TRANSLATE_NOOP("FullscreenUI", "Reloads the shaders from disk, applying any changes.");
+TRANSLATE_NOOP("FullscreenUI", "Remove Border Overlay");
 TRANSLATE_NOOP("FullscreenUI", "Remove From Chain");
 TRANSLATE_NOOP("FullscreenUI", "Remove From List");
 TRANSLATE_NOOP("FullscreenUI", "Removed stage {} ({}).");
@@ -8547,9 +8629,11 @@ TRANSLATE_NOOP("FullscreenUI", "Return to the previous menu.");
 TRANSLATE_NOOP("FullscreenUI", "Reverses the game list sort order from the default (usually ascending to descending).");
 TRANSLATE_NOOP("FullscreenUI", "Rewind Save Frequency");
 TRANSLATE_NOOP("FullscreenUI", "Rewind Save Slots");
+TRANSLATE_NOOP("FullscreenUI", "Rewind Timeline");
 TRANSLATE_NOOP("FullscreenUI", "Rewind for {0} frames, lasting {1:.2f} seconds will require up to {2} MB of RAM and {3} MB of VRAM.");
 TRANSLATE_NOOP("FullscreenUI", "Rewind is disabled because runahead is enabled. Runahead will significantly increase system requirements.");
 TRANSLATE_NOOP("FullscreenUI", "Rewind is not enabled. Please note that enabling rewind may significantly increase system requirements.");
+TRANSLATE_NOOP("FullscreenUI", "Rewind is not enabled. Turn it on in Settings > Emulation.");
 TRANSLATE_NOOP("FullscreenUI", "Rich presence inactive or unsupported.");
 TRANSLATE_NOOP("FullscreenUI", "Riverhorse is a free and open-source simulator/emulator of the Sony PlayStation(TM) console, focusing on playability, speed, and long-term maintainability.");
 TRANSLATE_NOOP("FullscreenUI", "Round Upscaled Texture Coordinates");
@@ -8566,7 +8650,9 @@ TRANSLATE_NOOP("FullscreenUI", "Save Screenshot");
 TRANSLATE_NOOP("FullscreenUI", "Save State");
 TRANSLATE_NOOP("FullscreenUI", "Save State Compression");
 TRANSLATE_NOOP("FullscreenUI", "Save State On Exit");
+TRANSLATE_NOOP("FullscreenUI", "Save Sync");
 TRANSLATE_NOOP("FullscreenUI", "Saved {:%c}");
+TRANSLATE_NOOP("FullscreenUI", "Saves changes the cartridge makes to its flash memory back to the image file. This overwrites your dump, so keep a backup.");
 TRANSLATE_NOOP("FullscreenUI", "Saves state periodically so you can rewind any mistakes while playing.");
 TRANSLATE_NOOP("FullscreenUI", "Scaled Dithering");
 TRANSLATE_NOOP("FullscreenUI", "Scales internal VRAM resolution by the specified multiplier. Some games require 1x VRAM resolution.");
@@ -8596,6 +8682,7 @@ TRANSLATE_NOOP("FullscreenUI", "Selects the resolution scale that will be applie
 TRANSLATE_NOOP("FullscreenUI", "Selects the resolution to use in fullscreen modes.");
 TRANSLATE_NOOP("FullscreenUI", "Selects the view that the game list will open to.");
 TRANSLATE_NOOP("FullscreenUI", "Serial");
+TRANSLATE_NOOP("FullscreenUI", "Server Address");
 TRANSLATE_NOOP("FullscreenUI", "Session: {}");
 TRANSLATE_NOOP("FullscreenUI", "Set Input Binding");
 TRANSLATE_NOOP("FullscreenUI", "Set VRAM Write Dump Alpha Channel");
@@ -8623,16 +8710,20 @@ TRANSLATE_NOOP("FullscreenUI", "Show OSD Messages");
 TRANSLATE_NOOP("FullscreenUI", "Show Resolution");
 TRANSLATE_NOOP("FullscreenUI", "Show Speed");
 TRANSLATE_NOOP("FullscreenUI", "Show Status Indicators");
+TRANSLATE_NOOP("FullscreenUI", "Shows a black frame between frames on a display at twice the console's rate, such as 120 Hz, for sharper motion. Needs VSync and Sync To Host Refresh Rate.");
 TRANSLATE_NOOP("FullscreenUI", "Shows a visual history of frame times in the upper-left corner of the display.");
+TRANSLATE_NOOP("FullscreenUI", "Shows each join request in a session you host so you can accept or decline it. Off: players join straight away.");
 TRANSLATE_NOOP("FullscreenUI", "Shows enhancement settings in the bottom-right corner of the screen.");
 TRANSLATE_NOOP("FullscreenUI", "Shows icons in the lower-right corner of the screen when a challenge/primed achievement is active.");
 TRANSLATE_NOOP("FullscreenUI", "Shows information about input and audio latency in the top-right corner of the display.");
 TRANSLATE_NOOP("FullscreenUI", "Shows information about the emulated GPU in the top-right corner of the display.");
 TRANSLATE_NOOP("FullscreenUI", "Shows on-screen-display messages when events occur.");
 TRANSLATE_NOOP("FullscreenUI", "Shows persistent icons when turbo is active or when paused.");
+TRANSLATE_NOOP("FullscreenUI", "Shows sessions you host, your nickname and the game to everyone browsing open sessions, so they can join without a code.");
 TRANSLATE_NOOP("FullscreenUI", "Shows the current controller state of the system in the bottom-left corner of the display.");
 TRANSLATE_NOOP("FullscreenUI", "Shows the current emulation speed of the system in the top-right corner of the display as a percentage.");
 TRANSLATE_NOOP("FullscreenUI", "Shows the current rendering resolution of the system in the top-right corner of the display.");
+TRANSLATE_NOOP("FullscreenUI", "Shows the game without a border overlay.");
 TRANSLATE_NOOP("FullscreenUI", "Shows the game you are currently playing as part of your profile in Discord.");
 TRANSLATE_NOOP("FullscreenUI", "Shows the host's CPU usage based on threads in the top-right corner of the display.");
 TRANSLATE_NOOP("FullscreenUI", "Shows the host's GPU usage in the top-right corner of the display.");
@@ -8670,8 +8761,18 @@ TRANSLATE_NOOP("FullscreenUI", "Stretches the display to match the aspect ratio 
 TRANSLATE_NOOP("FullscreenUI", "Summary");
 TRANSLATE_NOOP("FullscreenUI", "Switches back to 4:3 display aspect ratio when displaying 24-bit content, usually FMVs.");
 TRANSLATE_NOOP("FullscreenUI", "Switches between full screen and windowed when the window is double-clicked.");
+TRANSLATE_NOOP("FullscreenUI", "Sync Folder");
+TRANSLATE_NOOP("FullscreenUI", "Sync Game Settings");
+TRANSLATE_NOOP("FullscreenUI", "Sync Memory Cards");
+TRANSLATE_NOOP("FullscreenUI", "Sync Now");
+TRANSLATE_NOOP("FullscreenUI", "Sync Save States");
 TRANSLATE_NOOP("FullscreenUI", "Sync To Host Refresh Rate");
+TRANSLATE_NOOP("FullscreenUI", "Sync With");
 TRANSLATE_NOOP("FullscreenUI", "Synchronizes presentation of the console's frames to the host. GSync/FreeSync users should enable Optimal Frame Pacing instead.");
+TRANSLATE_NOOP("FullscreenUI", "Syncs memory card files.");
+TRANSLATE_NOOP("FullscreenUI", "Syncs now. Riverhorse also syncs at startup, before a game boots and after it closes.");
+TRANSLATE_NOOP("FullscreenUI", "Syncs save states, including the one made when a game closes, so you can resume on another device.");
+TRANSLATE_NOOP("FullscreenUI", "Syncs the settings you change for individual games.");
 TRANSLATE_NOOP("FullscreenUI", "System");
 TRANSLATE_NOOP("FullscreenUI", "Temporarily disables all enhancements, useful when testing.");
 TRANSLATE_NOOP("FullscreenUI", "Test Unofficial Achievements");
@@ -8680,6 +8781,8 @@ TRANSLATE_NOOP("FullscreenUI", "Texture Replacements");
 TRANSLATE_NOOP("FullscreenUI", "The SDL input source supports most controllers.");
 TRANSLATE_NOOP("FullscreenUI", "The XInput source provides support for XBox 360/XBox One/XBox Series controllers.");
 TRANSLATE_NOOP("FullscreenUI", "The audio backend determines how frames produced by the emulator are submitted to the host.");
+TRANSLATE_NOOP("FullscreenUI", "The cartridge flash dump to load.");
+TRANSLATE_NOOP("FullscreenUI", "The rewind timeline is not available during netplay or in hardcore mode.");
 TRANSLATE_NOOP("FullscreenUI", "The selected memory card image will be used in shared mode for this slot.");
 TRANSLATE_NOOP("FullscreenUI", "Theme");
 TRANSLATE_NOOP("FullscreenUI", "This game has no achievements.");
@@ -8711,8 +8814,11 @@ TRANSLATE_NOOP("FullscreenUI", "Use Blit Swap Chain");
 TRANSLATE_NOOP("FullscreenUI", "Use Debug GPU Device");
 TRANSLATE_NOOP("FullscreenUI", "Use Global Setting");
 TRANSLATE_NOOP("FullscreenUI", "Use Old MDEC Routines");
+TRANSLATE_NOOP("FullscreenUI", "Use Relay Server");
 TRANSLATE_NOOP("FullscreenUI", "Use Single Card For Multi-Disc Games");
 TRANSLATE_NOOP("FullscreenUI", "Use Software Renderer For Readbacks");
+TRANSLATE_NOOP("FullscreenUI", "Used in the names of conflict copies. Empty uses this device's name.");
+TRANSLATE_NOOP("FullscreenUI", "Username");
 TRANSLATE_NOOP("FullscreenUI", "Username: {}");
 TRANSLATE_NOOP("FullscreenUI", "Uses PGXP for all instructions, not just memory operations.");
 TRANSLATE_NOOP("FullscreenUI", "Uses a blit presentation model instead of flipping. This may be needed on some systems.");
@@ -8727,6 +8833,8 @@ TRANSLATE_NOOP("FullscreenUI", "Version: %s");
 TRANSLATE_NOOP("FullscreenUI", "Vertex Cache");
 TRANSLATE_NOOP("FullscreenUI", "Vertical Sync (VSync)");
 TRANSLATE_NOOP("FullscreenUI", "WARNING: Your game is still saving to the memory card. Continuing to {0} may IRREVERSIBLY DESTROY YOUR MEMORY CARD. We recommend resuming your game and waiting 5 seconds for it to finish saving.\n\nDo you want to {0} anyway?");
+TRANSLATE_NOOP("FullscreenUI", "WebDAV address of a folder for Riverhorse's saves.");
+TRANSLATE_NOOP("FullscreenUI", "Website");
 TRANSLATE_NOOP("FullscreenUI", "When enabled and logged in, Riverhorse will scan for achievements on startup.");
 TRANSLATE_NOOP("FullscreenUI", "When enabled, Riverhorse will assume all achievements are locked and not send any unlock notifications to the server.");
 TRANSLATE_NOOP("FullscreenUI", "When enabled, Riverhorse will list achievements from unofficial sets. These achievements are not tracked by RetroAchievements.");
@@ -8739,9 +8847,12 @@ TRANSLATE_NOOP("FullscreenUI", "Widescreen Rendering");
 TRANSLATE_NOOP("FullscreenUI", "Wireframe Rendering");
 TRANSLATE_NOOP("FullscreenUI", "Writes textures which can be replaced to the dump directory.");
 TRANSLATE_NOOP("FullscreenUI", "Yes, {} now and risk memory card corruption.");
+TRANSLATE_NOOP("FullscreenUI", "Your WebDAV password, stored in settings.ini.");
+TRANSLATE_NOOP("FullscreenUI", "Your account on the WebDAV server.");
 TRANSLATE_NOOP("FullscreenUI", "\"Challenge\" mode for achievements, including leaderboard tracking. Disables save state, cheats, and slowdown functions.");
 TRANSLATE_NOOP("FullscreenUI", "\"PlayStation\" and \"PSX\" are registered trademarks of Sony Interactive Entertainment Europe Limited. This software is not affiliated in any way with Sony Interactive Entertainment.");
 TRANSLATE_NOOP("FullscreenUI", "change disc");
+TRANSLATE_NOOP("FullscreenUI", "host or host:port");
 TRANSLATE_NOOP("FullscreenUI", "reset");
 TRANSLATE_NOOP("FullscreenUI", "shut down");
 TRANSLATE_NOOP("FullscreenUI", "{:%H:%M}");

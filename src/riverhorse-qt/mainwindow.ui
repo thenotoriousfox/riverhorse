@@ -90,6 +90,7 @@
     <addaction name="actionCheats"/>
     <addaction name="menuCheats"/>
     <addaction name="actionScreenshot"/>
+    <addaction name="actionRewindTimeline"/>
     <addaction name="separator"/>
     <addaction name="actionCreateNetplaySession"/>
     <addaction name="actionJoinNetplaySession"/>
@@ -540,6 +541,14 @@
    </property>
    <property name="text">
     <string>Cheats...</string>
+   </property>
+  </action>
+  <action name="actionRewindTimeline">
+   <property name="icon">
+    <iconset theme="history-line"/>
+   </property>
+   <property name="text">
+    <string>Rewind &amp;Timeline...</string>
    </property>
   </action>
   <action name="actionCheatsToolbar">

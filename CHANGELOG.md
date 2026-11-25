@@ -5,6 +5,12 @@ Changes since the DuckStation `v0.1-7371` base. Releases are tagged
 
 ## Unreleased
 
+### New
+- Rewind timeline: a strip of rewind snapshots with thumbnails over the paused
+  game. Scrub with left and right to see each moment, then continue from it or
+  cancel back to where you were. Pause menu → Rewind Timeline, System → Rewind
+  Timeline, or the Open Rewind Timeline hotkey; needs rewind turned on.
+
 ### Changed
 - Riverhorse identifies itself to web services as `Riverhorse/<version> (<OS> <CPU>)`,
   the form RetroAchievements asks emulators to use.

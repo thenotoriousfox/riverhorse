@@ -27,6 +27,7 @@ void OnSystemDestroyed();
 void OnRunningGameChanged();
 
 void OpenPauseMenu();
+void OpenRewindTimeline();
 void OpenAchievementsWindow();
 bool IsAchievementsWindowOpen();
 void OpenLeaderboardsWindow();

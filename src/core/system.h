@@ -377,6 +377,15 @@ void SetTurboEnabled(bool enabled);
 bool IsRewinding();
 void SetRewindState(bool enabled);
 
+/// Rewind timeline. Snapshots are numbered from the oldest (0) to the newest.
+bool BeginRewindTimeline();
+bool IsRewindTimelineActive();
+u32 GetRewindSnapshotCount();
+GPUTexture* GetRewindSnapshotThumbnail(u32 index);
+float GetRewindSnapshotAge(u32 index);
+bool ShowRewindSnapshot(u32 index);
+void EndRewindTimeline(std::optional<u32> continue_from);
+
 void DoFrameStep();
 void DoToggleCheats();
 

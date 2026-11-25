@@ -284,6 +284,14 @@ DEFINE_HOTKEY("Rewind", TRANSLATE_NOOP("Hotkeys", "System"), TRANSLATE_NOOP("Hot
 })
 
 #ifndef __ANDROID__
+DEFINE_HOTKEY("OpenRewindTimeline", TRANSLATE_NOOP("Hotkeys", "System"),
+              TRANSLATE_NOOP("Hotkeys", "Open Rewind Timeline"), [](s32 pressed) {
+                if (!pressed && CanPause())
+                  FullscreenUI::OpenRewindTimeline();
+              })
+#endif
+
+#ifndef __ANDROID__
 DEFINE_HOTKEY("ToggleCheats", TRANSLATE_NOOP("Hotkeys", "System"), TRANSLATE_NOOP("Hotkeys", "Toggle Cheats"),
               [](s32 pressed) {
                 if (!pressed)

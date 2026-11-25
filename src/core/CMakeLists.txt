@@ -110,6 +110,8 @@ add_library(core
   playstation_mouse.h
   psf_loader.cpp
   psf_loader.h
+  rewind_timeline.cpp
+  rewind_timeline.h
   save_state_version.h
   save_sync.cpp
   save_sync.h

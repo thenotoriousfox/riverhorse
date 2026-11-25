@@ -75,6 +75,7 @@
 		<file>icons/black/svg/github-line.svg</file>
 		<file>icons/black/svg/global-line.svg</file>
 		<file>icons/black/svg/guncon-line.svg</file>
+		<file>icons/black/svg/history-line.svg</file>
 		<file>icons/black/svg/image-fill.svg</file>
 		<file>icons/black/svg/information-line.svg</file>
 		<file>icons/black/svg/joystick-line.svg</file>
@@ -306,6 +307,7 @@
 		<file>icons/white/svg/github-line.svg</file>
 		<file>icons/white/svg/global-line.svg</file>
 		<file>icons/white/svg/guncon-line.svg</file>
+		<file>icons/white/svg/history-line.svg</file>
 		<file>icons/white/svg/image-fill.svg</file>
 		<file>icons/white/svg/information-line.svg</file>
 		<file>icons/white/svg/joystick-line.svg</file>

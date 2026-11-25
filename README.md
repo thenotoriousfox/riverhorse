@@ -65,6 +65,7 @@ The current release is 1.3.0; downloads are on [riverhorse.app](https://riverhor
 - Fullscreen interface with dark, light and high-contrast themes
 - Home screen with "Continue Playing" and library cover shelves
 - In-game side panel with quick graphics toggles
+- Rewind timeline: scrub through rewind snapshots and carry on from any of them
 - Border overlays (bezels) around the game
 - Post-processing with GLSL, ReShade FX and libretro slang shader presets
 - MMPX (pixel art) and Cubic texture filters

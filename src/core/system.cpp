@@ -210,6 +210,7 @@ static void ExecuteUntilInterrupted();
 static void UnloadCheatList();
 static void UpdateGamePatches();
 static bool SaveRewindState();
+static void RenderRewindThumbnail(std::unique_ptr<GPUTexture>* thumbnail);
 static void DoRewind();
 
 static void SaveRunaheadState();
@@ -232,6 +233,7 @@ static constexpr u32 MAX_SKIPPED_DUPLICATE_FRAME_COUNT = 2; // 20fps minimum
 static constexpr u32 MAX_SKIPPED_TIMEOUT_FRAME_COUNT = 3;   // 15fps minimum
 static constexpr u32 MAX_HOST_REFRESH_MULTIPLE = 4;
 static constexpr u32 BLACK_FRAME_INSERTION_MULTIPLE = 2;
+static constexpr u32 REWIND_THUMBNAIL_SIZE = 256;
 
 static std::unique_ptr<INISettingsInterface> s_game_settings_interface;
 static std::unique_ptr<INISettingsInterface> s_input_settings_interface;
@@ -332,12 +334,21 @@ static std::optional<System::SaveStateBuffer> s_undo_load_state;
 
 static bool s_memory_saves_enabled = false;
 
-static std::deque<System::MemorySaveState> s_rewind_states;
+struct RewindSnapshot
+{
+  System::MemorySaveState state;
+  std::unique_ptr<GPUTexture> thumbnail;
+  u32 frame_number = 0;
+};
+
+static std::deque<RewindSnapshot> s_rewind_states;
 static s32 s_rewind_load_frequency = -1;
 static s32 s_rewind_load_counter = -1;
 static s32 s_rewind_save_frequency = -1;
 static s32 s_rewind_save_counter = -1;
 static bool s_rewinding_first_save = false;
+static std::optional<System::MemorySaveState> s_rewind_timeline_return_state;
+static u32 s_rewind_timeline_frame_number = 0;
 
 static std::deque<System::MemorySaveState> s_runahead_states;
 static bool s_runahead_replay_pending = false;
@@ -5057,6 +5068,7 @@ void System::CalculateRewindMemoryUsage(u32 num_saves, u32 resolution_scale, u64
 void System::ClearMemorySaveStates()
 {
   s_rewind_states.clear();
+  s_rewind_timeline_return_state.reset();
   s_runahead_states.clear();
 }
 
@@ -5138,20 +5150,22 @@ bool System::SaveRewindState()
 
   // try to reuse the frontmost slot
   const u32 save_slots = g_settings.rewind_save_slots;
-  MemorySaveState mss;
+  RewindSnapshot snapshot;
   while (s_rewind_states.size() >= save_slots)
   {
-    mss = std::move(s_rewind_states.front());
+    snapshot = std::move(s_rewind_states.front());
     s_rewind_states.pop_front();
   }
 
-  if (!SaveMemoryState(&mss))
+  if (!SaveMemoryState(&snapshot.state))
     return false;
 
-  s_rewind_states.push_back(std::move(mss));
+  RenderRewindThumbnail(&snapshot.thumbnail);
+  snapshot.frame_number = s_frame_number;
+  s_rewind_states.push_back(std::move(snapshot));
 
 #ifdef PROFILE_MEMORY_SAVE_STATES
-  DEV_LOG("Saved rewind state ({} bytes, took {:.4f} ms)", s_rewind_states.back().state_size,
+  DEV_LOG("Saved rewind state ({} bytes, took {:.4f} ms)", s_rewind_states.back().state.state_size,
           save_timer.GetTimeMilliseconds());
 #endif
 
@@ -5162,7 +5176,8 @@ bool System::LoadRewindState(u32 skip_saves /*= 0*/, bool consume_state /*=true 
 {
   while (skip_saves > 0 && !s_rewind_states.empty())
   {
-    g_gpu_device->RecycleTexture(std::move(s_rewind_states.back().vram_texture));
+    g_gpu_device->RecycleTexture(std::move(s_rewind_states.back().state.vram_texture));
+    g_gpu_device->RecycleTexture(std::move(s_rewind_states.back().thumbnail));
     s_rewind_states.pop_back();
     skip_saves--;
   }
@@ -5174,7 +5189,7 @@ bool System::LoadRewindState(u32 skip_saves /*= 0*/, bool consume_state /*=true 
   Common::Timer load_timer;
 #endif
 
-  if (!LoadMemoryState(s_rewind_states.back()))
+  if (!LoadMemoryState(s_rewind_states.back().state))
     return false;
 
   if (consume_state)
@@ -5185,6 +5200,100 @@ bool System::LoadRewindState(u32 skip_saves /*= 0*/, bool consume_state /*=true 
 #endif
 
   return true;
+}
+
+void System::RenderRewindThumbnail(std::unique_ptr<GPUTexture>* thumbnail)
+{
+  GSVector4i display_rect, draw_rect;
+  g_gpu->CalculateDrawRect(REWIND_THUMBNAIL_SIZE, REWIND_THUMBNAIL_SIZE, true, true, &display_rect, &draw_rect);
+  const u32 width = static_cast<u32>(display_rect.width());
+  const u32 height = static_cast<u32>(display_rect.height());
+  if (*thumbnail && ((*thumbnail)->GetWidth() != width || (*thumbnail)->GetHeight() != height))
+    g_gpu_device->RecycleTexture(std::move(*thumbnail));
+  if (width == 0 || height == 0)
+    return;
+
+  if (!*thumbnail)
+  {
+    *thumbnail = g_gpu_device->FetchTexture(width, height, 1, 1, 1, GPUTexture::Type::RenderTarget,
+                                            GPUTexture::Format::RGBA8);
+    if (!*thumbnail)
+      return;
+  }
+
+  if (!g_gpu->RenderDisplayAtInternalResolution(thumbnail->get(), false))
+    g_gpu_device->RecycleTexture(std::move(*thumbnail));
+}
+
+bool System::BeginRewindTimeline()
+{
+  if (!IsValid() || s_rewind_states.empty() || Netplay::IsActive() || Achievements::IsHardcoreModeActive())
+    return false;
+
+  s_rewind_timeline_return_state.emplace();
+  if (!SaveMemoryState(&s_rewind_timeline_return_state.value()))
+  {
+    s_rewind_timeline_return_state.reset();
+    return false;
+  }
+
+  s_rewind_timeline_frame_number = s_frame_number;
+  return true;
+}
+
+bool System::IsRewindTimelineActive()
+{
+  return s_rewind_timeline_return_state.has_value();
+}
+
+u32 System::GetRewindSnapshotCount()
+{
+  return static_cast<u32>(s_rewind_states.size());
+}
+
+GPUTexture* System::GetRewindSnapshotThumbnail(u32 index)
+{
+  return s_rewind_states[index].thumbnail.get();
+}
+
+float System::GetRewindSnapshotAge(u32 index)
+{
+  return static_cast<float>(s_rewind_timeline_frame_number - s_rewind_states[index].frame_number) /
+         s_throttle_frequency;
+}
+
+bool System::ShowRewindSnapshot(u32 index)
+{
+  if (!IsRewindTimelineActive() || index >= s_rewind_states.size())
+    return false;
+
+  if (!LoadMemoryState(s_rewind_states[index].state))
+    return false;
+
+  InvalidateDisplay();
+  return true;
+}
+
+void System::EndRewindTimeline(std::optional<u32> continue_from)
+{
+  if (!IsRewindTimelineActive())
+    return;
+
+  if (continue_from.has_value() && continue_from.value() < s_rewind_states.size())
+  {
+    if (LoadMemoryState(s_rewind_states[continue_from.value()].state))
+    {
+      s_rewind_states.erase(s_rewind_states.begin() + continue_from.value() + 1, s_rewind_states.end());
+      s_runahead_states.clear();
+    }
+  }
+  else
+  {
+    LoadMemoryState(s_rewind_timeline_return_state.value());
+  }
+
+  s_rewind_timeline_return_state.reset();
+  InvalidateDisplay();
 }
 
 bool System::IsRewinding()
