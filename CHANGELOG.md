@@ -59,6 +59,7 @@ Changes since the DuckStation `v0.1-7371` base. Releases are tagged
   each start: their hashes are kept in `cache/bios.cache` until a file
   changes, so only the chosen image is read (about 40 MB less reading with a
   full BIOS folder on a handheld).
+- Slang shader presets showed a black picture with the Vulkan renderer.
 - PGXP uses about 30 MB less memory with the console's 2 MB of RAM: a reset
   cleared memory for the 8 MB development RAM.
 - libretro core: no longer starts every Vulkan driver at load. On frontends

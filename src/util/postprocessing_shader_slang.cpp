@@ -1035,7 +1035,8 @@ bool PostProcessing::SlangShader::CropOriginal(GPUTexture* input_color, GSVector
   g_gpu_device->SetPipeline(m_crop_pipeline.get());
   g_gpu_device->SetTextureSampler(0, input_color, g_gpu_device->GetNearestSampler());
   g_gpu_device->SetViewportAndScissor(GSVector4i(0, 0, original->GetWidth(), original->GetHeight()));
-  g_gpu_device->PushUniformBuffer(uniforms, sizeof(uniforms));
+  std::memcpy(g_gpu_device->MapUniformBuffer(sizeof(uniforms)), uniforms, sizeof(uniforms));
+  g_gpu_device->UnmapUniformBuffer(sizeof(uniforms));
   g_gpu_device->Draw(3, 0);
   original->MakeReadyForSampling();
   return true;
