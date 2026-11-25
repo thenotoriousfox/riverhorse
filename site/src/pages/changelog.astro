@@ -1,0 +1,10 @@
+---
+import Page from '../layouts/Page.astro';
+import {readRepoFile, renderMarkdown} from '../lib/repo-markdown';
+
+const html = (await renderMarkdown(await readRepoFile('CHANGELOG.md')))
+	.replace(/<h2 id="[^"]*">(\d+\.\d+\.\d+)(.*?)<\/h2>/g, '<h2 id="v$1"><a href="#v$1">$1</a>$2</h2>');
+---
+<Page title="Changelog" description="Everything that changed in each Riverhorse release.">
+	<Fragment set:html={html} />
+</Page>

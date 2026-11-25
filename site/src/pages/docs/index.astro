@@ -1,0 +1,13 @@
+---
+import Docs from '../../layouts/Docs.astro';
+import {DOCS} from '../../lib/docs';
+---
+<Docs title="Documentation" description="Setting up Riverhorse: BIOS, the libretro core, netplay, save sync and building from source.">
+	<h1>Documentation</h1>
+	<p>New to Riverhorse? Download it from the <a href="/#download">home page</a>, then start with <a href="/docs/getting-started">Getting started</a>: you'll need a BIOS from your own console.</p>
+	<ul class="doc-list">
+		{DOCS.map(doc => <li><a href={`/docs/${doc.slug}`}>{doc.title}</a><span>{doc.summary}</span></li>)}
+		<li><a href="/compatibility">Compatibility</a><span>Games with known problems, LibCrypt discs and automatic settings.</span></li>
+		<li><a href="/changelog">Changelog</a><span>Everything that changed in each release.</span></li>
+	</ul>
+</Docs>

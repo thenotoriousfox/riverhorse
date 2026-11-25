@@ -1,0 +1,17 @@
+---
+import Docs from '../../layouts/Docs.astro';
+import {DOCS, type DocPage} from '../../lib/docs';
+import {readmeSections, renderMarkdown} from '../../lib/repo-markdown';
+
+export function getStaticPaths() {
+	return DOCS.map(doc => ({params: {slug: doc.slug}, props: {doc}}));
+}
+
+const {doc} = Astro.props as {doc: DocPage};
+const sections = await readmeSections(doc.sections);
+const body = doc.sections.length === 1 ? sections.replace(/^## .*\n/, '') : sections;
+const html = await renderMarkdown(`# ${doc.title}\n\n${body}`);
+---
+<Docs title={doc.title} description={doc.summary} slug={doc.slug}>
+	<Fragment set:html={html} />
+</Docs>

@@ -30,7 +30,10 @@ const path = Astro.url.pathname;
 	<meta property="og:url" content={canonical} />
 	<meta property="og:title" content={fullTitle} />
 	<meta property="og:description" content={description} />
-	<meta property="og:image" content={new URL('/riverhorse.png', Astro.site)} />
+	<meta property="og:image" content={new URL('/og.png', Astro.site)} />
+	<meta property="og:image:width" content="1200" />
+	<meta property="og:image:height" content="630" />
+	<meta name="twitter:card" content="summary_large_image" />
 	<meta name="theme-color" content="#16131d" />
 </head>
 <body>
@@ -39,6 +42,8 @@ const path = Astro.url.pathname;
 		<nav aria-label="Main">
 			<a href="/#download">Download</a>
 			<a href="/docs" aria-current={path.startsWith('/docs') ? 'page' : undefined}>Docs</a>
+			<a href="/compatibility" aria-current={path.startsWith('/compatibility') ? 'page' : undefined}>Compatibility</a>
+			<a href="/changelog" aria-current={path.startsWith('/changelog') ? 'page' : undefined}>Changelog</a>
 			<a href="https://github.com/thenotoriousfox/riverhorse">GitHub</a>
 		</nav>
 	</header>

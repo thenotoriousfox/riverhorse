@@ -164,3 +164,91 @@ footer {
 }
 
 footer p { margin: 0.4rem 0; }
+
+.version { margin-top: 1rem; color: var(--muted); font-size: 0.95rem; }
+
+.shots {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr));
+  gap: 1.25rem;
+  margin-top: 2rem;
+}
+
+.shots figure { margin: 0; }
+.shots img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  object-fit: contain;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #000;
+}
+.shots figcaption { margin-top: 0.5rem; color: var(--muted); font-size: 0.92rem; }
+
+.platform.detected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+
+.docs {
+  display: grid;
+  grid-template-columns: 14rem minmax(0, 1fr);
+  gap: 2.5rem;
+  align-items: start;
+}
+
+.docs-nav {
+  position: sticky;
+  top: 5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding-top: 1.5rem;
+}
+
+.docs-nav a {
+  padding: 0.4rem 0.75rem;
+  border-radius: 8px;
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.docs-nav a:hover { background: var(--surface); color: var(--text); }
+.docs-nav a[aria-current="page"] { background: var(--surface-light); color: var(--text); font-weight: 600; }
+.docs-body { max-width: 48rem; }
+
+@media (max-width: 52rem) {
+  .docs { grid-template-columns: 1fr; gap: 0; }
+  .docs-nav { position: static; flex-direction: row; flex-wrap: wrap; padding-top: 0; }
+}
+
+.doc-list { list-style: none; padding: 0; }
+.doc-list li { padding: 0.9rem 0; border-bottom: 1px solid var(--line); }
+.doc-list a { display: block; font-weight: 600; font-size: 1.1rem; }
+.doc-list span { color: var(--muted); }
+
+.filters { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; }
+.filters input[type="search"] {
+  flex: 1 1 18rem;
+  padding: 0.6rem 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}
+#count { color: var(--muted); }
+
+.tag {
+  display: inline-block;
+  margin: 0.1rem 0.25rem 0.1rem 0;
+  padding: 0.05rem 0.5rem;
+  border-radius: 999px;
+  background: var(--surface-light);
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+.tag.problem { background: #5b1f2e; color: #ffd6de; }
+.tag.sbi { background: #3b2a78; color: #e4dcff; }
+
+.bar nav { flex-wrap: wrap; justify-content: flex-end; }
+#games td:nth-child(2) code { white-space: nowrap; }
+#games { display: table; width: 100%; }

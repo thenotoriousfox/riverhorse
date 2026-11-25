@@ -1,0 +1,23 @@
+---
+import Page from './Page.astro';
+import {DOCS} from '../lib/docs';
+
+interface Props {
+	title: string;
+	description: string;
+	slug?: string;
+}
+
+const {title, description, slug} = Astro.props;
+---
+<Page title={title} description={description} wide>
+	<div class="docs">
+		<nav class="docs-nav" aria-label="Documentation">
+			<a href="/docs" aria-current={slug ? undefined : 'page'}>Overview</a>
+			{DOCS.map(doc => <a href={`/docs/${doc.slug}`} aria-current={doc.slug === slug ? 'page' : undefined}>{doc.title}</a>)}
+			<a href="/compatibility">Compatibility</a>
+			<a href="/changelog">Changelog</a>
+		</nav>
+		<article class="prose docs-body"><slot /></article>
+	</div>
+</Page>

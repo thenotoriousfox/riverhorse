@@ -1,0 +1,66 @@
+---
+import Page from '../layouts/Page.astro';
+import {compatibilityRows} from '../lib/gamedb';
+
+const rows = await compatibilityRows();
+const problems = rows.filter(row => row.problem).length;
+const sbi = rows.filter(row => row.needsSbi).length;
+---
+<Page title="Compatibility" description="PlayStation games Riverhorse treats specially: known problems, LibCrypt discs and automatic settings." wide>
+	<div class="prose wide-tables">
+		<h1>Compatibility</h1>
+		<p>Riverhorse plays the PlayStation library as it is, with no per-game setup. This list covers the {rows.length.toLocaleString('en')} games its built-in game database treats specially:</p>
+		<ul>
+			<li><strong>Known problems</strong> ({problems}): games that still have a recorded issue.</li>
+			<li><strong>Needs an SBI file</strong> ({sbi}): PAL discs with LibCrypt protection. Put the disc's <code>.sbi</code> file next to it with the same name, or use a CHD image with subchannel data. See <a href="/docs/getting-started#bios">Getting started</a>.</li>
+			<li><strong>Automatic settings</strong>: settings Riverhorse changes for that game so it runs correctly. You don't need to do anything.</li>
+		</ul>
+		<p>A game missing from this list has nothing special recorded. If one doesn't work, please <a href="https://github.com/thenotoriousfox/riverhorse/issues">report it</a>.</p>
+
+		<p class="filters">
+			<input id="search" type="search" placeholder="Search by title or serial" aria-label="Search by title or serial" />
+			<label><input id="only-problems" type="checkbox" /> Known problems only</label>
+			<span id="count" aria-live="polite"></span>
+		</p>
+
+		<table id="games">
+			<thead><tr><th>Game</th><th>Serial</th><th>Notes</th></tr></thead>
+			<tbody>
+				{rows.map(row => (
+					<tr data-search={`${row.title} ${row.serial}`.toLowerCase()} data-problem={row.problem ? '1' : undefined}>
+						<td>{row.title}</td>
+						<td><code>{row.serial}</code></td>
+						<td>
+							{row.problem && <span class="tag problem">{row.problem}</span>}
+							{row.needsSbi && <span class="tag sbi">Needs an SBI file</span>}
+							{row.adjustments.map(label => <span class="tag">{label}</span>)}
+						</td>
+					</tr>
+				))}
+			</tbody>
+		</table>
+	</div>
+</Page>
+
+<script>
+	const search = document.getElementById('search') as HTMLInputElement;
+	const onlyProblems = document.getElementById('only-problems') as HTMLInputElement;
+	const count = document.getElementById('count')!;
+	const rows = Array.from(document.querySelectorAll<HTMLTableRowElement>('#games tbody tr'));
+
+	function filter() {
+		const words = search.value.toLowerCase().split(/\s+/).filter(Boolean);
+		let shown = 0;
+		for (const row of rows) {
+			const visible = (!onlyProblems.checked || row.dataset.problem === '1')
+				&& words.every(word => row.dataset.search!.includes(word));
+			row.hidden = !visible;
+			if (visible) shown++;
+		}
+		count.textContent = `${shown.toLocaleString('en')} games`;
+	}
+
+	search.addEventListener('input', filter);
+	onlyProblems.addEventListener('change', filter);
+	filter();
+</script>
