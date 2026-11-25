@@ -195,30 +195,31 @@ if(WIN32)
     vcruntimecheck.cpp
   )
 
-  # We want a Windows subsystem application not console.
   set_target_properties(riverhorse PROPERTIES
     WIN32_EXECUTABLE TRUE
     DEBUG_POSTFIX "-debug")
 
-  # Copy in Qt DLLs. Borrowed from Dolphin.
-  get_target_property(MOC_EXECUTABLE_LOCATION Qt6::moc IMPORTED_LOCATION)
-  get_filename_component(QT_BINARY_DIRECTORY "${MOC_EXECUTABLE_LOCATION}" DIRECTORY)
-  find_program(WINDEPLOYQT_EXE windeployqt HINTS "${QT_BINARY_DIRECTORY}")
+  get_target_property(QT_CORE_DLL Qt6::Core IMPORTED_LOCATION_RELEASE)
+  get_filename_component(QT_DLL_DIR "${QT_CORE_DLL}" DIRECTORY)
+  get_filename_component(QT_PLUGINS_DIR "${QT_DLL_DIR}/../plugins" ABSOLUTE)
+  set(QT_DLLS Qt6Core Qt6Gui Qt6Widgets Qt6Svg)
+  list(TRANSFORM QT_DLLS PREPEND "${QT_DLL_DIR}/")
+  list(TRANSFORM QT_DLLS APPEND ".dll")
   add_custom_command(TARGET riverhorse POST_BUILD
-    COMMAND "${CMAKE_COMMAND}" -E env PATH="${QT_BINARY_DIRECTORY}"
-            "${WINDEPLOYQT_EXE}" --libdir="${CMAKE_RUNTIME_OUTPUT_DIRECTORY}"
-                                 --plugindir="${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/QtPlugins"
-                                 $<IF:$<CONFIG:Debug>,--debug,--release>
-                                 --no-compiler-runtime
-                                 --no-system-d3d-compiler
-                                 --no-system-dxc-compiler
-                                 --no-translations
-                                 "$<TARGET_FILE:riverhorse>"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${QT_DLLS} "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}"
   )
+  file(GLOB_RECURSE QT_PLUGIN_DLLS RELATIVE "${QT_PLUGINS_DIR}" "${QT_PLUGINS_DIR}/*.dll")
+  foreach(QT_PLUGIN_DLL IN LISTS QT_PLUGIN_DLLS)
+    get_filename_component(QT_PLUGIN_SUBDIR "${QT_PLUGIN_DLL}" DIRECTORY)
+    add_custom_command(TARGET riverhorse POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/QtPlugins/${QT_PLUGIN_SUBDIR}"
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different "${QT_PLUGINS_DIR}/${QT_PLUGIN_DLL}" "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/QtPlugins/${QT_PLUGIN_SUBDIR}"
+    )
+  endforeach()
   add_custom_command(TARGET riverhorse POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/qt.conf.win" "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/qt.conf"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_SOURCE_DIR}/data/LICENSE.txt" "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}"
   )
-  #set_source_files_properties(${TS_FILES} PROPERTIES OUTPUT_LOCATION "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/translations")
 
   set(DEPS_TO_COPY cpuinfo.dll discord-rpc.dll freetype.dll harfbuzz.dll libjpeg.dll libpng16.dll libsharpyuv.dll libwebp.dll
                    SDL2.dll shaderc_shared.dll soundtouch.dll spirv-cross-c-shared.dll zlib1.dll zstd.dll)

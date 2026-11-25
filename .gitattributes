@@ -5,10 +5,6 @@
 *.hlsl text
 *.xml text
 
-*.sln text eol=crlf
-*.vcxproj text eol=crlf
-*.vcxproj.filter text eol=crlf
-
 *.sh text eol=lf
 CMakeLists.txt text eol=lf
 

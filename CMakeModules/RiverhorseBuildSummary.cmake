@@ -36,13 +36,3 @@ Riverhorse only supports the Clang and MSVC compilers.
 No support will be provided, continue at your own risk.
 *********************************************************")
 endif()
-
-if(WIN32)
-  message(WARNING "
-*************** UNSUPPORTED CONFIGURATION ***************
-You are compiling Riverhorse with CMake on Windows.
-It may not even build successfully.
-Riverhorse only supports MSBuild on Windows.
-No support will be provided, continue at your own risk.
-*********************************************************")
-endif()

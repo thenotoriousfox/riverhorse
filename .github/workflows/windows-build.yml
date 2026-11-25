@@ -1,0 +1,102 @@
+name: Windows Build
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+jobs:
+  windows-build:
+    strategy:
+      matrix:
+        include:
+          - arch: x64
+            artifact: windows
+            vcvars: x64
+            cmake_args: ""
+          - arch: arm64
+            artifact: windows-arm64
+            vcvars: amd64_arm64
+            cmake_args: >-
+              -DCMAKE_TOOLCHAIN_FILE=scripts/deps/cmake-toolchain-windows-arm64.cmake
+              -DCMAKE_C_COMPILER_TARGET=arm64-pc-windows-msvc
+              -DCMAKE_CXX_COMPILER_TARGET=arm64-pc-windows-msvc
+              -DQT_HOST_PATH=%CD%/dep/msvc/deps-x64
+              -DENABLE_OPENGL=OFF
+    runs-on: windows-2022
+    timeout-minutes: 120
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Cache Dependencies
+      id: cache-deps
+      uses: actions/cache@v4
+      with:
+        path: |
+          dep/msvc/deps-arm64
+          dep/msvc/deps-x64
+        key: deps ${{ hashFiles('scripts/deps/build-dependencies-windows-arm64.bat', 'scripts/deps/build-dependencies-windows-x64.bat') }}
+
+    - name: Build X64 Dependencies
+      if: steps.cache-deps.outputs.cache-hit != 'true'
+      env:
+        DEBUG: 0
+      run: scripts/deps/build-dependencies-windows-x64.bat
+
+    - name: Build ARM64 Dependencies
+      if: steps.cache-deps.outputs.cache-hit != 'true'
+      env:
+        DEBUG: 0
+      run: scripts/deps/build-dependencies-windows-arm64.bat
+
+    - name: Initialize build tag
+      shell: cmd
+      run: |
+        echo #pragma once > src/scmversion/tag.h
+
+    - name: Tag as release build
+      shell: cmd
+      run: |
+        echo #define SCM_RELEASE_ASSET "riverhorse-windows-${{ matrix.arch }}-release.zip" >> src/scmversion/tag.h
+
+    - name: Update RC version fields
+      shell: cmd
+      run: |
+        cd src\scmversion
+        call update_rc_version.bat
+        cd ..\..
+        git update-index --assume-unchanged src/riverhorse-qt/riverhorse-qt.rc
+
+    - name: Compile release build
+      shell: cmd
+      run: |
+        call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvarsall.bat" ${{ matrix.vcvars }}
+        cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON ^
+          -DCMAKE_C_COMPILER="%VCINSTALLDIR%Tools\Llvm\x64\bin\clang-cl.exe" ^
+          -DCMAKE_CXX_COMPILER="%VCINSTALLDIR%Tools\Llvm\x64\bin\clang-cl.exe" ^
+          -DCMAKE_PREFIX_PATH="%CD%/dep/msvc/deps-${{ matrix.arch }}" ${{ matrix.cmake_args }} || exit /b 1
+        cmake --build build --parallel || exit /b 1
+
+    - name: Create symbols archive
+      shell: cmd
+      run: |
+        "C:\Program Files\7-Zip\7z.exe" a riverhorse-windows-${{ matrix.arch }}-release-symbols.zip ./build/bin/*.pdb
+
+    - name: Remove extra bloat before archiving
+      shell: cmd
+      run: |
+        del /Q build\bin\*.pdb build\bin\*.exp build\bin\*.lib build\bin\*.ilk
+        rename build\bin\riverhorse.exe riverhorse-qt-${{ matrix.arch == 'arm64' && 'ARM64' || 'x64' }}-ReleaseLTCG.exe
+
+    - name: Create release archive
+      shell: cmd
+      run: |
+        "C:\Program Files\7-Zip\7z.exe" a -r riverhorse-windows-${{ matrix.arch }}-release.zip ./build/bin/*
+
+    - name: Upload release artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.artifact }}
+        path: "riverhorse-windows-${{ matrix.arch }}-release*.zip"
+        retention-days: 1

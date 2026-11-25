@@ -113,6 +113,24 @@ build-essential clang cmake curl extra-cmake-modules git libasound2-dev libcurl4
 4. Build: `ninja -C build-release`
 5. Run: `./build-release/bin/riverhorse`
 
+## 🛠️ Building on Windows
+
+Needs Visual Studio 2022 (or its Build Tools) with the C++ and "C++ Clang
+tools for Windows" components.
+
+1. Build the dependencies into `dep\msvc\deps-x64`:
+   `scripts\deps\build-dependencies-windows-x64.bat`
+2. From an "x64 Native Tools Command Prompt", configure:
+   ```
+   cmake -B build-release -G Ninja -DCMAKE_BUILD_TYPE=Release ^
+     -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON ^
+     -DCMAKE_C_COMPILER="%VCINSTALLDIR%Tools\Llvm\x64\bin\clang-cl.exe" ^
+     -DCMAKE_CXX_COMPILER="%VCINSTALLDIR%Tools\Llvm\x64\bin\clang-cl.exe" ^
+     -DCMAKE_PREFIX_PATH="%CD%\dep\msvc\deps-x64"
+   ```
+3. Build: `ninja -C build-release`
+4. Run: `build-release\bin\riverhorse.exe`
+
 ---
 
 ## 🧩 libretro core
