@@ -24,6 +24,8 @@ Changes since the DuckStation `v0.1-7371` base. Releases are tagged
   types, and a Multitap core option for up to 8 players (users 3 to 5 on
   port 1's Multitap, 6 to 8 on port 2's). Light guns aim with the frontend's
   light gun input; shooting off-screen reloads.
+- libretro core: describes the console's RAM and scratchpad to the frontend
+  as memory maps, so RetroAchievements can read the scratchpad too.
 
 ### Changes
 - Hosted sessions are only listed when the host turns on "List in the

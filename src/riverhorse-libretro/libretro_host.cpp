@@ -3,6 +3,7 @@
 
 #include "core/achievements.h"
 #include "core/bus.h"
+#include "core/cpu_core.h"
 #include "core/cheats.h"
 #include "core/fullscreen_ui.h"
 #include "core/game_list.h"
@@ -59,6 +60,7 @@ static retro_game_geometry GetGeometry();
 static void UpdateGeometry();
 static void ApplyCoreOptions();
 static void RegisterDiscControl();
+static void RegisterMemoryMaps();
 static void UpdateCheats();
 static bool BootGame();
 static bool SetupHardwareOutput();
@@ -313,6 +315,19 @@ void LibretroHost::UpdateCheats()
   }
 
   System::SetCheatList(list->GetCodeCount() > 0 ? std::move(list) : nullptr);
+}
+
+void LibretroHost::RegisterMemoryMaps()
+{
+  static retro_memory_descriptor descriptors[] = {
+    {RETRO_MEMDESC_SYSTEM_RAM, nullptr, 0, 0x00000000, 0, 0, Bus::RAM_2MB_SIZE, "RAM"},
+    {0, nullptr, 0, 0x1F800000, 0, 0, CPU::SCRATCHPAD_SIZE, "SCRATCH"},
+  };
+  descriptors[0].ptr = Bus::g_unprotected_ram;
+  descriptors[1].ptr = CPU::g_state.scratchpad.data();
+
+  retro_memory_map map = {descriptors, static_cast<unsigned>(std::size(descriptors))};
+  s_environment(RETRO_ENVIRONMENT_SET_MEMORY_MAPS, &map);
 }
 
 bool LibretroHost::BootGame()
@@ -667,6 +682,8 @@ RETRO_API bool retro_load_game(const retro_game_info* game)
     ERROR_LOG("Failed to start up: {}", error.GetDescription());
     return false;
   }
+
+  LibretroHost::RegisterMemoryMaps();
 
   s_game_path = game->path;
   s_video_output = VideoOutput::Readback;
