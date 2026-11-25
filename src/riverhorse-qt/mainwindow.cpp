@@ -1375,6 +1375,11 @@ void MainWindow::onViewGamePropertiesActionTriggered()
   });
 }
 
+void MainWindow::onWebsiteActionTriggered()
+{
+  QtUtils::OpenURL(this, "https://riverhorse.app/");
+}
+
 void MainWindow::onGitHubRepositoryActionTriggered()
 {
   QtUtils::OpenURL(this, "https://github.com/thenotoriousfox/riverhorse/");
@@ -2119,6 +2124,7 @@ void MainWindow::connectSignals()
   connect(m_ui.actionViewGameGrid, &QAction::triggered, this, &MainWindow::onViewGameGridActionTriggered);
   connect(m_ui.actionViewSystemDisplay, &QAction::triggered, this, &MainWindow::onViewSystemDisplayTriggered);
   connect(m_ui.actionViewGameProperties, &QAction::triggered, this, &MainWindow::onViewGamePropertiesActionTriggered);
+  connect(m_ui.actionWebsite, &QAction::triggered, this, &MainWindow::onWebsiteActionTriggered);
   connect(m_ui.actionGitHubRepository, &QAction::triggered, this, &MainWindow::onGitHubRepositoryActionTriggered);
   connect(m_ui.actionIssueTracker, &QAction::triggered, this, &MainWindow::onIssueTrackerActionTriggered);
   connect(m_ui.actionDiscordServer, &QAction::triggered, this, &MainWindow::onDiscordServerActionTriggered);
@@ -2934,11 +2940,10 @@ void MainWindow::checkForUpdates(bool display_message)
       QString message;
 #ifdef _WIN32
       message =
-        tr("<p>Sorry, you are trying to update a Riverhorse version which is not an official GitHub release. To "
+        tr("<p>Sorry, you are trying to update a Riverhorse version which is not an official release. To "
            "prevent incompatibilities, the auto-updater is only enabled on official builds.</p>"
-           "<p>To obtain an official build, please follow the instructions under \"Downloading and Running\" at the "
-           "link below:</p>"
-           "<p><a href=\"https://github.com/thenotoriousfox/riverhorse/\">https://github.com/thenotoriousfox/riverhorse/</a></p>");
+           "<p>Official builds can be downloaded from the website:</p>"
+           "<p><a href=\"https://riverhorse.app/\">https://riverhorse.app/</a></p>");
 #else
       message = tr("Automatic updating is not supported on the current platform.");
 #endif

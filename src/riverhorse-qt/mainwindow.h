@@ -170,6 +170,7 @@ private Q_SLOTS:
   void onViewGameGridActionTriggered();
   void onViewSystemDisplayTriggered();
   void onViewGamePropertiesActionTriggered();
+  void onWebsiteActionTriggered();
   void onGitHubRepositoryActionTriggered();
   void onIssueTrackerActionTriggered();
   void onDiscordServerActionTriggered();

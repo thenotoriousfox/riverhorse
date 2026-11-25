@@ -7914,7 +7914,9 @@ void FullscreenUI::DrawAboutWindow()
     ImGui::NewLine();
 
     BeginMenuButtons();
-    if (ActiveButton(FSUI_ICONSTR(ICON_FA_GLOBE, "GitHub Repository"), false))
+    if (ActiveButton(FSUI_ICONSTR(ICON_FA_GLOBE, "Website"), false))
+      ExitFullscreenAndOpenURL("https://riverhorse.app/");
+    if (ActiveButton(FSUI_ICONSTR(ICON_FA_CODE, "GitHub Repository"), false))
       ExitFullscreenAndOpenURL("https://github.com/thenotoriousfox/riverhorse/");
     if (ActiveButton(FSUI_ICONSTR(ICON_FA_COMMENT, "Discord Server"), false))
       ExitFullscreenAndOpenURL("https://hippos-linux.org/discord");

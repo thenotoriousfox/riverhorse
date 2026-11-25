@@ -148,6 +148,7 @@
     <property name="title">
      <string>&amp;Help</string>
     </property>
+    <addaction name="actionWebsite"/>
     <addaction name="actionGitHubRepository"/>
     <addaction name="actionIssueTracker"/>
     <addaction name="actionDiscordServer"/>
@@ -459,6 +460,14 @@
   <action name="actionResolution_Scale">
    <property name="text">
     <string>Resolution Scale</string>
+   </property>
+  </action>
+  <action name="actionWebsite">
+   <property name="icon">
+    <iconset theme="global-line"/>
+   </property>
+   <property name="text">
+    <string>&amp;Website...</string>
    </property>
   </action>
   <action name="actionGitHubRepository">
