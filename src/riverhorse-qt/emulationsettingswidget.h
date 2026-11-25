@@ -23,7 +23,7 @@ private Q_SLOTS:
   void onTurboSpeedIndexChanged(int index);
   void onOptimalFramePacingChanged();
   void onPreFrameSleepChanged();
-  void updateSkipDuplicateFramesEnabled();
+  void updateHostSyncOptions();
   void updateRewind();
 
 private:

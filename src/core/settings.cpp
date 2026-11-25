@@ -301,6 +301,7 @@ void Settings::Load(SettingsInterface& si)
   display_pre_frame_sleep_buffer =
     si.GetFloatValue("Display", "PreFrameSleepBuffer", DEFAULT_DISPLAY_PRE_FRAME_SLEEP_BUFFER);
   display_skip_presenting_duplicate_frames = si.GetBoolValue("Display", "SkipPresentingDuplicateFrames", false);
+  display_black_frame_insertion = si.GetBoolValue("Display", "BlackFrameInsertion", false);
   display_vsync = si.GetBoolValue("Display", "VSync", false);
   display_disable_mailbox_presentation = si.GetBoolValue("Display", "DisableMailboxPresentation", false);
   display_relaxed_vsync = si.GetBoolValue("Display", "RelaxedVSync", false);
@@ -582,6 +583,7 @@ void Settings::Save(SettingsInterface& si, bool ignore_base) const
   si.SetBoolValue("Display", "OptimalFramePacing", display_optimal_frame_pacing);
   si.SetBoolValue("Display", "PreFrameSleep", display_pre_frame_sleep);
   si.SetBoolValue("Display", "SkipPresentingDuplicateFrames", display_skip_presenting_duplicate_frames);
+  si.SetBoolValue("Display", "BlackFrameInsertion", display_black_frame_insertion);
   si.SetFloatValue("Display", "PreFrameSleepBuffer", display_pre_frame_sleep_buffer);
   si.SetBoolValue("Display", "VSync", display_vsync);
   si.SetBoolValue("Display", "DisableMailboxPresentation", display_disable_mailbox_presentation);

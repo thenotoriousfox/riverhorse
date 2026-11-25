@@ -96,6 +96,13 @@
         </property>
        </widget>
       </item>
+      <item row="3" column="0">
+       <widget class="QCheckBox" name="blackFrameInsertion">
+        <property name="text">
+         <string>Black Frame Insertion</string>
+        </property>
+       </widget>
+      </item>
       <item row="2" column="0">
        <widget class="QCheckBox" name="skipPresentingDuplicateFrames">
         <property name="text">

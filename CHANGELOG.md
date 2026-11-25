@@ -17,6 +17,10 @@ Changes since the DuckStation `v0.1-7371` base. Releases are tagged
 - Your own patches: Game Properties > Patches has Add Patch, Edit and Remove.
   Patches you add are kept per game in the new `patches` folder (same code
   format as cheats) and are ticked on and off like the built-in ones.
+- Sync To Host Refresh Rate also syncs on displays at two, three or four times
+  the console's refresh rate (such as 120 Hz for 60 Hz games), showing each
+  frame that many times; Black Frame Insertion shows black instead of the
+  repeats for sharper motion.
 - libretro core for Windows (x64), Android (arm64-v8a, x86_64), macOS (arm64,
   x86_64) and Linux arm64 on every release, built from the bundled
   dependencies. The core is also submitted to libretro's buildbot, so

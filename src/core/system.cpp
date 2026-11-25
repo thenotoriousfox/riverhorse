@@ -201,6 +201,8 @@ static bool DoState(StateWrapper& sw, GPUTexture** host_texture, bool update_dis
 static bool UseHostTexturesForMemoryStates();
 static bool PresentFrame(bool skip_present, bool explicit_present, const ImDrawData* draw_data);
 static void WaitForPendingPresent();
+static void PresentSubframes();
+static void PresentBlackFrame();
 
 static void SetRewinding(bool enabled);
 static void ExecuteUntilInterrupted();
@@ -227,6 +229,7 @@ static constexpr const float PERFORMANCE_COUNTER_UPDATE_INTERVAL = 1.0f;
 static constexpr const char FALLBACK_EXE_NAME[] = "PSX.EXE";
 static constexpr u32 MAX_SKIPPED_DUPLICATE_FRAME_COUNT = 2; // 20fps minimum
 static constexpr u32 MAX_SKIPPED_TIMEOUT_FRAME_COUNT = 1;   // 30fps minimum
+static constexpr u32 MAX_HOST_REFRESH_MULTIPLE = 4;
 
 static std::unique_ptr<INISettingsInterface> s_game_settings_interface;
 static std::unique_ptr<INISettingsInterface> s_input_settings_interface;
@@ -269,6 +272,7 @@ static bool s_pre_frame_sleep = false;
 static bool s_can_sync_to_host = false;
 static bool s_syncing_to_host = false;
 static bool s_syncing_to_host_with_vsync = false;
+static u32 s_host_refresh_multiple = 1;
 static bool s_skip_presenting_duplicate_frames = false;
 static u32 s_skipped_frame_count = 0;
 static u32 s_last_presented_internal_frame_number = 0;
@@ -2190,6 +2194,7 @@ void System::FrameDone()
         Throttle(current_time);
 
       PresentDisplay(false, false);
+      PresentSubframes();
 
       if (!throttle_before_present && s_throttler_enabled && !IsExecutionInterrupted())
         Throttle(current_time);
@@ -3554,16 +3559,20 @@ void System::UpdateSpeedLimiterState()
   s_can_sync_to_host = false;
   s_syncing_to_host = false;
   s_syncing_to_host_with_vsync = false;
+  s_host_refresh_multiple = 1;
 
   if (g_settings.sync_to_host_refresh_rate)
   {
     const float host_refresh_rate = g_gpu_device->GetWindowInfo().surface_refresh_rate;
     if (host_refresh_rate > 0.0f)
     {
-      const float ratio = host_refresh_rate / System::GetThrottleFrequency();
+      const float host_ratio = host_refresh_rate / System::GetThrottleFrequency();
+      s_host_refresh_multiple = std::clamp<u32>(static_cast<u32>(std::lround(host_ratio)), 1, MAX_HOST_REFRESH_MULTIPLE);
+      const float ratio = host_ratio / static_cast<float>(s_host_refresh_multiple);
       s_can_sync_to_host = (ratio >= 0.95f && ratio <= 1.05f);
-      INFO_LOG("Refresh rate: Host={}hz Guest={}hz Ratio={} - {}", host_refresh_rate, System::GetThrottleFrequency(),
-               ratio, s_can_sync_to_host ? "can sync" : "can't sync");
+      INFO_LOG("Refresh rate: Host={}hz Guest={}hz Multiple={} Ratio={} - {}", host_refresh_rate,
+               System::GetThrottleFrequency(), s_host_refresh_multiple, ratio,
+               s_can_sync_to_host ? "can sync" : "can't sync");
 
       s_syncing_to_host = (s_can_sync_to_host && g_settings.sync_to_host_refresh_rate && s_target_speed == 1.0f);
       if (s_syncing_to_host)
@@ -6113,6 +6122,41 @@ bool System::PresentDisplay(bool skip_present, bool explicit_present)
   ImGuiManager::NewFrame();
 
   return do_present;
+}
+
+void System::PresentBlackFrame()
+{
+  if (g_gpu_device->BeginPresent(false))
+    g_gpu_device->EndPresent(false);
+}
+
+void System::PresentSubframes()
+{
+  if (!s_syncing_to_host_with_vsync || s_host_refresh_multiple <= 1 || IsExecutionInterrupted())
+    return;
+
+  for (u32 i = 1; i < s_host_refresh_multiple; i++)
+  {
+    if (!g_settings.display_black_frame_insertion)
+    {
+      PresentDisplay(false, false);
+      continue;
+    }
+
+    WaitForPendingPresent();
+    if (GPUDevice::HasDeviceThread())
+    {
+      s_present_pending = true;
+      GPUDevice::QueueOnDeviceThread([]() {
+        PresentBlackFrame();
+        s_present_done_semaphore.Post();
+      });
+    }
+    else
+    {
+      PresentBlackFrame();
+    }
+  }
 }
 
 void System::InvalidateDisplay()

@@ -18,6 +18,7 @@ EmulationSettingsWidget::EmulationSettingsWidget(SettingsWindow* dialog, QWidget
 
   SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.vsync, "Display", "VSync", false);
   SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.syncToHostRefreshRate, "Main", "SyncToHostRefreshRate", false);
+  SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.blackFrameInsertion, "Display", "BlackFrameInsertion", false);
   SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.optimalFramePacing, "Display", "OptimalFramePacing", false);
   SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.preFrameSleep, "Display", "PreFrameSleep", false);
   SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.skipPresentingDuplicateFrames, "Display",
@@ -73,9 +74,9 @@ EmulationSettingsWidget::EmulationSettingsWidget(SettingsWindow* dialog, QWidget
   }
   connect(m_ui.turboSpeed, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
           &EmulationSettingsWidget::onTurboSpeedIndexChanged);
-  connect(m_ui.vsync, &QCheckBox::checkStateChanged, this, &EmulationSettingsWidget::updateSkipDuplicateFramesEnabled);
+  connect(m_ui.vsync, &QCheckBox::checkStateChanged, this, &EmulationSettingsWidget::updateHostSyncOptions);
   connect(m_ui.syncToHostRefreshRate, &QCheckBox::checkStateChanged, this,
-          &EmulationSettingsWidget::updateSkipDuplicateFramesEnabled);
+          &EmulationSettingsWidget::updateHostSyncOptions);
   connect(m_ui.optimalFramePacing, &QCheckBox::checkStateChanged, this,
           &EmulationSettingsWidget::onOptimalFramePacingChanged);
   connect(m_ui.preFrameSleep, &QCheckBox::checkStateChanged, this, &EmulationSettingsWidget::onPreFrameSleepChanged);
@@ -109,8 +110,15 @@ EmulationSettingsWidget::EmulationSettingsWidget(SettingsWindow* dialog, QWidget
     tr(
       "Adjusts the emulation speed so the console's refresh rate matches the host's refresh rate when VSync is "
       "enabled. This results in the smoothest animations possible, at the cost of potentially increasing the emulation "
-      "speed by less than 1%. Sync To Host Refresh Rate will not take effect if the console's refresh rate is too far "
-      "from the host's refresh rate. Users with variable refresh rate displays should disable this option."));
+      "speed by less than 1%. On a display running at two, three or four times the console's refresh rate (such as "
+      "120 Hz for 60 Hz games), each frame is shown that many times. Sync To Host Refresh Rate will not take effect if "
+      "the console's refresh rate is too far from the host's refresh rate. Users with variable refresh rate displays "
+      "should disable this option."));
+  dialog->registerWidgetHelp(
+    m_ui.blackFrameInsertion, tr("Black Frame Insertion"), tr("Unchecked"),
+    tr("On a display running at two, three or four times the console's refresh rate, shows black instead of repeating "
+       "each frame, which makes motion look sharper but the picture darker. Needs VSync and Sync To Host Refresh "
+       "Rate."));
   dialog->registerWidgetHelp(
     m_ui.optimalFramePacing, tr("Optimal Frame Pacing"), tr("Unchecked"),
     tr("Enabling this option will ensure every frame the console renders is displayed to the screen, at a consistent "
@@ -143,7 +151,7 @@ EmulationSettingsWidget::EmulationSettingsWidget(SettingsWindow* dialog, QWidget
       "Simulates the system ahead of time and rolls back/replays to reduce input lag. Very high system requirements."));
 
   onOptimalFramePacingChanged();
-  updateSkipDuplicateFramesEnabled();
+  updateHostSyncOptions();
   updateRewind();
 }
 
@@ -224,11 +232,12 @@ void EmulationSettingsWidget::onPreFrameSleepChanged()
   m_ui.preFrameSleepBufferLabel->setVisible(show_buffer_size);
 }
 
-void EmulationSettingsWidget::updateSkipDuplicateFramesEnabled()
+void EmulationSettingsWidget::updateHostSyncOptions()
 {
   const bool vsync = m_dialog->getEffectiveBoolValue("Display", "VSync", false);
   const bool sync_to_host = m_dialog->getEffectiveBoolValue("Main", "SyncToHostRefreshRate", false) && vsync;
   m_ui.skipPresentingDuplicateFrames->setEnabled(!sync_to_host);
+  m_ui.blackFrameInsertion->setEnabled(sync_to_host);
 }
 
 void EmulationSettingsWidget::updateRewind()

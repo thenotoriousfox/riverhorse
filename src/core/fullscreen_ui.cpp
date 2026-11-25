@@ -4110,8 +4110,17 @@ void FullscreenUI::DrawEmulationSettingsPage()
 
   DrawToggleSetting(
     bsi, FSUI_ICONSTR(ICON_FA_LIGHTBULB, "Sync To Host Refresh Rate"),
-    FSUI_CSTR("Adjusts the emulation speed so the console's refresh rate matches the host when VSync is enabled."),
+    FSUI_CSTR("Adjusts the emulation speed so the console's refresh rate matches the host when VSync is enabled. "
+              "Also works at two, three or four times the console's rate, such as 120 Hz."),
     "Main", "SyncToHostRefreshRate", false);
+
+  DrawToggleSetting(
+    bsi, FSUI_ICONSTR(ICON_FA_TV, "Black Frame Insertion"),
+    FSUI_CSTR("Shows black instead of repeating frames on a display at a multiple of the console's rate, for sharper "
+              "motion. Needs VSync and Sync To Host Refresh Rate."),
+    "Display", "BlackFrameInsertion", false,
+    GetEffectiveBoolSetting(bsi, "Display", "VSync", false) &&
+      GetEffectiveBoolSetting(bsi, "Main", "SyncToHostRefreshRate", false));
 
   DrawToggleSetting(
     bsi, FSUI_ICONSTR(ICON_FA_TACHOMETER_ALT, "Optimal Frame Pacing"),
