@@ -16,7 +16,7 @@
 
 ## ℹ️ About
 
-Riverhorse is a standalone PS1 emulator for Linux. It aims to start straight into a game from a frontend, run well on low-end ARM devices, and never interrupt play with dialogs.
+Riverhorse is a standalone PS1 emulator for Linux, Windows and macOS. It aims to start straight into a game from a frontend, run well on low-end ARM devices, and never interrupt play with dialogs.
 
 It is based on [DuckStation](https://github.com/stenzek/duckstation) `v0.1-7371` by Connor McLaughlin (Stenzek) and contributors, the last DuckStation release published under the GNU GPL v3. The full upstream history up to that release is kept in this repository.
 
@@ -27,14 +27,14 @@ It is based on [DuckStation](https://github.com/stenzek/duckstation) `v0.1-7371`
 
 ## 🚧 Status
 
-The current release is 1.2.0; downloads are on the [Releases](https://github.com/thenotoriousfox/riverhorse/releases) page. Releases are tagged `vMAJOR.MINOR.PATCH`; the upstream tag `v0.1-7371` marks the base. Settings files use the same format and keys as the base. See [CHANGELOG.md](CHANGELOG.md) for everything changed since.
+The current release is 1.3.0; downloads are on the [Releases](https://github.com/thenotoriousfox/riverhorse/releases) page. Releases are tagged `vMAJOR.MINOR.PATCH`; the upstream tag `v0.1-7371` marks the base. Settings files use the same format and keys as the base. See [CHANGELOG.md](CHANGELOG.md) for everything changed since.
 
 | Platform | Build |
 |---|---|
 | Linux x64 / ARM64 | AppImage, Flatpak |
 | Windows x64 / ARM64 | Zip |
 | macOS | Zip |
-| libretro (Linux x64 / ARM64) | Single-file core |
+| libretro: Linux x64 / ARM64 / ARMv7, Windows x64, Android ARM64 / ARMv7 / x64, macOS | Single-file core |
 
 ---
 
@@ -50,11 +50,14 @@ The current release is 1.2.0; downloads are on the [Releases](https://github.com
 
 ### Play
 
-- Rollback netplay for up to four players and four spectators, direct or through a relay server
-- Patch database with widescreen, 60 FPS and fix patches per game
+- Rollback netplay for up to four players and four spectators, direct or through a relay server, with a public session list
+- Save sync: memory cards, save states and game settings kept the same on every device through a synced folder or a WebDAV server, so a game closed on one device resumes on another
+- Patch database with widescreen, 60 FPS and fix patches per game, plus your own patches per game
 - About 66,000 cheats for 1,900+ games, including libretro-database
 - Cheats that replace instructions without writing RAM, for games that check their own code
 - Maximum CD-ROM read speedup and fast forward while loading
+- Frameskip for devices that can't keep up, and frame pacing on 120, 180 and 240 Hz displays, with optional black frame insertion at 120 Hz
+- Controller lights (DualShock 4, DualSense) that dim while the DualShock is in digital mode
 
 ### Interface
 
@@ -63,12 +66,13 @@ The current release is 1.2.0; downloads are on the [Releases](https://github.com
 - In-game side panel with quick graphics toggles
 - Border overlays (bezels) around the game
 - Post-processing with GLSL, ReShade FX and libretro slang shader presets
+- MMPX (pixel art) and Cubic texture filters
 - Interface Size option with a Handheld preset, and touch swiping
 - Native Wayland, with X11 as a fallback
 
 ### Frontends
 
-- libretro core for RetroArch and other frontends: software, OpenGL and Vulkan rendering, core options, multi-disc control, cheats, save states, RetroAchievements
+- libretro core for RetroArch and other frontends: software, OpenGL, OpenGL ES and Vulkan rendering, grouped core options, multi-disc control, rumble, light guns with crosshairs, NeGcon and mouse, cheat database codes as options, frameskip, notifications, save states, netplay, rewind, RetroAchievements
 - Command-line options to start a game, host or join netplay straight from a launcher
 
 ---
@@ -127,7 +131,9 @@ with `git submodule update --init --recursive` and configure with
 `CMAKE_PREFIX_PATH`). The result needs only the C and C++ runtime.
 `scripts/libretro/make-libretro-package.sh <core file> <output directory>
 <name suffix>` packs the result. For Windows, cross-compile with
-`-DCMAKE_TOOLCHAIN_FILE=scripts/libretro/mingw-w64-x86_64.cmake`.
+`-DCMAKE_TOOLCHAIN_FILE=scripts/libretro/mingw-w64-x86_64.cmake`; for 32-bit
+ARM Linux, with `-DCMAKE_TOOLCHAIN_FILE=scripts/libretro/linux-armhf.cmake`
+(clang and Debian's `g++-arm-linux-gnueabihf`).
 
 Each release has the core for Linux, Windows, Android and macOS
 (`riverhorse_libretro-<platform>.zip`). To install: put the core
@@ -149,7 +155,7 @@ or enter the session code the host is shown. The host can list the session
 or keep it to people with the code, and can ask to accept each player.
 Everyone needs the same game in their game list, a BIOS with the same hash
 and the same Riverhorse version. For three or four players, the host turns
-on a multitap first (Settings > Controllers > Multitap, port 1 for most
+on a multitap first (Settings > Controllers > Global Settings > Multitap Mode, port 1 for most
 games); players then take slots 1A-1D in the order they joined. From a
 frontend, start Riverhorse with `-netplayhost <port> -- <game>` or
 `-netplayjoin <code|host:port> -- <game>` (the game is used when it matches
@@ -186,8 +192,8 @@ listed; joining goes through the relay.
 
 Session codes come from a relay server, which introduces the players; they
 then connect directly, and only players whose routers block that keep going
-through the relay. Riverhorse uses a default relay; Settings > Essentials >
-Netplay (or the host and join dialogs) can turn the relay off or set your
+through the relay. Riverhorse uses a default relay; the host and join
+dialogs (or Settings > Essentials > Netplay in Big Picture) can turn the relay off or set your
 own as Custom Relay Server (`host` or `host:port`, the same for everyone).
 Without a relay, or when it can't be reached, players join with the host's
 address and UDP port (31200 by default), which must be reachable, so the
@@ -197,11 +203,34 @@ relay, build with `-DBUILD_RELAY_SERVER=ON` and start `riverhorse-relay
 
 ---
 
+## 🔄 Save sync
+
+Settings > Save Sync (or the Memory Cards page in Big Picture) keeps memory
+cards, save states and game settings the same on all your devices. Pick
+Folder for a folder another program keeps in sync, such as Syncthing,
+Dropbox or Nextcloud, or WebDAV Server with its address, username and
+password (Nextcloud, many NAS boxes, `rclone serve webdav`). Riverhorse
+creates `memcards`, `savestates` and `gamesettings` folders inside it.
+
+Riverhorse syncs when it starts, before a game boots and after it closes,
+and Sync Now syncs straight away. The save state made when a game closes
+travels too, so you can resume on another device. A save changed on two
+devices is kept twice: the older copy gets `(conflict <device> <date>)` in
+its name. Files a sync replaces or removes are kept for 30 days in
+`savesync/backup` in the user directory. The WebDAV password is stored in
+`settings.ini`.
+
+---
+
 ## 🖥️ Wayland and X11
 
-Riverhorse runs natively on Wayland when the session provides it, and on X11
-otherwise. To run the AppImage through X11 on a Wayland session, start it
-with `RIVERHORSE_X11=1`.
+On Linux, Riverhorse runs natively on Wayland when the session provides it,
+and on X11 otherwise. To use X11 on a Wayland session:
+
+- AppImage: start it with `RIVERHORSE_X11=1`
+- Flatpak: `flatpak run --socket=x11 --env=QT_QPA_PLATFORM=xcb
+  io.github.thenotoriousfox.Riverhorse`
+- Built from source: start it with `QT_QPA_PLATFORM=xcb`
 
 ---
 
