@@ -32,6 +32,7 @@
 
 #include "libretro.h"
 #include "libretro_core_options.h"
+#include "libretro_crosshair.h"
 #include "libretro_input.h"
 #include "libretro_resources.h"
 #include "libretro_rumble.h"
@@ -425,6 +426,7 @@ void LibretroHost::OnContextDestroy()
 
 void LibretroHost::DestroyHardwareFrameResources()
 {
+  LibretroCrosshair::DestroyResources();
 #ifdef ENABLE_OPENGL
   if (s_video_output == VideoOutput::OpenGL)
     LibretroOpenGL::DestroyFrameResources();
@@ -489,6 +491,7 @@ void LibretroHost::SendVideoFrame()
       dst[x] = ((rgba & 0xFFu) << 16) | (rgba & 0xFF00u) | ((rgba >> 16) & 0xFFu);
     }
   }
+  LibretroCrosshair::Draw(s_xrgb_buffer.data(), width, height);
 
   const float aspect_ratio = g_gpu->ComputeDisplayAspectRatio();
   if (width != s_video_width || height != s_video_height || aspect_ratio != s_video_aspect_ratio)

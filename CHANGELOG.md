@@ -46,6 +46,9 @@ Changes since the DuckStation `v0.1-7371` base. Releases are tagged
   types, and a Multitap core option for up to 8 players (users 3 to 5 on
   port 1's Multitap, 6 to 8 on port 2's). Light guns aim with the frontend's
   light gun input; shooting off-screen reloads.
+- libretro core: Light Gun Crosshair option (on by default) draws where each
+  GunCon or Justifier is aiming, and DualShock Analog Button sets a button
+  combination (L3 + R3, or Select + L1 + R1) for the Analog button.
 - libretro core: describes the console's RAM and scratchpad to the frontend
   as memory maps, so RetroAchievements can read the scratchpad too.
 - libretro core: the Crop option's new default, Frontend Setting, follows the
@@ -59,6 +62,9 @@ Changes since the DuckStation `v0.1-7371` base. Releases are tagged
 ### Fixes
 - Netplay started from the command line uses the Nickname setting when
   `-netplaynick` isn't given, instead of "Player".
+- libretro core: frontends' default controller (RetroPad) is now the DualShock;
+  it used to be the digital pad, so analog sticks and rumble did nothing until
+  DualShock was picked. Digital Controller is still in the list.
 - libretro core: starts in RetroArch for Windows, and its recompiler no
   longer crashes there.
 - libretro core: works with RetroArch builds that only have OpenGL ES (such

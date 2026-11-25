@@ -22,10 +22,11 @@
 #include <array>
 #include <span>
 #include <tuple>
+#include <vector>
 
 namespace LibretroInput {
 
-static constexpr unsigned RETRO_DEVICE_DUALSHOCK = RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_ANALOG, 1);
+static constexpr unsigned RETRO_DEVICE_DIGITAL = RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_JOYPAD, 0);
 static constexpr unsigned RETRO_DEVICE_NEGCON = RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_ANALOG, 2);
 static constexpr unsigned RETRO_DEVICE_GUNCON = RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_LIGHTGUN, 0);
 static constexpr unsigned RETRO_DEVICE_JUSTIFIER = RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_LIGHTGUN, 1);
@@ -62,11 +63,15 @@ static constexpr std::array<std::pair<unsigned, NeGcon::Button>, 8> s_negcon_but
   {RETRO_DEVICE_ID_JOYPAD_X, NeGcon::Button::B},
 }};
 
+static std::vector<Crosshair> s_crosshairs;
+static bool s_show_crosshairs = true;
+static std::vector<unsigned> s_analog_button_combo;
+static std::array<bool, PORT_COUNT> s_analog_button_held = {};
 static retro_input_poll_t s_input_poll;
 static retro_input_state_t s_input_state;
-static std::array<unsigned, PORT_COUNT> s_port_devices = {
-  RETRO_DEVICE_DUALSHOCK, RETRO_DEVICE_DUALSHOCK, RETRO_DEVICE_DUALSHOCK, RETRO_DEVICE_DUALSHOCK,
-  RETRO_DEVICE_DUALSHOCK, RETRO_DEVICE_DUALSHOCK, RETRO_DEVICE_DUALSHOCK, RETRO_DEVICE_DUALSHOCK};
+static std::array<unsigned, PORT_COUNT> s_port_devices = {RETRO_DEVICE_JOYPAD, RETRO_DEVICE_JOYPAD, RETRO_DEVICE_JOYPAD,
+                                                          RETRO_DEVICE_JOYPAD, RETRO_DEVICE_JOYPAD, RETRO_DEVICE_JOYPAD,
+                                                          RETRO_DEVICE_JOYPAD, RETRO_DEVICE_JOYPAD};
 
 static ControllerType GetControllerType(unsigned device);
 static float GetAnalogButton(u32 port, unsigned id);
@@ -94,7 +99,7 @@ ControllerType LibretroInput::GetControllerType(unsigned device)
   {
     case RETRO_DEVICE_NONE:
       return ControllerType::None;
-    case RETRO_DEVICE_JOYPAD:
+    case RETRO_DEVICE_DIGITAL:
       return ControllerType::DigitalController;
     case RETRO_DEVICE_NEGCON:
       return ControllerType::NeGcon;
@@ -112,18 +117,15 @@ ControllerType LibretroInput::GetControllerType(unsigned device)
 void LibretroInput::RegisterControllers(retro_environment_t environment)
 {
   static constexpr retro_controller_description types[] = {
-    {"DualShock", RETRO_DEVICE_DUALSHOCK},
-    {"Digital Controller", RETRO_DEVICE_JOYPAD},
-    {"NeGcon", RETRO_DEVICE_NEGCON},
-    {"GunCon", RETRO_DEVICE_GUNCON},
-    {"Justifier", RETRO_DEVICE_JUSTIFIER},
-    {"PlayStation Mouse", RETRO_DEVICE_MOUSE},
+    {"DualShock", RETRO_DEVICE_JOYPAD},    {"Digital Controller", RETRO_DEVICE_DIGITAL},
+    {"NeGcon", RETRO_DEVICE_NEGCON},       {"GunCon", RETRO_DEVICE_GUNCON},
+    {"Justifier", RETRO_DEVICE_JUSTIFIER}, {"PlayStation Mouse", RETRO_DEVICE_MOUSE},
     {"None", RETRO_DEVICE_NONE},
   };
   static constexpr retro_controller_info ports[] = {
-    {types, std::size(types)}, {types, std::size(types)}, {types, std::size(types)}, {types, std::size(types)},
-    {types, std::size(types)}, {types, std::size(types)}, {types, std::size(types)}, {types, std::size(types)},
-    {nullptr, 0},
+    {types, std::size(types)}, {types, std::size(types)}, {types, std::size(types)},
+    {types, std::size(types)}, {types, std::size(types)}, {types, std::size(types)},
+    {types, std::size(types)}, {types, std::size(types)}, {nullptr, 0},
   };
   static_assert(std::size(ports) == PORT_COUNT + 1);
   environment(RETRO_ENVIRONMENT_SET_CONTROLLER_INFO, const_cast<retro_controller_info*>(ports));
@@ -150,8 +152,8 @@ void LibretroInput::RegisterControllers(retro_environment_t environment)
     {port, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_Y, "Left Stick Y"},             \
     {port, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_X, "Right Stick X"},           \
     {port, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_Y, "Right Stick Y"}
-    PORT_BUTTONS(0), PORT_BUTTONS(1), PORT_BUTTONS(2), PORT_BUTTONS(3),
-    PORT_BUTTONS(4), PORT_BUTTONS(5), PORT_BUTTONS(6), PORT_BUTTONS(7),
+    PORT_BUTTONS(0),       PORT_BUTTONS(1), PORT_BUTTONS(2), PORT_BUTTONS(3),
+    PORT_BUTTONS(4),       PORT_BUTTONS(5), PORT_BUTTONS(6), PORT_BUTTONS(7),
 #undef PORT_BUTTONS
     {0, 0, 0, 0, nullptr},
   };
@@ -169,6 +171,15 @@ bool LibretroInput::SetPortDevice(u32 port, unsigned device)
 
 void LibretroInput::ApplyPortDevices(SettingsInterface& si)
 {
+  s_show_crosshairs = si.GetBoolValue("Libretro", "Crosshair", true);
+  const std::string analog_button = si.GetStringValue("Libretro", "AnalogButton", "Disabled");
+  if (analog_button == "L3R3")
+    s_analog_button_combo = {RETRO_DEVICE_ID_JOYPAD_L3, RETRO_DEVICE_ID_JOYPAD_R3};
+  else if (analog_button == "SelectL1R1")
+    s_analog_button_combo = {RETRO_DEVICE_ID_JOYPAD_SELECT, RETRO_DEVICE_ID_JOYPAD_L, RETRO_DEVICE_ID_JOYPAD_R};
+  else
+    s_analog_button_combo.clear();
+
   Settings multitap_settings;
   multitap_settings.multitap_mode =
     Settings::ParseMultitapModeName(si.GetStringValue("ControllerPorts", "MultitapMode", "").c_str())
@@ -203,6 +214,14 @@ void LibretroInput::UpdatePad(u32 port, Controller* controller)
   if (controller->GetType() != ControllerType::AnalogController)
     return;
 
+  const bool analog_button =
+    !s_analog_button_combo.empty() &&
+    std::all_of(s_analog_button_combo.begin(), s_analog_button_combo.end(),
+                [port](unsigned id) { return s_input_state(port, RETRO_DEVICE_JOYPAD, 0, id) != 0; });
+  if (analog_button && !s_analog_button_held[port])
+    controller->SetBindState(static_cast<u32>(AnalogController::Button::Analog), 1.0f);
+  s_analog_button_held[port] = analog_button;
+
   static constexpr std::array<std::tuple<unsigned, unsigned, AnalogController::HalfAxis, AnalogController::HalfAxis>, 4>
     axes = {{
       {RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X, AnalogController::HalfAxis::LLeft,
@@ -232,19 +251,19 @@ void LibretroInput::UpdateNeGcon(u32 port, Controller* controller)
   }
 
   const u32 base = static_cast<u32>(NeGcon::Button::Count);
-  const float steering =
-    static_cast<float>(s_input_state(port, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT,
-                                     RETRO_DEVICE_ID_ANALOG_X)) /
-    ANALOG_RANGE;
+  const float steering = static_cast<float>(s_input_state(port, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT,
+                                                          RETRO_DEVICE_ID_ANALOG_X)) /
+                         ANALOG_RANGE;
   controller->SetBindState(base + static_cast<u32>(NeGcon::HalfAxis::SteeringLeft), std::max(-steering, 0.0f));
   controller->SetBindState(base + static_cast<u32>(NeGcon::HalfAxis::SteeringRight), std::max(steering, 0.0f));
-  controller->SetBindState(base + static_cast<u32>(NeGcon::HalfAxis::I),
-                           std::max(GetAnalogButton(port, RETRO_DEVICE_ID_JOYPAD_R2),
-                                    GetAnalogButton(port, RETRO_DEVICE_ID_JOYPAD_B)));
-  controller->SetBindState(base + static_cast<u32>(NeGcon::HalfAxis::II),
-                           std::max(GetAnalogButton(port, RETRO_DEVICE_ID_JOYPAD_L2),
-                                    GetAnalogButton(port, RETRO_DEVICE_ID_JOYPAD_Y)));
-  controller->SetBindState(base + static_cast<u32>(NeGcon::HalfAxis::L), GetAnalogButton(port, RETRO_DEVICE_ID_JOYPAD_L));
+  controller->SetBindState(
+    base + static_cast<u32>(NeGcon::HalfAxis::I),
+    std::max(GetAnalogButton(port, RETRO_DEVICE_ID_JOYPAD_R2), GetAnalogButton(port, RETRO_DEVICE_ID_JOYPAD_B)));
+  controller->SetBindState(
+    base + static_cast<u32>(NeGcon::HalfAxis::II),
+    std::max(GetAnalogButton(port, RETRO_DEVICE_ID_JOYPAD_L2), GetAnalogButton(port, RETRO_DEVICE_ID_JOYPAD_Y)));
+  controller->SetBindState(base + static_cast<u32>(NeGcon::HalfAxis::L),
+                           GetAnalogButton(port, RETRO_DEVICE_ID_JOYPAD_L));
 }
 
 void LibretroInput::UpdateLightGun(u32 port, Controller* controller, u32 trigger, u32 shoot_offscreen,
@@ -263,6 +282,8 @@ void LibretroInput::UpdateLightGun(u32 port, Controller* controller, u32 trigger
        ANALOG_RANGE) /
       (2.0f * ANALOG_RANGE);
     g_gpu->ConvertPictureCoordinatesToScreenCoordinates(picture_x, picture_y, &window_x, &window_y);
+    if (s_show_crosshairs)
+      s_crosshairs.push_back(Crosshair{port, picture_x, picture_y});
   }
   InputManager::UpdatePointerAbsolutePosition(0, window_x, window_y);
 
@@ -280,16 +301,22 @@ void LibretroInput::UpdateMouse(u32 port, Controller* controller)
                            (s_input_state(port, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_LEFT) != 0) ? 1.0f : 0.0f);
   controller->SetBindState(static_cast<u32>(PlayStationMouse::Binding::Right),
                            (s_input_state(port, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_RIGHT) != 0) ? 1.0f :
-                                                                                                           0.0f);
+                                                                                                            0.0f);
   controller->SetBindState(static_cast<u32>(PlayStationMouse::Binding::PointerX),
                            static_cast<float>(s_input_state(port, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_X)));
   controller->SetBindState(static_cast<u32>(PlayStationMouse::Binding::PointerY),
                            static_cast<float>(s_input_state(port, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_Y)));
 }
 
+std::span<const LibretroInput::Crosshair> LibretroInput::GetCrosshairs()
+{
+  return s_crosshairs;
+}
+
 void LibretroInput::Update()
 {
   s_input_poll();
+  s_crosshairs.clear();
 
   for (u32 port = 0; port < PORT_COUNT; port++)
   {

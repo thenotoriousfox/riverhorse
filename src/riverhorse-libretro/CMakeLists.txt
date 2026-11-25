@@ -1,6 +1,8 @@
 add_library(riverhorse_libretro SHARED
   libretro_core_options.cpp
   libretro_core_options.h
+  libretro_crosshair.cpp
+  libretro_crosshair.h
   libretro_host.cpp
   libretro_input.cpp
   libretro_input.h

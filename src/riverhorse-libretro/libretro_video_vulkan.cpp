@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 #include "libretro_video_vulkan.h"
+#include "libretro_crosshair.h"
 
 #include "core/gpu.h"
 #include "core/host.h"
@@ -171,6 +172,7 @@ bool LibretroVulkan::RenderFrame(u32* width, u32* height)
 
   if (!g_gpu->RenderDisplayAtInternalResolution(texture.get(), true))
     return false;
+  LibretroCrosshair::Draw(texture.get());
 
   VulkanTexture* vk_texture = static_cast<VulkanTexture*>(texture.get());
   vk_texture->TransitionToLayout(VulkanTexture::Layout::ShaderReadOnly);

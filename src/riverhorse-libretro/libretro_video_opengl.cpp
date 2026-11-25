@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 #include "libretro_video_opengl.h"
+#include "libretro_crosshair.h"
 
 #include "core/gpu.h"
 #include "core/settings.h"
@@ -107,6 +108,7 @@ bool LibretroOpenGL::RenderFrame(u32* width, u32* height)
 
   if (!g_gpu->RenderDisplayAtInternalResolution(s_frame_texture.get(), true))
     return false;
+  LibretroCrosshair::Draw(s_frame_texture.get());
 
   if (s_frame_fbo == 0)
     glGenFramebuffers(1, &s_frame_fbo);

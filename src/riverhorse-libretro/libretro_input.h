@@ -7,6 +7,8 @@
 
 #include "common/types.h"
 
+#include <span>
+
 class SettingsInterface;
 
 /// Maps the frontend's input ports onto the emulated controllers.
@@ -21,5 +23,15 @@ bool SetPortDevice(u32 port, unsigned device);
 void ApplyPortDevices(SettingsInterface& si);
 
 void Update();
+
+struct Crosshair
+{
+  u32 player;
+  float x;
+  float y;
+};
+
+/// Light gun aim positions on screen, 0..1 across the picture, for drawing crosshairs.
+std::span<const Crosshair> GetCrosshairs();
 
 } // namespace LibretroInput
