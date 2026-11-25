@@ -16,7 +16,7 @@ class Error;
 
 namespace NetplayRelay {
 
-static constexpr const char* DEFAULT_SERVER = "relay.hippos-linux.org";
+static constexpr const char* DEFAULT_SERVER = "relay.riverhorse.app";
 static constexpr u16 DEFAULT_PORT = 31210;
 static constexpr u8 MAGIC[4] = {'R', 'H', 'R', 'L'};
 static constexpr u32 HEADER_SIZE = 5;
