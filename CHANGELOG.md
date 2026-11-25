@@ -29,6 +29,9 @@ Changes since the DuckStation `v0.1-7371` base. Releases are tagged
   game), so RetroArch users get the database too.
 - libretro core: options are grouped (Video, PGXP, Patches, Console, CD-ROM,
   Input, Memory Cards) in frontends that support option categories.
+- libretro core: PPF Patches option (on by default) applies a .ppf patch with
+  the same name as the disc image, such as a fan translation. RetroArch's own
+  softpatching can't be used, as the core reads discs from their files.
 - Texture filters: MMPX (Pixel Art), which keeps the look of pixel art while
   smoothing its diagonals at higher resolutions, and Cubic, a sharper
   alternative to bilinear that doesn't overshoot at edges. Also in the
