@@ -91,6 +91,13 @@ static const std::vector<Option> s_options = {
   {"riverhorse_region", "Console Region", "Region of the emulated console.", "Console", "Region",
    {{"Auto", "Auto-Detect"}, {"NTSC-U", "NTSC-U/C"}, {"NTSC-J", "NTSC-J"}, {"PAL", "PAL"}}, "Auto"},
   {"riverhorse_fast_boot", "Fast Boot", "Skips the BIOS logo.", "BIOS", "PatchFastBoot", s_on_off, "false"},
+  {"riverhorse_widescreen_patch", "Widescreen Patch",
+   "Applies the game's 16:9 widescreen patch from Riverhorse's patch database, if it has one, and shows the game at "
+   "16:9 while Aspect Ratio is Game Native.",
+   "Libretro", "WidescreenPatch", s_on_off, "false"},
+  {"riverhorse_60fps_patch", "60 FPS Patch",
+   "Applies the game's 60 FPS patch from Riverhorse's patch database, if it has one.", "Libretro", "FrameRatePatch",
+   s_on_off, "false"},
   {"riverhorse_cpu_mode", "CPU Execution Mode", "The recompiler is fastest; the interpreters help with problem games.",
    "CPU", "ExecutionMode",
    {{"Recompiler", "Recompiler"}, {"CachedInterpreter", "Cached Interpreter"}, {"Interpreter", "Interpreter"}},

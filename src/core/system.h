@@ -288,6 +288,18 @@ std::vector<std::string> GetGamePatchNames(const std::string& serial);
 /// Returns the file holding the player's own patches for a game.
 std::string GetUserGamePatchFileName(std::string_view serial);
 
+/// Kinds of patch the emulator knows how to pick and pair with settings.
+enum class GamePatchKind : u8
+{
+  Other,
+  Widescreen,
+  FrameRate60,
+};
+GamePatchKind GetGamePatchKind(std::string_view name);
+
+/// Returns the first patch of each requested kind for a game, in the patch database's order.
+std::vector<std::string> GetDefaultGamePatches(const std::string& serial, bool widescreen, bool frame_rate_60);
+
 void SingleStepCPU();
 
 /// Sets target emulation speed.

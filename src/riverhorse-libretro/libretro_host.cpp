@@ -62,6 +62,7 @@ static void ApplyCoreOptions();
 static void RegisterDiscControl();
 static void RegisterMemoryMaps();
 static void UpdateCheats();
+static void UpdateGamePatches();
 static bool BootGame();
 static bool SetupHardwareOutput();
 static void OnContextReset();
@@ -218,6 +219,8 @@ void LibretroHost::ApplyCoreOptions()
   SettingsInterface& si = *s_base_settings_interface;
   LibretroCoreOptions::Apply(s_environment, si);
   LibretroInput::ApplyPortDevices(si);
+  if (System::IsValid())
+    UpdateGamePatches();
   si.SetStringValue("GPU", "Renderer", s_loaded_renderer.c_str());
   System::ApplySettings(false);
 
@@ -341,7 +344,21 @@ bool LibretroHost::BootGame()
     return false;
   }
 
+  UpdateGamePatches();
+  System::ApplySettings(false);
   return true;
+}
+
+void LibretroHost::UpdateGamePatches()
+{
+  SettingsInterface& si = *s_base_settings_interface;
+  const std::vector<std::string> patches =
+    System::GetDefaultGamePatches(System::GetGameSerial(), si.GetBoolValue("Libretro", "WidescreenPatch", false),
+                                  si.GetBoolValue("Libretro", "FrameRatePatch", false));
+  if (patches.empty())
+    si.DeleteValue("Patches", "Enable");
+  else
+    si.SetStringList("Patches", "Enable", patches);
 }
 
 bool LibretroHost::SetupHardwareOutput()

@@ -1233,6 +1233,18 @@ void System::LoadSettings(bool display_osd_messages)
       entry->ApplySettings(g_settings, display_osd_messages);
   }
 
+  if (g_settings.display_aspect_ratio == DisplayAspectRatio::Auto && !s_running_game_serial.empty() &&
+      !Achievements::IsHardcoreModeActive())
+  {
+    const std::vector<std::string> enabled_patches = si.GetStringList("Patches", "Enable");
+    if (std::any_of(enabled_patches.begin(), enabled_patches.end(), [](const std::string& name) {
+          return GetGamePatchKind(name) == GamePatchKind::Widescreen;
+        }))
+    {
+      g_settings.display_aspect_ratio = DisplayAspectRatio::R16_9;
+    }
+  }
+
   g_settings.FixIncompatibleSettings(display_osd_messages);
 }
 
@@ -4473,6 +4485,47 @@ bool System::LoadGamePatchList(const std::string& serial, CheatList* list)
   }
 
   return list->GetCodeCount() > 0;
+}
+
+System::GamePatchKind System::GetGamePatchKind(std::string_view name)
+{
+  std::string lower(name);
+  std::transform(lower.begin(), lower.end(), lower.begin(),
+                 [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+  if ((lower.find("widescreen") != std::string::npos || lower.find("16:9") != std::string::npos ||
+       lower.find("16-9") != std::string::npos) &&
+      lower.find("21:9") == std::string::npos)
+  {
+    return GamePatchKind::Widescreen;
+  }
+
+  if (lower.find("60 fps") != std::string::npos)
+    return GamePatchKind::FrameRate60;
+
+  return GamePatchKind::Other;
+}
+
+std::vector<std::string> System::GetDefaultGamePatches(const std::string& serial, bool widescreen, bool frame_rate_60)
+{
+  std::vector<std::string> patches;
+  bool have_widescreen = !widescreen;
+  bool have_frame_rate_60 = !frame_rate_60;
+  for (std::string& name : GetGamePatchNames(serial))
+  {
+    const GamePatchKind kind = GetGamePatchKind(name);
+    if (kind == GamePatchKind::Widescreen && !have_widescreen)
+    {
+      patches.push_back(std::move(name));
+      have_widescreen = true;
+    }
+    else if (kind == GamePatchKind::FrameRate60 && !have_frame_rate_60)
+    {
+      patches.push_back(std::move(name));
+      have_frame_rate_60 = true;
+    }
+  }
+
+  return patches;
 }
 
 std::vector<std::string> System::GetGamePatchNames(const std::string& serial)

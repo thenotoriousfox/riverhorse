@@ -22,6 +22,11 @@ Changes since the DuckStation `v0.1-7371` base. Releases are tagged
   frame that many times. At exactly twice the rate (such as 120 Hz for 60 Hz
   games), Black Frame Insertion shows a black frame between frames for sharper
   motion.
+- A ticked widescreen patch now shows the game at 16:9 by itself while the
+  aspect ratio is Auto.
+- libretro core: Widescreen Patch and 60 FPS Patch options apply the game's
+  patch from Riverhorse's patch database (the first one of that kind for the
+  game), so RetroArch users get the database too.
 - Texture filters: MMPX (Pixel Art), which keeps the look of pixel art while
   smoothing its diagonals at higher resolutions, and Cubic, a sharper
   alternative to bilinear that doesn't overshoot at edges. Also in the
