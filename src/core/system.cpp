@@ -201,7 +201,7 @@ static bool DoState(StateWrapper& sw, GPUTexture** host_texture, bool update_dis
 static bool UseHostTexturesForMemoryStates();
 static bool PresentFrame(bool skip_present, bool explicit_present, const ImDrawData* draw_data);
 static void WaitForPendingPresent();
-static void PresentSubframes();
+static void InsertBlackFrame();
 static void PresentBlackFrame();
 
 static void SetRewinding(bool enabled);
@@ -230,6 +230,7 @@ static constexpr const char FALLBACK_EXE_NAME[] = "PSX.EXE";
 static constexpr u32 MAX_SKIPPED_DUPLICATE_FRAME_COUNT = 2; // 20fps minimum
 static constexpr u32 MAX_SKIPPED_TIMEOUT_FRAME_COUNT = 1;   // 30fps minimum
 static constexpr u32 MAX_HOST_REFRESH_MULTIPLE = 4;
+static constexpr u32 BLACK_FRAME_INSERTION_MULTIPLE = 2;
 
 static std::unique_ptr<INISettingsInterface> s_game_settings_interface;
 static std::unique_ptr<INISettingsInterface> s_input_settings_interface;
@@ -2194,7 +2195,7 @@ void System::FrameDone()
         Throttle(current_time);
 
       PresentDisplay(false, false);
-      PresentSubframes();
+      InsertBlackFrame();
 
       if (!throttle_before_present && s_throttler_enabled && !IsExecutionInterrupted())
         Throttle(current_time);
@@ -6133,29 +6134,26 @@ void System::PresentBlackFrame()
     g_gpu_device->EndPresent(false);
 }
 
-void System::PresentSubframes()
+void System::InsertBlackFrame()
 {
-  if (!s_syncing_to_host || s_host_refresh_multiple <= 1 || !g_settings.display_vsync ||
+  if (!s_syncing_to_host || s_host_refresh_multiple != BLACK_FRAME_INSERTION_MULTIPLE || !g_settings.display_vsync ||
       !g_settings.display_black_frame_insertion || IsExecutionInterrupted())
   {
     return;
   }
 
-  for (u32 i = 1; i < s_host_refresh_multiple; i++)
+  WaitForPendingPresent();
+  if (GPUDevice::HasDeviceThread())
   {
-    WaitForPendingPresent();
-    if (GPUDevice::HasDeviceThread())
-    {
-      s_present_pending = true;
-      GPUDevice::QueueOnDeviceThread([]() {
-        PresentBlackFrame();
-        s_present_done_semaphore.Post();
-      });
-    }
-    else
-    {
+    s_present_pending = true;
+    GPUDevice::QueueOnDeviceThread([]() {
       PresentBlackFrame();
-    }
+      s_present_done_semaphore.Post();
+    });
+  }
+  else
+  {
+    PresentBlackFrame();
   }
 }
 

@@ -4116,7 +4116,7 @@ void FullscreenUI::DrawEmulationSettingsPage()
 
   DrawToggleSetting(
     bsi, FSUI_ICONSTR(ICON_FA_TV, "Black Frame Insertion"),
-    FSUI_CSTR("Shows black instead of repeating frames on a display at a multiple of the console's rate, for sharper "
+    FSUI_CSTR("Shows a black frame between frames on a display at twice the console's rate, such as 120 Hz, for sharper "
               "motion. Needs VSync and Sync To Host Refresh Rate."),
     "Display", "BlackFrameInsertion", false,
     GetEffectiveBoolSetting(bsi, "Display", "VSync", false) &&

@@ -116,8 +116,8 @@ EmulationSettingsWidget::EmulationSettingsWidget(SettingsWindow* dialog, QWidget
       "should disable this option."));
   dialog->registerWidgetHelp(
     m_ui.blackFrameInsertion, tr("Black Frame Insertion"), tr("Unchecked"),
-    tr("On a display running at two, three or four times the console's refresh rate, shows black instead of repeating "
-       "each frame, which makes motion look sharper but the picture darker. Needs VSync and Sync To Host Refresh "
+    tr("On a display running at twice the console's refresh rate (such as 120 Hz for 60 Hz games), shows a black frame "
+       "between frames, which makes motion look sharper but the picture darker. Needs VSync and Sync To Host Refresh "
        "Rate."));
   dialog->registerWidgetHelp(
     m_ui.optimalFramePacing, tr("Optimal Frame Pacing"), tr("Unchecked"),

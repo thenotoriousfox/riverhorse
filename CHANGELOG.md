@@ -19,8 +19,9 @@ Changes since the DuckStation `v0.1-7371` base. Releases are tagged
   format as cheats) and are ticked on and off like the built-in ones.
 - Sync To Host Refresh Rate also syncs on displays at two, three or four times
   the console's refresh rate (such as 120 Hz for 60 Hz games), showing each
-  frame that many times; Black Frame Insertion shows black instead of the
-  repeats for sharper motion.
+  frame that many times. At exactly twice the rate (such as 120 Hz for 60 Hz
+  games), Black Frame Insertion shows a black frame between frames for sharper
+  motion.
 - Texture filters: MMPX (Pixel Art), which keeps the look of pixel art while
   smoothing its diagonals at higher resolutions, and Cubic, a sharper
   alternative to bilinear that doesn't overshoot at edges. Also in the
