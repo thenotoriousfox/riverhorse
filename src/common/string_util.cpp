@@ -178,6 +178,73 @@ std::string StringUtil::EncodeHex(const u8* data, int length)
   return ss.str();
 }
 
+std::string StringUtil::EncodeBase64(std::string_view data)
+{
+  static constexpr char alphabet[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+  std::string ret;
+  ret.reserve(((data.size() + 2) / 3) * 4);
+  for (size_t i = 0; i < data.size(); i += 3)
+  {
+    const size_t remaining = data.size() - i;
+    const u32 block = (static_cast<u32>(static_cast<u8>(data[i])) << 16) |
+                      ((remaining > 1) ? (static_cast<u32>(static_cast<u8>(data[i + 1])) << 8) : 0u) |
+                      ((remaining > 2) ? static_cast<u32>(static_cast<u8>(data[i + 2])) : 0u);
+    ret.push_back(alphabet[(block >> 18) & 0x3F]);
+    ret.push_back(alphabet[(block >> 12) & 0x3F]);
+    ret.push_back((remaining > 1) ? alphabet[(block >> 6) & 0x3F] : '=');
+    ret.push_back((remaining > 2) ? alphabet[block & 0x3F] : '=');
+  }
+
+  return ret;
+}
+
+std::string StringUtil::EncodeURLComponent(std::string_view str)
+{
+  static constexpr char hex_digits[] = "0123456789ABCDEF";
+
+  std::string ret;
+  ret.reserve(str.size());
+  for (const char ch : str)
+  {
+    if ((ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9') || ch == '-' || ch == '.' ||
+        ch == '_' || ch == '~')
+    {
+      ret.push_back(ch);
+    }
+    else
+    {
+      ret.push_back('%');
+      ret.push_back(hex_digits[static_cast<u8>(ch) >> 4]);
+      ret.push_back(hex_digits[static_cast<u8>(ch) & 0xF]);
+    }
+  }
+
+  return ret;
+}
+
+std::string StringUtil::DecodeURLComponent(std::string_view str)
+{
+  std::string ret;
+  ret.reserve(str.size());
+  for (size_t i = 0; i < str.size(); i++)
+  {
+    if (str[i] == '%' && i + 2 < str.size())
+    {
+      if (const std::optional<u8> value = StringUtil::FromChars<u8>(str.substr(i + 1, 2), 16); value.has_value())
+      {
+        ret.push_back(static_cast<char>(value.value()));
+        i += 2;
+        continue;
+      }
+    }
+
+    ret.push_back(str[i]);
+  }
+
+  return ret;
+}
+
 std::string_view StringUtil::StripWhitespace(const std::string_view str)
 {
   std::string_view::size_type start = 0;

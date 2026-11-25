@@ -32,6 +32,7 @@
 #include "pcdrv.h"
 #include "psf_loader.h"
 #include "save_state_version.h"
+#include "save_sync.h"
 #include "sio.h"
 #include "spu.h"
 #include "texture_replacements.h"
@@ -1557,6 +1558,7 @@ bool System::BootSystem(SystemBootParameters parameters, Error* error)
   s_keep_gpu_device_on_shutdown = static_cast<bool>(g_gpu_device);
   s_region = g_settings.region;
   Host::OnSystemStarting();
+  SaveSync::SyncAndReport();
 
   // Load CD image up and detect region.
   std::unique_ptr<CDImage> disc;
@@ -1980,6 +1982,7 @@ void System::DestroySystem()
 
   Host::OnSystemDestroyed();
   Host::OnIdleStateChanged();
+  SaveSync::SyncAndReport();
 }
 
 void System::ClearRunningGame()

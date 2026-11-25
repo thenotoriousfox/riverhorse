@@ -141,6 +141,9 @@ set(SRCS
   qtutils.cpp
   qtutils.h
   resource.h
+  savesyncsettingswidget.cpp
+  savesyncsettingswidget.h
+  savesyncsettingswidget.ui
   selectdiscdialog.cpp
   selectdiscdialog.h
   selectdiscdialog.ui

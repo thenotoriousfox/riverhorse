@@ -673,6 +673,7 @@ void RegTestHost::PrintCommandLineHelp(const char* progname)
   std::fprintf(stderr, "  -runahead <frames>: Runs ahead by the given number of frames.\n");
   std::fprintf(stderr, "  -cheats: Loads the game's cheat file from the cheats directory.\n");
   std::fprintf(stderr, "  -patch <name>: Turns on the game's patch with this name. Can be repeated.\n");
+  std::fprintf(stderr, "  -setting <Section/Key=Value>: Sets any setting. Can be repeated.\n");
   std::fprintf(stderr, "  -frames: Sets the number of frames to execute.\n");
   std::fprintf(stderr, "  -log <level>: Sets the log level. Defaults to verbose.\n");
   std::fprintf(stderr, "  -renderer <renderer>: Sets the graphics renderer. Default to software.\n");
@@ -796,6 +797,24 @@ bool RegTestHost::ParseCommandLineParameters(int argc, char* argv[], std::option
       else if (CHECK_ARG_PARAM("-patch"))
       {
         s_base_settings_interface->AddToStringList("Patches", "Enable", argv[++i]);
+        continue;
+      }
+      else if (CHECK_ARG_PARAM("-setting"))
+      {
+        const std::string_view setting = argv[++i];
+        const size_t slash = setting.find('/');
+        const size_t equals = setting.find('=');
+        if (slash == std::string_view::npos || equals == std::string_view::npos || equals < slash)
+        {
+          ERROR_LOG("Invalid setting '{}', expected Section/Key=Value.", setting);
+          return false;
+        }
+
+        s_base_settings_interface->SetStringValue(std::string(setting.substr(0, slash)).c_str(),
+                                                  std::string(setting.substr(slash + 1, equals - slash - 1)).c_str(),
+                                                  std::string(setting.substr(equals + 1)).c_str());
+        EmuFolders::LoadConfig(*s_base_settings_interface.get());
+        EmuFolders::EnsureFoldersExist();
         continue;
       }
       else if (CHECK_ARG_PARAM("-runahead"))

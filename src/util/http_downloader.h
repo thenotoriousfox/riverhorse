@@ -31,12 +31,6 @@ public:
     using Data = std::vector<u8>;
     using Callback = std::function<void(s32 status_code, const std::string& content_type, Data data)>;
 
-    enum class Type
-    {
-      Get,
-      Post,
-    };
-
     enum class State
     {
       Pending,
@@ -49,7 +43,9 @@ public:
     HTTPDownloader* parent;
     Callback callback;
     ProgressCallback* progress;
+    std::string method;
     std::string url;
+    std::vector<std::string> headers;
     std::string post_data;
     std::string content_type;
     Data data;
@@ -57,7 +53,6 @@ public:
     s32 status_code = 0;
     u32 content_length = 0;
     u32 last_progress_update = 0;
-    Type type = Type::Get;
     std::atomic<State> state{State::Pending};
   };
 
@@ -73,6 +68,10 @@ public:
   void CreateRequest(std::string url, Request::Callback callback, ProgressCallback* progress = nullptr);
   void CreatePostRequest(std::string url, std::string post_data, Request::Callback callback,
                          ProgressCallback* progress = nullptr);
+
+  /// Sends a request with any method, such as WebDAV's PROPFIND or PUT. Each header is "Name: value".
+  void CreateCustomRequest(std::string method, std::string url, std::vector<std::string> headers, std::string body,
+                           Request::Callback callback);
   void PollRequests();
   void WaitForAllRequests();
   bool HasAnyRequests();
@@ -86,6 +85,7 @@ protected:
   virtual bool StartRequest(Request* request) = 0;
   virtual void CloseRequest(Request* request) = 0;
 
+  void QueueRequest(Request* request);
   void LockedAddRequest(Request* request);
   u32 LockedGetActiveRequestCount();
   void LockedPollRequests(std::unique_lock<std::mutex>& lock);

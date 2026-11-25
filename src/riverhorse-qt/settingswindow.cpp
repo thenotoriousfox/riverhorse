@@ -18,6 +18,7 @@
 #include "mainwindow.h"
 #include "memorycardsettingswidget.h"
 #include "postprocessingsettingswidget.h"
+#include "savesyncsettingswidget.h"
 #include "qthost.h"
 
 #include "core/achievements.h"
@@ -166,6 +167,11 @@ void SettingsWindow::addPages()
 
   if (!isPerGameSettings())
   {
+    addWidget(new SaveSyncSettingsWidget(this, m_ui.settingsContainer), tr("Save Sync"),
+              QStringLiteral("refresh-line"),
+              tr("<strong>Save Sync</strong><hr>Keeps memory cards, save states and game settings the same on all your "
+                 "devices, through a synced folder or a WebDAV server. Mouse over an option for additional "
+                 "information."));
     addWidget(
       m_folder_settings = new FolderSettingsWidget(this, m_ui.settingsContainer), tr("Folders"),
       QStringLiteral("folder-settings-line"),

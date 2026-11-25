@@ -111,6 +111,10 @@ add_library(core
   psf_loader.cpp
   psf_loader.h
   save_state_version.h
+  save_sync.cpp
+  save_sync.h
+  save_sync_backends.cpp
+  save_sync_backends.h
   settings.cpp
   settings.h
   shader_cache_version.h

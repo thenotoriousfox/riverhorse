@@ -12,6 +12,7 @@
 #include "netplay.h"
 #include "gpu.h"
 #include "host.h"
+#include "save_sync.h"
 #include "settings.h"
 #include "system.h"
 
@@ -408,6 +409,7 @@ static void DrawFloatListSetting(SettingsInterface* bsi, const char* title, cons
                                  const float* option_values, size_t option_count, bool translate_options,
                                  bool enabled = true, float height = ImGuiFullscreen::LAYOUT_MENU_BUTTON_HEIGHT,
                                  ImFont* font = g_large_font, ImFont* summary_font = g_medium_font);
+static void DrawSaveSyncSettings(SettingsInterface* bsi);
 static void DrawFolderSetting(SettingsInterface* bsi, const char* title, const char* section, const char* key,
                               const std::string& runtime_var, float height = ImGuiFullscreen::LAYOUT_MENU_BUTTON_HEIGHT,
                               ImFont* font = g_large_font, ImFont* summary_font = g_medium_font);
@@ -4807,7 +4809,80 @@ void FullscreenUI::DrawMemoryCardSettingsPage()
     }
   }
 
+  if (!game_settings)
+    DrawSaveSyncSettings(bsi);
+
   EndMenuButtons();
+}
+
+void FullscreenUI::DrawSaveSyncSettings(SettingsInterface* bsi)
+{
+  MenuHeading(FSUI_CSTR("Save Sync"));
+  DrawEnumSetting(bsi, FSUI_ICONSTR(ICON_FA_SYNC, "Sync With"),
+                  FSUI_CSTR("Keeps memory cards, save states and game settings the same on all your devices, through "
+                            "a folder another program syncs or a WebDAV server."),
+                  "SaveSync", "Mode", SaveSync::Mode::Disabled, &SaveSync::ParseModeName, &SaveSync::GetModeName,
+                  &SaveSync::GetModeDisplayName, SaveSync::Mode::Count);
+
+  const SaveSync::Mode mode =
+    SaveSync::ParseModeName(
+      bsi->GetTinyStringValue("SaveSync", "Mode", SaveSync::GetModeName(SaveSync::Mode::Disabled)).c_str())
+      .value_or(SaveSync::Mode::Disabled);
+  if (mode == SaveSync::Mode::Disabled)
+    return;
+
+  const auto draw_text_setting = [bsi](const char* title, const char* summary, const char* key, bool secret) {
+    const std::string value = bsi->GetStringValue("SaveSync", key);
+    const char* shown_value = value.empty() ? FSUI_CSTR("Not Set") : (secret ? "********" : value.c_str());
+    if (MenuButtonWithValue(title, summary, shown_value))
+    {
+      OpenInputStringDialog(title, summary, std::string(), FSUI_STR("OK"),
+                            [key = TinyString(key)](std::string new_value) {
+                              SettingsInterface* bsi = GetEditingSettingsInterface();
+                              bsi->SetStringValue("SaveSync", key.c_str(),
+                                                  std::string(StringUtil::StripWhitespace(new_value)).c_str());
+                              SetSettingsChanged(bsi);
+                            },
+                            secret ? std::string() : value);
+    }
+  };
+
+  if (mode == SaveSync::Mode::Folder)
+  {
+    DrawFolderSetting(bsi, FSUI_ICONSTR(ICON_FA_FOLDER_OPEN, "Sync Folder"), "SaveSync", "Folder",
+                      bsi->GetStringValue("SaveSync", "Folder"));
+  }
+  else
+  {
+    draw_text_setting(FSUI_ICONSTR(ICON_FA_GLOBE, "Server Address"),
+                      FSUI_CSTR("WebDAV address of a folder for Riverhorse's saves."), "URL", false);
+    draw_text_setting(FSUI_ICONSTR(ICON_FA_USER, "Username"), FSUI_CSTR("Your account on the WebDAV server."),
+                      "Username", false);
+    draw_text_setting(FSUI_ICONSTR(ICON_FA_KEY, "Password"),
+                      FSUI_CSTR("Your WebDAV password, stored in settings.ini."), "Password", true);
+  }
+
+  draw_text_setting(FSUI_ICONSTR(ICON_FA_TAG, "Device Name"),
+                    FSUI_CSTR("Used in the names of conflict copies. Empty uses this device's name."), "DeviceName",
+                    false);
+  DrawToggleSetting(bsi, FSUI_ICONSTR(ICON_FA_SD_CARD, "Sync Memory Cards"), FSUI_CSTR("Syncs memory card files."),
+                    "SaveSync", "MemoryCards", true);
+  DrawToggleSetting(bsi, FSUI_ICONSTR(ICON_FA_SAVE, "Sync Save States"),
+                    FSUI_CSTR("Syncs save states, including the one made when a game closes, so you can resume on "
+                              "another device."),
+                    "SaveSync", "SaveStates", true);
+  DrawToggleSetting(bsi, FSUI_ICONSTR(ICON_FA_COGS, "Sync Game Settings"),
+                    FSUI_CSTR("Syncs the settings you change for individual games."), "SaveSync", "GameSettings",
+                    true);
+
+  if (MenuButton(FSUI_ICONSTR(ICON_FA_SYNC, "Sync Now"),
+                 System::IsValid() ? FSUI_CSTR("Close the game first.") :
+                                     FSUI_CSTR("Syncs now. Riverhorse also syncs at startup, before a game boots and "
+                                               "after it closes."),
+                 !System::IsValid()))
+  {
+    Host::RunOnCPUThread(&SaveSync::SyncAndReport);
+  }
 }
 
 void FullscreenUI::DrawDisplaySettingsPage()

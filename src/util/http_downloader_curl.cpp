@@ -173,11 +173,18 @@ bool HTTPDownloaderCurl::StartRequest(HTTPDownloader::Request* request)
   curl_easy_setopt(req->handle, CURLOPT_PRIVATE, req);
   curl_easy_setopt(req->handle, CURLOPT_FOLLOWLOCATION, 1L);
 
-  if (request->type == Request::Type::Post)
+  if (request->method != "GET")
   {
-    curl_easy_setopt(req->handle, CURLOPT_POST, 1L);
-    curl_easy_setopt(req->handle, CURLOPT_POSTFIELDS, request->post_data.c_str());
+    curl_easy_setopt(req->handle, CURLOPT_POSTFIELDS, request->post_data.data());
+    curl_easy_setopt(req->handle, CURLOPT_POSTFIELDSIZE_LARGE, static_cast<curl_off_t>(request->post_data.size()));
+    if (request->method != "POST")
+      curl_easy_setopt(req->handle, CURLOPT_CUSTOMREQUEST, request->method.c_str());
   }
+
+  for (const std::string& header : request->headers)
+    req->header_list = curl_slist_append(req->header_list, header.c_str());
+  if (req->header_list)
+    curl_easy_setopt(req->handle, CURLOPT_HTTPHEADER, req->header_list);
 
   DEV_LOG("Started HTTP request for '{}'", req->url);
   req->state.store(Request::State::Started, std::memory_order_release);
@@ -189,6 +196,7 @@ bool HTTPDownloaderCurl::StartRequest(HTTPDownloader::Request* request)
     ERROR_LOG("curl_multi_add_handle() returned {}", static_cast<int>(err));
     req->callback(HTTP_STATUS_ERROR, std::string(), req->data);
     curl_easy_cleanup(req->handle);
+    curl_slist_free_all(req->header_list);
     delete req;
     return false;
   }
@@ -202,5 +210,6 @@ void HTTPDownloaderCurl::CloseRequest(HTTPDownloader::Request* request)
   DebugAssert(req->handle);
   curl_multi_remove_handle(m_multi_handle, req->handle);
   curl_easy_cleanup(req->handle);
+  curl_slist_free_all(req->header_list);
   delete req;
 }

@@ -258,7 +258,7 @@ bool HTTPDownloaderWinHttp::StartRequest(HTTPDownloader::Request* request)
 
   const DWORD request_flags = uc.nScheme == INTERNET_SCHEME_HTTPS ? WINHTTP_FLAG_SECURE : 0;
   req->hRequest =
-    WinHttpOpenRequest(req->hConnection, (req->type == HTTPDownloader::Request::Type::Post) ? L"POST" : L"GET",
+    WinHttpOpenRequest(req->hConnection, StringUtil::UTF8StringToWideString(req->method).c_str(),
                        req->object_name.c_str(), NULL, NULL, NULL, request_flags);
   if (!req->hRequest)
   {
@@ -267,19 +267,18 @@ bool HTTPDownloaderWinHttp::StartRequest(HTTPDownloader::Request* request)
     return false;
   }
 
-  BOOL result;
-  if (req->type == HTTPDownloader::Request::Type::Post)
+  std::string headers;
+  for (const std::string& header : req->headers)
   {
-    const std::wstring_view additional_headers(L"Content-Type: application/x-www-form-urlencoded\r\n");
-    result = WinHttpSendRequest(req->hRequest, additional_headers.data(), static_cast<DWORD>(additional_headers.size()),
-                                req->post_data.data(), static_cast<DWORD>(req->post_data.size()),
-                                static_cast<DWORD>(req->post_data.size()), reinterpret_cast<DWORD_PTR>(req));
+    headers.append(header);
+    headers.append("\r\n");
   }
-  else
-  {
-    result = WinHttpSendRequest(req->hRequest, WINHTTP_NO_ADDITIONAL_HEADERS, 0, WINHTTP_NO_REQUEST_DATA, 0, 0,
-                                reinterpret_cast<DWORD_PTR>(req));
-  }
+  const std::wstring headers_wide(StringUtil::UTF8StringToWideString(headers));
+  const BOOL result = WinHttpSendRequest(
+    req->hRequest, headers_wide.empty() ? WINHTTP_NO_ADDITIONAL_HEADERS : headers_wide.c_str(),
+    static_cast<DWORD>(headers_wide.size()), req->post_data.empty() ? WINHTTP_NO_REQUEST_DATA : req->post_data.data(),
+    static_cast<DWORD>(req->post_data.size()), static_cast<DWORD>(req->post_data.size()),
+    reinterpret_cast<DWORD_PTR>(req));
 
   if (!result && GetLastError() != ERROR_IO_PENDING)
   {

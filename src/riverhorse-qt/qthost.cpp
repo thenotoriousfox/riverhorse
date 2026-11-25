@@ -21,6 +21,7 @@
 #include "core/imgui_overlays.h"
 #include "core/memory_card.h"
 #include "core/netplay.h"
+#include "core/save_sync.h"
 #include "core/spu.h"
 #include "core/system.h"
 
@@ -1607,6 +1608,8 @@ void EmuThread::run()
   // bind buttons/axises
   createBackgroundControllerPollTimer();
   startBackgroundControllerPollTimer();
+
+  SaveSync::SyncAndReport();
 
   // main loop
   while (!m_shutdown_flag)

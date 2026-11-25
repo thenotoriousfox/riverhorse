@@ -205,6 +205,13 @@ inline std::string ToChars(bool value, int base)
 std::optional<std::vector<u8>> DecodeHex(const std::string_view str);
 std::string EncodeHex(const u8* data, int length);
 
+/// Encodes bytes as standard Base64 with padding.
+std::string EncodeBase64(std::string_view data);
+
+/// Percent-encodes everything except unreserved URL characters, for one path segment or query value.
+std::string EncodeURLComponent(std::string_view str);
+std::string DecodeURLComponent(std::string_view str);
+
 /// StartsWith/EndsWith variants which aren't case sensitive.
 ALWAYS_INLINE static bool StartsWithNoCase(const std::string_view str, const std::string_view prefix)
 {

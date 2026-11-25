@@ -6,6 +6,13 @@ Changes since the DuckStation `v0.1-7371` base. Releases are tagged
 ## Unreleased
 
 ### New
+- Save sync: memory cards, save states and per-game settings stay the same on
+  every device, through a folder another program syncs (Syncthing, Dropbox,
+  Nextcloud) or a WebDAV server. Syncs at startup, before a game boots and
+  after it closes, so a game closed on one device resumes on another. A save
+  changed on two devices is kept twice, the older copy named after its device;
+  files a sync replaces or removes are kept for 30 days. Settings → Save Sync,
+  or Big Picture's Memory Cards page.
 - Frameskip setting (Emulation settings and Big Picture, on by default): when
   the system can't keep up, up to three frames in a row go undisplayed instead
   of one, and it can now be turned off.

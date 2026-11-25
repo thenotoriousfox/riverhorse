@@ -1,0 +1,187 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>SaveSyncSettingsWidget</class>
+ <widget class="QWidget" name="SaveSyncSettingsWidget">
+  <layout class="QVBoxLayout" name="verticalLayout">
+   <property name="leftMargin">
+    <number>0</number>
+   </property>
+   <property name="topMargin">
+    <number>0</number>
+   </property>
+   <property name="rightMargin">
+    <number>0</number>
+   </property>
+   <property name="bottomMargin">
+    <number>0</number>
+   </property>
+   <item>
+    <widget class="QGroupBox" name="locationGroup">
+     <property name="title">
+      <string>Sync Location</string>
+     </property>
+     <layout class="QFormLayout" name="locationLayout">
+      <item row="0" column="0">
+       <widget class="QLabel" name="modeLabel">
+        <property name="text">
+         <string>Sync With:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="1">
+       <widget class="QComboBox" name="mode"/>
+      </item>
+      <item row="1" column="0">
+       <widget class="QLabel" name="folderLabel">
+        <property name="text">
+         <string>Folder:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="1">
+       <layout class="QHBoxLayout" name="folderLayout">
+        <item>
+         <widget class="QLineEdit" name="folder"/>
+        </item>
+        <item>
+         <widget class="QPushButton" name="folderBrowse">
+          <property name="text">
+           <string>Browse...</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+      <item row="2" column="0">
+       <widget class="QLabel" name="urlLabel">
+        <property name="text">
+         <string>Server Address:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="1">
+       <widget class="QLineEdit" name="url">
+        <property name="placeholderText">
+         <string>https://cloud.example.com/remote.php/dav/files/you/Riverhorse/</string>
+        </property>
+       </widget>
+      </item>
+      <item row="3" column="0">
+       <widget class="QLabel" name="usernameLabel">
+        <property name="text">
+         <string>Username:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="3" column="1">
+       <widget class="QLineEdit" name="username"/>
+      </item>
+      <item row="4" column="0">
+       <widget class="QLabel" name="passwordLabel">
+        <property name="text">
+         <string>Password:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="4" column="1">
+       <widget class="QLineEdit" name="password">
+        <property name="echoMode">
+         <enum>QLineEdit::Password</enum>
+        </property>
+       </widget>
+      </item>
+      <item row="5" column="0">
+       <widget class="QLabel" name="deviceNameLabel">
+        <property name="text">
+         <string>Device Name:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="5" column="1">
+       <widget class="QLineEdit" name="deviceName"/>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QGroupBox" name="contentsGroup">
+     <property name="title">
+      <string>What to Sync</string>
+     </property>
+     <layout class="QGridLayout" name="contentsLayout">
+      <item row="0" column="0">
+       <widget class="QCheckBox" name="memoryCards">
+        <property name="text">
+         <string>Memory Cards</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="1">
+       <widget class="QCheckBox" name="saveStates">
+        <property name="text">
+         <string>Save States</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="2">
+       <widget class="QCheckBox" name="gameSettings">
+        <property name="text">
+         <string>Game Settings</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="syncNowLayout">
+     <item>
+      <widget class="QPushButton" name="syncNow">
+       <property name="text">
+        <string>Sync Now</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QLabel" name="status">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+         <horstretch>0</horstretch>
+         <verstretch>0</verstretch>
+        </sizepolicy>
+       </property>
+       <property name="wordWrap">
+        <bool>true</bool>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+   <item>
+    <widget class="QLabel" name="explanation">
+     <property name="text">
+      <string>Riverhorse syncs when it starts, before a game boots and after it closes. A save changed on two devices is kept twice: the older copy gets "conflict" and the device name in its file name. Files replaced or removed by a sync are kept for 30 days in the savesync/backup folder of the user directory. The password is stored in settings.ini.</string>
+     </property>
+     <property name="wordWrap">
+      <bool>true</bool>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <spacer name="verticalSpacer">
+     <property name="orientation">
+      <enum>Qt::Vertical</enum>
+     </property>
+     <property name="sizeHint" stdset="0">
+      <size>
+       <width>20</width>
+       <height>40</height>
+      </size>
+     </property>
+    </spacer>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

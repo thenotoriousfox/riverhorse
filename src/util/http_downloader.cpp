@@ -38,33 +38,42 @@ void HTTPDownloader::SetMaxActiveRequests(u32 max_active_requests)
 void HTTPDownloader::CreateRequest(std::string url, Request::Callback callback, ProgressCallback* progress)
 {
   Request* req = InternalCreateRequest();
-  req->parent = this;
-  req->type = Request::Type::Get;
+  req->method = "GET";
   req->url = std::move(url);
   req->callback = std::move(callback);
   req->progress = progress;
-  req->start_time = Common::Timer::GetCurrentValue();
-
-  std::unique_lock<std::mutex> lock(m_pending_http_request_lock);
-  if (LockedGetActiveRequestCount() < m_max_active_requests)
-  {
-    if (!StartRequest(req))
-      return;
-  }
-
-  LockedAddRequest(req);
+  QueueRequest(req);
 }
 
 void HTTPDownloader::CreatePostRequest(std::string url, std::string post_data, Request::Callback callback,
                                        ProgressCallback* progress)
 {
   Request* req = InternalCreateRequest();
-  req->parent = this;
-  req->type = Request::Type::Post;
+  req->method = "POST";
   req->url = std::move(url);
+  req->headers.emplace_back("Content-Type: application/x-www-form-urlencoded");
   req->post_data = std::move(post_data);
   req->callback = std::move(callback);
   req->progress = progress;
+  QueueRequest(req);
+}
+
+void HTTPDownloader::CreateCustomRequest(std::string method, std::string url, std::vector<std::string> headers,
+                                         std::string body, Request::Callback callback)
+{
+  Request* req = InternalCreateRequest();
+  req->method = std::move(method);
+  req->url = std::move(url);
+  req->headers = std::move(headers);
+  req->post_data = std::move(body);
+  req->callback = std::move(callback);
+  req->progress = nullptr;
+  QueueRequest(req);
+}
+
+void HTTPDownloader::QueueRequest(Request* req)
+{
+  req->parent = this;
   req->start_time = Common::Timer::GetCurrentValue();
 
   std::unique_lock<std::mutex> lock(m_pending_http_request_lock);
