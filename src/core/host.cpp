@@ -253,7 +253,8 @@ void Host::Internal::SetNetplaySettingsLayer(SettingsInterface* sif)
 
 std::string Host::GetHTTPUserAgent()
 {
-  return fmt::format("Riverhorse for {} ({}) {}", TARGET_OS_STR, CPU_ARCH_STR, g_scm_tag_str);
+  const std::string_view tag = g_scm_tag_str;
+  return fmt::format("Riverhorse/{} ({} {})", tag.substr(0, tag.find('-')), TARGET_OS_STR, CPU_ARCH_STR);
 }
 
 bool Host::CreateGPUDevice(RenderAPI api, Error* error)
