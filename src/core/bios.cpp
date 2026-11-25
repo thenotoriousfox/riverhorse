@@ -15,10 +15,40 @@
 #include "common/path.h"
 #include "common/string_util.h"
 
+#include <ctime>
+#include <mutex>
+#include <span>
+#include <unordered_map>
+
 Log_SetChannel(BIOS);
 
 namespace BIOS {
-static const ImageInfo* GetInfoForHash(const std::span<u8> image, const ImageInfo::Hash& hash);
+namespace {
+struct IdentifiedFile
+{
+  ImageInfo::Hash hash;
+  const ImageInfo* info;
+};
+
+struct HashCacheEntry
+{
+  s64 size;
+  std::time_t modification_time;
+  ImageInfo::Hash hash;
+  bool openbios;
+};
+} // namespace
+
+static bool IsOpenBIOS(std::span<const u8> image);
+static const ImageInfo* GetInfoForHash(bool openbios, const ImageInfo::Hash& hash);
+static std::optional<IdentifiedFile> IdentifyFile(const char* directory, const FILESYSTEM_FIND_DATA& fd);
+static void LoadHashCache();
+static void SaveHashCache();
+
+static std::mutex s_hash_cache_mutex;
+static std::unordered_map<std::string, HashCacheEntry> s_hash_cache;
+static bool s_hash_cache_loaded = false;
+static bool s_hash_cache_dirty = false;
 
 static constexpr ImageInfo::Hash MakeHashFromString(const char str[])
 {
@@ -200,20 +230,22 @@ std::optional<BIOS::Image> BIOS::LoadImageFromFile(const char* filename, Error* 
   // But only copy the first 512KB, since that's all that's mapped.
   ret->data = std::move(data.value());
   ret->data.resize(BIOS_SIZE);
-  ret->info = GetInfoForHash(ret->data, ret->hash);
+  ret->info = GetInfoForHash(IsOpenBIOS(ret->data), ret->hash);
 
   DEV_LOG("Hash for BIOS '{}': {}", FileSystem::GetDisplayNameFromPath(filename), ImageInfo::GetHashString(ret->hash));
   return ret;
 }
 
-const BIOS::ImageInfo* BIOS::GetInfoForHash(const std::span<u8> image, const ImageInfo::Hash& hash)
+bool BIOS::IsOpenBIOS(std::span<const u8> image)
 {
-  // check for openbios
-  if (image.size() >= (s_openbios_signature_offset + std::size(s_openbios_signature)) &&
-      std::memcmp(&image[s_openbios_signature_offset], s_openbios_signature, std::size(s_openbios_signature)) == 0)
-  {
+  return (image.size() >= (s_openbios_signature_offset + std::size(s_openbios_signature)) &&
+          std::memcmp(&image[s_openbios_signature_offset], s_openbios_signature, std::size(s_openbios_signature)) == 0);
+}
+
+const BIOS::ImageInfo* BIOS::GetInfoForHash(bool openbios, const ImageInfo::Hash& hash)
+{
+  if (openbios)
     return &s_openbios_info;
-  }
 
   for (const ImageInfo& ii : s_image_info_by_hash)
   {
@@ -361,6 +393,89 @@ std::optional<BIOS::Image> BIOS::GetBIOSImage(ConsoleRegion region, Error* error
   return image;
 }
 
+void BIOS::LoadHashCache()
+{
+  s_hash_cache_loaded = true;
+  if (EmuFolders::Cache.empty())
+    return;
+
+  const std::optional<std::string> data = FileSystem::ReadFileToString(Path::Combine(EmuFolders::Cache, "bios.cache").c_str());
+  if (!data.has_value())
+    return;
+
+  for (const std::string_view line : StringUtil::SplitString(data.value(), '\n'))
+  {
+    const std::vector<std::string_view> fields = StringUtil::SplitString(line, ' ', false);
+    if (fields.size() < 5 || fields[0].size() != ImageInfo::HASH_SIZE * 2)
+      continue;
+
+    HashCacheEntry entry = {};
+    bool valid = true;
+    for (u32 i = 0; i < ImageInfo::HASH_SIZE && valid; i++)
+    {
+      const std::optional<u8> byte = StringUtil::FromChars<u8>(fields[0].substr(i * 2, 2), 16);
+      valid = byte.has_value();
+      entry.hash[i] = byte.value_or(0);
+    }
+    const std::optional<s64> size = StringUtil::FromChars<s64>(fields[1]);
+    const std::optional<s64> modification_time = StringUtil::FromChars<s64>(fields[2]);
+    if (!valid || !size.has_value() || !modification_time.has_value())
+      continue;
+
+    entry.size = size.value();
+    entry.modification_time = static_cast<std::time_t>(modification_time.value());
+    entry.openbios = (fields[3] == "1");
+    const size_t path_start = fields[4].data() - line.data();
+    s_hash_cache.insert_or_assign(std::string(line.substr(path_start)), entry);
+  }
+}
+
+void BIOS::SaveHashCache()
+{
+  if (!s_hash_cache_dirty || EmuFolders::Cache.empty())
+    return;
+
+  std::string data;
+  for (const auto& [path, entry] : s_hash_cache)
+  {
+    data += fmt::format("{} {} {} {} {}\n", ImageInfo::GetHashString(entry.hash), entry.size,
+                        static_cast<s64>(entry.modification_time), entry.openbios ? 1 : 0, path);
+  }
+
+  Error error;
+  if (FileSystem::WriteStringToFile(Path::Combine(EmuFolders::Cache, "bios.cache").c_str(), data, &error))
+    s_hash_cache_dirty = false;
+  else
+    WARNING_LOG("Failed to write the BIOS hash cache: {}", error.GetDescription());
+}
+
+std::optional<BIOS::IdentifiedFile> BIOS::IdentifyFile(const char* directory, const FILESYSTEM_FIND_DATA& fd)
+{
+  if (fd.Size != BIOS_SIZE && fd.Size != BIOS_SIZE_PS2 && fd.Size != BIOS_SIZE_PS3)
+    return std::nullopt;
+
+  std::string path = Path::Combine(directory, fd.FileName);
+  {
+    std::unique_lock lock(s_hash_cache_mutex);
+    if (!s_hash_cache_loaded)
+      LoadHashCache();
+
+    const auto it = s_hash_cache.find(path);
+    if (it != s_hash_cache.end() && it->second.size == fd.Size && it->second.modification_time == fd.ModificationTime)
+      return IdentifiedFile{it->second.hash, GetInfoForHash(it->second.openbios, it->second.hash)};
+  }
+
+  const std::optional<Image> image = LoadImageFromFile(path.c_str(), nullptr);
+  if (!image.has_value())
+    return std::nullopt;
+
+  std::unique_lock lock(s_hash_cache_mutex);
+  s_hash_cache.insert_or_assign(std::move(path),
+                                HashCacheEntry{fd.Size, fd.ModificationTime, image->hash, IsOpenBIOS(image->data)});
+  s_hash_cache_dirty = true;
+  return IdentifiedFile{image->hash, image->info};
+}
+
 std::optional<BIOS::Image> BIOS::FindBIOSImageInDirectory(ConsoleRegion region, const char* directory, Error* error)
 {
   INFO_LOG("Searching for a {} BIOS in '{}'...", Settings::GetConsoleRegionName(region), directory);
@@ -369,36 +484,41 @@ std::optional<BIOS::Image> BIOS::FindBIOSImageInDirectory(ConsoleRegion region, 
   FileSystem::FindFiles(
     directory, "*", FILESYSTEM_FIND_FILES | FILESYSTEM_FIND_HIDDEN_FILES | FILESYSTEM_FIND_RELATIVE_PATHS, &results);
 
-  std::optional<Image> image;
+  std::optional<IdentifiedFile> best;
   std::string image_path;
   bool image_region_match = false;
 
   for (const FILESYSTEM_FIND_DATA& fd : results)
   {
-    if (fd.Size != BIOS_SIZE && fd.Size != BIOS_SIZE_PS2 && fd.Size != BIOS_SIZE_PS3)
+    const std::optional<IdentifiedFile> found = IdentifyFile(directory, fd);
+    if (!found.has_value())
     {
-      WARNING_LOG("Skipping '{}': incorrect size", fd.FileName.c_str());
+      WARNING_LOG("Skipping '{}': not a BIOS image", fd.FileName.c_str());
       continue;
     }
-
-    std::string full_path(Path::Combine(directory, fd.FileName));
-    std::optional<Image> found_image = LoadImageFromFile(full_path.c_str(), nullptr);
-    if (!found_image.has_value())
-      continue;
 
     // don't let an unknown bios take precedence over a known one
-    const bool region_match = (found_image->info && IsValidBIOSForRegion(region, found_image->info->region));
-    if (image.has_value() &&
-        ((image->info && !found_image->info) || (image_region_match && !region_match) ||
-         (image->info && found_image->info && image->info->priority < found_image->info->priority)))
+    const bool region_match = (found->info && IsValidBIOSForRegion(region, found->info->region));
+    if (best.has_value() &&
+        ((best->info && !found->info) || (image_region_match && !region_match) ||
+         (best->info && found->info && best->info->priority < found->info->priority)))
     {
       continue;
     }
 
-    image = std::move(found_image);
-    image_path = std::move(full_path);
+    best = found;
+    image_path = Path::Combine(directory, fd.FileName);
     image_region_match = region_match;
   }
+
+  {
+    std::unique_lock lock(s_hash_cache_mutex);
+    SaveHashCache();
+  }
+
+  std::optional<Image> image;
+  if (best.has_value())
+    image = LoadImageFromFile(image_path.c_str(), error);
 
   if (!image.has_value())
   {
@@ -433,17 +553,13 @@ std::vector<std::pair<std::string, const BIOS::ImageInfo*>> BIOS::FindBIOSImages
 
   for (FILESYSTEM_FIND_DATA& fd : files)
   {
-    if (fd.Size != BIOS_SIZE && fd.Size != BIOS_SIZE_PS2 && fd.Size != BIOS_SIZE_PS3)
-      continue;
-
-    std::string full_path(Path::Combine(directory, fd.FileName));
-    std::optional<Image> found_image = LoadImageFromFile(full_path.c_str(), nullptr);
-    if (!found_image)
-      continue;
-
-    results.emplace_back(std::move(fd.FileName), found_image->info);
+    const std::optional<IdentifiedFile> found = IdentifyFile(directory, fd);
+    if (found.has_value())
+      results.emplace_back(std::move(fd.FileName), found->info);
   }
 
+  std::unique_lock lock(s_hash_cache_mutex);
+  SaveHashCache();
   return results;
 }
 
@@ -453,17 +569,20 @@ std::string BIOS::FindBIOSFileWithHash(const char* directory, const ImageInfo::H
   FileSystem::FindFiles(directory, "*",
                         FILESYSTEM_FIND_FILES | FILESYSTEM_FIND_HIDDEN_FILES | FILESYSTEM_FIND_RELATIVE_PATHS, &files);
 
+  std::string result;
   for (FILESYSTEM_FIND_DATA& fd : files)
   {
-    if (fd.Size != BIOS_SIZE && fd.Size != BIOS_SIZE_PS2 && fd.Size != BIOS_SIZE_PS3)
-      continue;
-
-    const std::optional<Image> image = LoadImageFromFile(Path::Combine(directory, fd.FileName).c_str(), nullptr);
-    if (image.has_value() && image->hash == hash)
-      return std::move(fd.FileName);
+    const std::optional<IdentifiedFile> found = IdentifyFile(directory, fd);
+    if (found.has_value() && found->hash == hash)
+    {
+      result = std::move(fd.FileName);
+      break;
+    }
   }
 
-  return {};
+  std::unique_lock lock(s_hash_cache_mutex);
+  SaveHashCache();
+  return result;
 }
 
 bool BIOS::HasAnyBIOSImages()

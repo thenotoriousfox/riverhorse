@@ -44,6 +44,10 @@ Changes since the DuckStation `v0.1-7371` base. Releases are tagged
   renderer when the frontend has no hardware renderer at all.
 - macOS 10.15 builds no longer need a macOS 11 feature in the cover
   downloader.
+- Finding the BIOS no longer reads every BIOS-sized file in the BIOS folder on
+  each start: their hashes are kept in `cache/bios.cache` until a file
+  changes, so only the chosen image is read (about 40 MB less reading with a
+  full BIOS folder on a handheld).
 - PGXP uses about 30 MB less memory with the console's 2 MB of RAM: a reset
   cleared memory for the 8 MB development RAM.
 - libretro core: no longer starts every Vulkan driver at load. On frontends
