@@ -103,6 +103,12 @@ static const std::vector<Option> s_options = {
    s_on_off, "true", &ApplyForceAnalog},
   {"riverhorse_memory_card_2", "Memory Card 2", "Adds a second per-game memory card.", "MemoryCards", "Card2Type",
    {{"None", "Disabled"}, {"PerGameTitle", "Enabled"}}, "None"},
+  {"riverhorse_multitap", "Multitap",
+   "Connects a Multitap for up to four players per port. Users 3 to 5 are port 1's extra controllers, users 6 to 8 "
+   "port 2's.",
+   "ControllerPorts", "MultitapMode",
+   {{"Disabled", "Disabled"}, {"Port1Only", "Port 1"}, {"Port2Only", "Port 2"}, {"BothPorts", "Both Ports"}},
+   "Disabled"},
 };
 
 void Register(retro_environment_t environment)

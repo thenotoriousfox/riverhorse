@@ -2,15 +2,12 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 #include "core/achievements.h"
-#include "core/analog_controller.h"
 #include "core/bus.h"
 #include "core/cheats.h"
-#include "core/controller.h"
 #include "core/fullscreen_ui.h"
 #include "core/game_list.h"
 #include "core/gpu.h"
 #include "core/host.h"
-#include "core/pad.h"
 #include "core/spu.h"
 #include "core/netplay.h"
 #include "core/system.h"
@@ -34,6 +31,7 @@
 
 #include "libretro.h"
 #include "libretro_core_options.h"
+#include "libretro_input.h"
 #include "libretro_resources.h"
 #include "libretro_rumble.h"
 #ifdef ENABLE_OPENGL
@@ -55,14 +53,11 @@ namespace LibretroHost {
 static bool InitializeConfig();
 static void LogCallback(void* user, const char* channel, const char* function, LOGLEVEL level,
                         std::string_view message);
-static void UpdateInput();
 static void SendVideoFrame();
 static void SendAudio();
 static retro_game_geometry GetGeometry();
 static void UpdateGeometry();
 static void ApplyCoreOptions();
-static void ApplyPortDevices(SettingsInterface& si);
-static void RegisterControllers();
 static void RegisterDiscControl();
 static void UpdateCheats();
 static bool BootGame();
@@ -76,8 +71,6 @@ static void DestroyHardwareFrameResources();
 static retro_environment_t s_environment;
 static retro_video_refresh_t s_video_refresh;
 static retro_audio_sample_batch_t s_audio_sample_batch;
-static retro_input_poll_t s_input_poll;
-static retro_input_state_t s_input_state;
 static retro_log_printf_t s_log_printf;
 
 static std::unique_ptr<MemorySettingsInterface> s_base_settings_interface;
@@ -93,8 +86,6 @@ static bool s_can_dupe_frames = false;
 
 static std::vector<AudioStream::SampleType> s_audio_buffer;
 
-static constexpr unsigned RETRO_DEVICE_DUALSHOCK = RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_ANALOG, 1);
-static std::array<unsigned, 2> s_port_devices = {RETRO_DEVICE_DUALSHOCK, RETRO_DEVICE_DUALSHOCK};
 static std::string s_loaded_renderer;
 
 static bool s_tray_open = false;
@@ -115,27 +106,9 @@ static std::vector<u8> s_context_lost_state;
 static std::vector<std::string> s_cheat_codes;
 static std::vector<bool> s_cheat_enabled;
 
-static constexpr u32 PAD_PORT_COUNT = static_cast<u32>(std::tuple_size_v<decltype(s_port_devices)>);
 static constexpr u32 AUDIO_BUFFER_MS = 200;
-
-static constexpr std::array<std::pair<unsigned, AnalogController::Button>, 16> s_joypad_mapping = {{
-  {RETRO_DEVICE_ID_JOYPAD_B, AnalogController::Button::Cross},
-  {RETRO_DEVICE_ID_JOYPAD_A, AnalogController::Button::Circle},
-  {RETRO_DEVICE_ID_JOYPAD_Y, AnalogController::Button::Square},
-  {RETRO_DEVICE_ID_JOYPAD_X, AnalogController::Button::Triangle},
-  {RETRO_DEVICE_ID_JOYPAD_SELECT, AnalogController::Button::Select},
-  {RETRO_DEVICE_ID_JOYPAD_START, AnalogController::Button::Start},
-  {RETRO_DEVICE_ID_JOYPAD_UP, AnalogController::Button::Up},
-  {RETRO_DEVICE_ID_JOYPAD_DOWN, AnalogController::Button::Down},
-  {RETRO_DEVICE_ID_JOYPAD_LEFT, AnalogController::Button::Left},
-  {RETRO_DEVICE_ID_JOYPAD_RIGHT, AnalogController::Button::Right},
-  {RETRO_DEVICE_ID_JOYPAD_L, AnalogController::Button::L1},
-  {RETRO_DEVICE_ID_JOYPAD_R, AnalogController::Button::R1},
-  {RETRO_DEVICE_ID_JOYPAD_L2, AnalogController::Button::L2},
-  {RETRO_DEVICE_ID_JOYPAD_R2, AnalogController::Button::R2},
-  {RETRO_DEVICE_ID_JOYPAD_L3, AnalogController::Button::L3},
-  {RETRO_DEVICE_ID_JOYPAD_R3, AnalogController::Button::R3},
-}};
+static constexpr u32 POINTER_WINDOW_WIDTH = 640;
+static constexpr u32 POINTER_WINDOW_HEIGHT = 480;
 
 void LibretroHost::LogCallback(void* user, const char* channel, const char* function, LOGLEVEL level,
                                std::string_view message)
@@ -207,7 +180,7 @@ bool LibretroHost::InitializeConfig()
     si.SetBoolValue("InputSources", InputManager::InputSourceToString(static_cast<InputSourceType>(i)), false);
 
   LibretroCoreOptions::Apply(s_environment, si);
-  ApplyPortDevices(si);
+  LibretroInput::ApplyPortDevices(si);
   s_loaded_renderer = si.GetStringValue("GPU", "Renderer");
 
   EmuFolders::LoadConfig(si);
@@ -216,47 +189,6 @@ bool LibretroHost::InitializeConfig()
 
   ImGuiManager::SetFontPathAndRange(std::string(), {0x0020, 0x00FF, 0, 0});
   return true;
-}
-
-void LibretroHost::UpdateInput()
-{
-  s_input_poll();
-
-  for (u32 port = 0; port < PAD_PORT_COUNT; port++)
-  {
-    Controller* controller = Pad::GetController(port);
-    if (!controller)
-      continue;
-
-    for (const auto& [retro_id, button] : s_joypad_mapping)
-    {
-      const bool pressed = (s_input_state(port, RETRO_DEVICE_JOYPAD, 0, retro_id) != 0);
-      controller->SetBindState(static_cast<u32>(button), pressed ? 1.0f : 0.0f);
-    }
-
-    if (controller->GetType() != ControllerType::AnalogController)
-      continue;
-
-    static constexpr std::array<std::tuple<unsigned, unsigned, AnalogController::HalfAxis, AnalogController::HalfAxis>,
-                                4>
-      axes = {{
-        {RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X, AnalogController::HalfAxis::LLeft,
-         AnalogController::HalfAxis::LRight},
-        {RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_Y, AnalogController::HalfAxis::LUp,
-         AnalogController::HalfAxis::LDown},
-        {RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_X, AnalogController::HalfAxis::RLeft,
-         AnalogController::HalfAxis::RRight},
-        {RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_Y, AnalogController::HalfAxis::RUp,
-         AnalogController::HalfAxis::RDown},
-      }};
-    for (const auto& [index, id, negative, positive] : axes)
-    {
-      const float value = static_cast<float>(s_input_state(port, RETRO_DEVICE_ANALOG, index, id)) / 32767.0f;
-      const u32 base = static_cast<u32>(AnalogController::Button::Count);
-      controller->SetBindState(base + static_cast<u32>(negative), std::max(-value, 0.0f));
-      controller->SetBindState(base + static_cast<u32>(positive), std::max(value, 0.0f));
-    }
-  }
 }
 
 retro_game_geometry LibretroHost::GetGeometry()
@@ -283,7 +215,7 @@ void LibretroHost::ApplyCoreOptions()
 
   SettingsInterface& si = *s_base_settings_interface;
   LibretroCoreOptions::Apply(s_environment, si);
-  ApplyPortDevices(si);
+  LibretroInput::ApplyPortDevices(si);
   si.SetStringValue("GPU", "Renderer", s_loaded_renderer.c_str());
   System::ApplySettings(false);
 
@@ -293,72 +225,6 @@ void LibretroHost::ApplyCoreOptions()
     retro_get_system_av_info(&av_info);
     s_environment(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO, &av_info);
   }
-}
-
-void LibretroHost::ApplyPortDevices(SettingsInterface& si)
-{
-  for (u32 port = 0; port < PAD_PORT_COUNT; port++)
-  {
-    ControllerType type;
-    switch (s_port_devices[port])
-    {
-      case RETRO_DEVICE_NONE:
-        type = ControllerType::None;
-        break;
-      case RETRO_DEVICE_JOYPAD:
-        type = ControllerType::DigitalController;
-        break;
-      default:
-        type = ControllerType::AnalogController;
-        break;
-    }
-
-    si.SetStringValue(TinyString::from_format("Pad{}", port + 1), "Type", Controller::GetControllerInfo(type)->name);
-  }
-}
-
-void LibretroHost::RegisterControllers()
-{
-  static constexpr retro_controller_description types[] = {
-    {"DualShock", RETRO_DEVICE_DUALSHOCK},
-    {"Digital Controller", RETRO_DEVICE_JOYPAD},
-    {"None", RETRO_DEVICE_NONE},
-  };
-  static constexpr retro_controller_info ports[] = {
-    {types, std::size(types)},
-    {types, std::size(types)},
-    {nullptr, 0},
-  };
-  s_environment(RETRO_ENVIRONMENT_SET_CONTROLLER_INFO, const_cast<retro_controller_info*>(ports));
-
-  static constexpr retro_input_descriptor descriptors[] = {
-#define PORT_BUTTONS(port)                                                                                             \
-  {port, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT, "D-Pad Left"},                                           \
-    {port, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP, "D-Pad Up"},                                             \
-    {port, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN, "D-Pad Down"},                                         \
-    {port, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT, "D-Pad Right"},                                       \
-    {port, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B, "Cross"},                                                 \
-    {port, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A, "Circle"},                                                \
-    {port, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_X, "Triangle"},                                              \
-    {port, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_Y, "Square"},                                                \
-    {port, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L, "L1"},                                                    \
-    {port, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R, "R1"},                                                    \
-    {port, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L2, "L2"},                                                   \
-    {port, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R2, "R2"},                                                   \
-    {port, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L3, "L3"},                                                   \
-    {port, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R3, "R3"},                                                   \
-    {port, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_SELECT, "Select"},                                           \
-    {port, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START, "Start"},                                             \
-    {port, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X, "Left Stick X"},             \
-    {port, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_Y, "Left Stick Y"},             \
-    {port, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_X, "Right Stick X"},           \
-    {port, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_Y, "Right Stick Y"}
-    PORT_BUTTONS(0),
-    PORT_BUTTONS(1),
-#undef PORT_BUTTONS
-    {0, 0, 0, 0, nullptr},
-  };
-  s_environment(RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS, const_cast<retro_input_descriptor*>(descriptors));
 }
 
 void LibretroHost::RegisterDiscControl()
@@ -629,7 +495,7 @@ RETRO_API void retro_set_environment(retro_environment_t cb)
   cb(RETRO_ENVIRONMENT_SET_SUPPORT_NO_GAME, &no_game);
 
   LibretroCoreOptions::Register(cb);
-  LibretroHost::RegisterControllers();
+  LibretroInput::RegisterControllers(s_environment);
   LibretroHost::RegisterDiscControl();
 }
 
@@ -649,12 +515,12 @@ RETRO_API void retro_set_audio_sample_batch(retro_audio_sample_batch_t cb)
 
 RETRO_API void retro_set_input_poll(retro_input_poll_t cb)
 {
-  s_input_poll = cb;
+  LibretroInput::SetPollCallback(cb);
 }
 
 RETRO_API void retro_set_input_state(retro_input_state_t cb)
 {
-  s_input_state = cb;
+  LibretroInput::SetStateCallback(cb);
 }
 
 RETRO_API unsigned retro_api_version(void)
@@ -698,13 +564,12 @@ RETRO_API void retro_deinit(void)
 
 RETRO_API void retro_set_controller_port_device(unsigned port, unsigned device)
 {
-  if (port >= PAD_PORT_COUNT)
+  if (!LibretroInput::SetPortDevice(port, device))
     return;
 
-  s_port_devices[port] = device;
   if (System::IsValid())
   {
-    LibretroHost::ApplyPortDevices(*s_base_settings_interface);
+    LibretroInput::ApplyPortDevices(*s_base_settings_interface);
     System::ApplySettings(false);
   }
 }
@@ -722,7 +587,7 @@ RETRO_API void retro_run(void)
   if (!System::IsValid())
     return;
 
-  LibretroHost::UpdateInput();
+  LibretroInput::Update();
   System::ExecuteFrame();
   if (s_video_output == VideoOutput::Readback)
     LibretroHost::SendVideoFrame();
@@ -1065,6 +930,8 @@ std::optional<WindowInfo> Host::AcquireRenderWindow(bool recreate_window)
 {
   WindowInfo wi;
   wi.SetSurfaceless();
+  wi.surface_width = POINTER_WINDOW_WIDTH;
+  wi.surface_height = POINTER_WINDOW_HEIGHT;
   return wi;
 }
 

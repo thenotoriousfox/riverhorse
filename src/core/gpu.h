@@ -196,6 +196,10 @@ public:
   bool ConvertDisplayCoordinatesToBeamTicksAndLines(float display_x, float display_y, float x_scale, u32* out_tick,
                                                     u32* out_line) const;
 
+  // Converts a position in the displayed picture (0..1 across the active area) into window coordinates.
+  void ConvertPictureCoordinatesToScreenCoordinates(float picture_x, float picture_y, float* window_x,
+                                                    float* window_y) const;
+
   // Returns the current beam position.
   void GetBeamPosition(u32* out_ticks, u32* out_line);
 

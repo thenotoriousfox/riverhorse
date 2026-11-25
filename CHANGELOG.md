@@ -20,6 +20,10 @@ Changes since the DuckStation `v0.1-7371` base. Releases are tagged
   RetroArch's Core Downloader can offer it once it is accepted.
 - libretro core: controller rumble through the frontend's rumble interface
   (both DualShock motors).
+- libretro core: NeGcon, GunCon, Justifier and PlayStation Mouse controller
+  types, and a Multitap core option for up to 8 players (users 3 to 5 on
+  port 1's Multitap, 6 to 8 on port 2's). Light guns aim with the frontend's
+  light gun input; shooting off-screen reloads.
 
 ### Changes
 - Hosted sessions are only listed when the host turns on "List in the

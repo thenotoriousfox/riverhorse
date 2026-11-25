@@ -1311,6 +1311,22 @@ void GPU::ConvertScreenCoordinatesToDisplayCoordinates(float window_x, float win
           *display_y / static_cast<float>(m_crtc_state.display_height));
 }
 
+void GPU::ConvertPictureCoordinatesToScreenCoordinates(float picture_x, float picture_y, float* window_x,
+                                                       float* window_y) const
+{
+  GSVector4i display_rc, draw_rc;
+  CalculateWindowDrawRect(GetDisplayState(), &display_rc, &draw_rc);
+
+  const float display_x = static_cast<float>(m_crtc_state.display_origin_left) +
+                          picture_x * static_cast<float>(m_crtc_state.display_vram_width);
+  const float display_y = static_cast<float>(m_crtc_state.display_origin_top) +
+                          picture_y * static_cast<float>(m_crtc_state.display_vram_height);
+  *window_x = static_cast<float>(display_rc.left) +
+              display_x / static_cast<float>(m_crtc_state.display_width) * static_cast<float>(display_rc.width());
+  *window_y = static_cast<float>(display_rc.top) +
+              display_y / static_cast<float>(m_crtc_state.display_height) * static_cast<float>(display_rc.height());
+}
+
 bool GPU::ConvertDisplayCoordinatesToBeamTicksAndLines(float display_x, float display_y, float x_scale, u32* out_tick,
                                                        u32* out_line) const
 {
