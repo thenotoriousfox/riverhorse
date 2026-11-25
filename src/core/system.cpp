@@ -228,7 +228,7 @@ static void PollDiscordPresence();
 static constexpr const float PERFORMANCE_COUNTER_UPDATE_INTERVAL = 1.0f;
 static constexpr const char FALLBACK_EXE_NAME[] = "PSX.EXE";
 static constexpr u32 MAX_SKIPPED_DUPLICATE_FRAME_COUNT = 2; // 20fps minimum
-static constexpr u32 MAX_SKIPPED_TIMEOUT_FRAME_COUNT = 1;   // 30fps minimum
+static constexpr u32 MAX_SKIPPED_TIMEOUT_FRAME_COUNT = 3;   // 15fps minimum
 static constexpr u32 MAX_HOST_REFRESH_MULTIPLE = 4;
 static constexpr u32 BLACK_FRAME_INSERTION_MULTIPLE = 2;
 
@@ -2179,7 +2179,8 @@ void System::FrameDone()
 
   const bool skip_this_frame = (((s_skip_presenting_duplicate_frames && !is_unique_frame &&
                                   s_skipped_frame_count < MAX_SKIPPED_DUPLICATE_FRAME_COUNT) ||
-                                 (!s_optimal_frame_pacing && current_time > s_next_frame_time &&
+                                 (g_settings.display_frame_skip && !s_optimal_frame_pacing &&
+                                  current_time > s_next_frame_time &&
                                   s_skipped_frame_count < MAX_SKIPPED_TIMEOUT_FRAME_COUNT) ||
                                  g_gpu_device->ShouldSkipPresentingFrame()) &&
                                 !s_syncing_to_host_with_vsync && !IsExecutionInterrupted());

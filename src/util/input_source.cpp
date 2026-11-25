@@ -17,6 +17,10 @@ void InputSource::UpdateMotorState(InputBindingKey large_key, InputBindingKey sm
     UpdateMotorState(small_key, small_intensity);
 }
 
+void InputSource::UpdateAnalogModeLED(InputBindingKey motor_key, bool analog_mode)
+{
+}
+
 InputBindingKey InputSource::MakeGenericControllerAxisKey(InputSourceType clazz, u32 controller_index, s32 axis_index)
 {
   InputBindingKey key = {};

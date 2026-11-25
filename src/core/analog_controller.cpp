@@ -28,7 +28,10 @@ AnalogController::AnalogController(u32 index) : Controller(index)
   m_rumble_config.fill(0xFF);
 }
 
-AnalogController::~AnalogController() = default;
+AnalogController::~AnalogController()
+{
+  InputManager::SetPadAnalogModeLED(m_index, true);
+}
 
 ControllerType AnalogController::GetType() const
 {
@@ -48,6 +51,7 @@ void AnalogController::Reset()
   m_tx_buffer.fill(0x00);
   m_analog_mode = false;
   m_configuration_mode = false;
+  InputManager::SetPadAnalogModeLED(m_index, false);
 
   for (u32 i = 0; i < NUM_MOTORS; i++)
   {
@@ -133,6 +137,7 @@ bool AnalogController::DoState(StateWrapper& sw, bool apply_input_state)
                                             TRANSLATE_FS("AnalogController", "Controller {} switched to digital mode."),
                                           m_index + 1u),
                               5.0f);
+      InputManager::SetPadAnalogModeLED(m_index, m_analog_mode);
     }
   }
   return true;
@@ -320,6 +325,7 @@ void AnalogController::SetAnalogMode(bool enabled, bool show_message)
   }
 
   m_analog_mode = enabled;
+  InputManager::SetPadAnalogModeLED(m_index, enabled);
 }
 
 void AnalogController::ProcessAnalogModeToggle()

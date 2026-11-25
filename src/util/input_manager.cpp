@@ -117,6 +117,7 @@ static void AddHotkeyBindings(SettingsInterface& si);
 static void AddPadBindings(SettingsInterface& si, const std::string& section, u32 pad,
                            const Controller::ControllerInfo* cinfo);
 static void UpdateContinuedVibration();
+static void ApplyPadAnalogModeLEDs();
 static void GenerateRelativeMouseEvents();
 
 static bool DoEventHook(InputBindingKey key, float value);
@@ -141,6 +142,7 @@ using BindingMap = std::unordered_multimap<InputBindingKey, std::shared_ptr<Inpu
 using VibrationBindingArray = std::vector<PadVibrationBinding>;
 static BindingMap s_binding_map;
 static VibrationBindingArray s_pad_vibration_array;
+static std::array<bool, NUM_CONTROLLER_AND_CARD_PORTS> s_pads_in_digital_mode = {};
 static std::mutex s_binding_map_write_lock;
 
 // Hooks/intercepting (for setting bindings)
@@ -1462,6 +1464,7 @@ std::vector<std::string> InputManager::GetInputProfileNames()
 
 void InputManager::OnInputDeviceConnected(std::string_view identifier, std::string_view device_name)
 {
+  ApplyPadAnalogModeLEDs();
   Host::OnInputDeviceConnected(identifier, device_name);
 }
 
@@ -1522,6 +1525,25 @@ void InputManager::SetPadVibrationIntensity(u32 pad_index, float large_or_single
 
     large_motor.last_intensity = large_or_single_motor_intensity;
     small_motor.last_intensity = small_motor_intensity;
+  }
+}
+
+void InputManager::SetPadAnalogModeLED(u32 pad_index, bool analog_mode)
+{
+  s_pads_in_digital_mode[pad_index] = !analog_mode;
+  ApplyPadAnalogModeLEDs();
+}
+
+void InputManager::ApplyPadAnalogModeLEDs()
+{
+  for (const PadVibrationBinding& pad : s_pad_vibration_array)
+  {
+    for (u32 i = 0; i < MAX_MOTORS_PER_PAD; i++)
+    {
+      const PadVibrationBinding::Motor& motor = pad.motors[i];
+      if (motor.source && (i == 0 || motor.source != pad.motors[0].source))
+        motor.source->UpdateAnalogModeLED(motor.binding, !s_pads_in_digital_mode[pad.pad_index]);
+    }
   }
 }
 
@@ -1780,6 +1802,7 @@ void InputManager::ReloadBindings(SettingsInterface& si, SettingsInterface& bind
   }
 
   UpdateHostMouseMode();
+  ApplyPadAnalogModeLEDs();
 }
 
 // ------------------------------------------------------------------------

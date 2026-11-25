@@ -86,7 +86,7 @@ static const std::vector<Option> s_options = {
    "Libretro",
    "FrameSkip",
    {{"Disabled", "Disabled"}, {"Auto", "Auto"}},
-   "Disabled"},
+   "Auto"},
   {"video", "riverhorse_osd_messages", "On-Screen Messages",
    "Shows notices such as disc changes and applied patches through the frontend.", "Libretro", "OSDMessages", s_on_off,
    "true"},

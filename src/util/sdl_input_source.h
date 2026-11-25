@@ -33,6 +33,7 @@ public:
   void UpdateMotorState(InputBindingKey key, float intensity) override;
   void UpdateMotorState(InputBindingKey large_key, InputBindingKey small_key, float large_intensity,
                         float small_intensity) override;
+  void UpdateAnalogModeLED(InputBindingKey motor_key, bool analog_mode) override;
 
   std::optional<InputBindingKey> ParseKeyString(std::string_view device, std::string_view binding) override;
   TinyString ConvertKeyToString(InputBindingKey key) override;
@@ -60,6 +61,7 @@ private:
     int joystick_id;
     int player_id;
     bool use_game_controller_rumble;
+    bool digital_mode_led;
 
     // Used to disable Joystick controls that are used in GameController inputs so we don't get double events
     std::vector<bool> joy_button_used_in_gc;
@@ -88,6 +90,7 @@ private:
   bool HandleJoystickButtonEvent(const SDL_JoyButtonEvent* ev);
   bool HandleJoystickHatEvent(const SDL_JoyHatEvent* ev);
   void SendRumbleUpdate(ControllerData* cd);
+  void UpdateControllerLED(ControllerData* cd);
 
   ControllerDataVector m_controllers;
 
@@ -97,6 +100,7 @@ private:
   bool m_sdl_subsystem_initialized = false;
   bool m_controller_enhanced_mode = false;
   bool m_controller_ps5_player_led = false;
+  bool m_analog_mode_led = true;
 
 #ifdef __APPLE__
   bool m_enable_iokit_driver = false;

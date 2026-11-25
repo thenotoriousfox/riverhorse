@@ -131,9 +131,17 @@ static constexpr const char* s_sdl_default_led_colors[] = {
   "ffff00", // SDL-3
 };
 
+static constexpr u32 DIGITAL_MODE_LED_DIVISOR = 4;
+
 static void SetControllerRGBLED(SDL_GameController* gc, u32 color)
 {
   SDL_GameControllerSetLED(gc, (color >> 16) & 0xff, (color >> 8) & 0xff, color & 0xff);
+}
+
+static u32 DimLEDColor(u32 color)
+{
+  return ((((color >> 16) & 0xff) / DIGITAL_MODE_LED_DIVISOR) << 16) |
+         ((((color >> 8) & 0xff) / DIGITAL_MODE_LED_DIVISOR) << 8) | ((color & 0xff) / DIGITAL_MODE_LED_DIVISOR);
 }
 
 static void SDLLogCallback(void* userdata, int category, SDL_LogPriority priority, const char* message)
@@ -216,19 +224,10 @@ void SDLInputSource::Shutdown()
 void SDLInputSource::LoadSettings(SettingsInterface& si)
 {
   for (u32 i = 0; i < MAX_LED_COLORS; i++)
-  {
-    const u32 color = GetRGBForPlayerId(si, i);
-    if (m_led_colors[i] == color)
-      continue;
-
-    m_led_colors[i] = color;
-
-    const auto it = GetControllerDataForPlayerId(i);
-    if (it == m_controllers.end() || !it->game_controller || !SDL_GameControllerHasLED(it->game_controller))
-      continue;
-
-    SetControllerRGBLED(it->game_controller, color);
-  }
+    m_led_colors[i] = GetRGBForPlayerId(si, i);
+  m_analog_mode_led = si.GetBoolValue("InputSources", "SDLAnalogModeLED", true);
+  for (ControllerData& cd : m_controllers)
+    UpdateControllerLED(&cd);
 
   m_controller_enhanced_mode = si.GetBoolValue("InputSources", "SDLControllerEnhancedMode", false);
   m_controller_ps5_player_led = si.GetBoolValue("InputSources", "SDLPS5PlayerLED", false);
@@ -808,11 +807,7 @@ bool SDLInputSource::OpenDevice(int index, bool is_gamecontroller)
   if (!cd.haptic && !cd.use_game_controller_rumble)
     VERBOSE_LOG("Rumble is not supported on '{}'", name);
 
-  if (player_id >= 0 && static_cast<u32>(player_id) < MAX_LED_COLORS && gcontroller &&
-      SDL_GameControllerHasLED(gcontroller))
-  {
-    SetControllerRGBLED(gcontroller, m_led_colors[player_id]);
-  }
+  UpdateControllerLED(&cd);
 
   m_controllers.push_back(std::move(cd));
 
@@ -1009,6 +1004,28 @@ bool SDLInputSource::GetGenericBindingMapping(std::string_view device, GenericIn
     // joysticks have arbitrary axis numbers, so automapping isn't going to work here.
     return false;
   }
+}
+
+void SDLInputSource::UpdateControllerLED(ControllerData* cd)
+{
+  if (cd->player_id < 0 || static_cast<u32>(cd->player_id) >= MAX_LED_COLORS || !cd->game_controller ||
+      !SDL_GameControllerHasLED(cd->game_controller))
+  {
+    return;
+  }
+
+  const u32 color = m_led_colors[cd->player_id];
+  SetControllerRGBLED(cd->game_controller, (m_analog_mode_led && cd->digital_mode_led) ? DimLEDColor(color) : color);
+}
+
+void SDLInputSource::UpdateAnalogModeLED(InputBindingKey motor_key, bool analog_mode)
+{
+  auto it = GetControllerDataForPlayerId(motor_key.source_index);
+  if (it == m_controllers.end() || it->digital_mode_led == !analog_mode)
+    return;
+
+  it->digital_mode_led = !analog_mode;
+  UpdateControllerLED(&(*it));
 }
 
 void SDLInputSource::UpdateMotorState(InputBindingKey key, float intensity)

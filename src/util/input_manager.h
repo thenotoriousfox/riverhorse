@@ -307,6 +307,9 @@ bool HasHook();
 /// Intensity is normalized from 0 to 1.
 void SetPadVibrationIntensity(u32 pad_index, float large_or_single_motor_intensity, float small_motor_intensity);
 
+/// Internal method used by DualShocks to show their analog mode on the lights of the devices their motors are bound to.
+void SetPadAnalogModeLED(u32 pad_index, bool analog_mode);
+
 /// Zeros all vibration intensities. Call when pausing.
 /// The pad vibration state will internally remain, so that when emulation is unpaused, the effect resumes.
 void PauseVibration();

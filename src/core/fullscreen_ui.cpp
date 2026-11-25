@@ -4141,6 +4141,14 @@ void FullscreenUI::DrawEmulationSettingsPage()
     !(GetEffectiveBoolSetting(bsi, "Display", "VSync", false) &&
       GetEffectiveBoolSetting(bsi, "Main", "SyncToHostRefreshRate", false)));
 
+  DrawToggleSetting(
+    bsi, FSUI_ICONSTR(ICON_FA_FAST_FORWARD, "Frameskip"),
+    FSUI_CSTR("Leaves up to three frames in a row undisplayed when the system can't keep up. Not used with Optimal "
+              "Frame Pacing or syncing to host refresh."),
+    "Display", "FrameSkip", true,
+    !(GetEffectiveBoolSetting(bsi, "Display", "VSync", false) &&
+      GetEffectiveBoolSetting(bsi, "Main", "SyncToHostRefreshRate", false)));
+
   const bool pre_frame_sleep_active =
     (optimal_frame_pacing_active && GetEffectiveBoolSetting(bsi, "Display", "PreFrameSleep", false));
   DrawFloatRangeSetting(
@@ -4389,6 +4397,9 @@ void FullscreenUI::DrawControllerSettingsPage()
                     FSUI_CSTR("Enable/Disable the Player LED on DualSense controllers."), "InputSources",
                     "SDLPS5PlayerLED", false, bsi->GetBoolValue("InputSources", "SDLControllerEnhancedMode", true),
                     false);
+  DrawToggleSetting(bsi, FSUI_ICONSTR(ICON_FA_LIGHTBULB, "Dim Light in Digital Mode"),
+                    FSUI_CSTR("Dims a controller's light while the DualShock it plays as is in digital mode."),
+                    "InputSources", "SDLAnalogModeLED", true, bsi->GetBoolValue("InputSources", "SDL", true), false);
 #ifdef _WIN32
   DrawToggleSetting(bsi, FSUI_ICONSTR(ICON_FA_COG, "Enable XInput Input Source"),
                     FSUI_CSTR("The XInput source provides support for XBox 360/XBox One/XBox Series controllers."),

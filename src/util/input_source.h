@@ -50,6 +50,10 @@ public:
   virtual void UpdateMotorState(InputBindingKey large_key, InputBindingKey small_key, float large_intensity,
                                 float small_intensity);
 
+  /// Informs the source whether the emulated controller using the device with this motor is in analog mode, for
+  /// devices with a light. Does nothing for sources without lights.
+  virtual void UpdateAnalogModeLED(InputBindingKey motor_key, bool analog_mode);
+
   /// Creates a key for a generic controller axis event.
   static InputBindingKey MakeGenericControllerAxisKey(InputSourceType clazz, u32 controller_index, s32 axis_index);
 

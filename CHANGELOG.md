@@ -6,14 +6,21 @@ Changes since the DuckStation `v0.1-7371` base. Releases are tagged
 ## Unreleased
 
 ### New
+- Frameskip setting (Emulation settings and Big Picture, on by default): when
+  the system can't keep up, up to three frames in a row go undisplayed instead
+  of one, and it can now be turned off.
+- Controller lights dim while the DualShock they play as is in digital mode
+  (SDL controllers with a light, such as DualShock 4 and DualSense; set in the
+  controller LED settings). The libretro core sends the same state to
+  RetroArch's LED interface.
 - libretro core:
   - Native cheats: the cheat database's codes for the loaded game are core
     options in a Cheats category, and work alongside RetroArch's cheats.
   - Riverhorse's notices (disc changes, applied patches, memory card saves,
     warnings) show as RetroArch notifications; On-Screen Messages turns them off.
-  - Frameskip option: Auto leaves frames out while RetroArch's audio buffer runs
-    low, for slow devices. While fast-forwarding, the core sends no more frames
-    than the display shows.
+  - Frameskip option (Auto by default): leaves up to three frames in a row out
+    while RetroArch's audio buffer runs low, for slow devices. While
+    fast-forwarding, the core sends no more frames than the display shows.
   - Options from the standalone app: Disable Interlacing, Force NTSC Timings,
     Chroma Smoothing (24-Bit), PGXP Vertex Cache, PGXP Geometry Tolerance,
     Enable 8 MB RAM, and Memory Cards (per game or shared).

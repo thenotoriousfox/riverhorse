@@ -137,6 +137,7 @@ ControllerLEDSettingsDialog::ControllerLEDSettingsDialog(QWidget* parent, Contro
   SettingsInterface* sif = dialog->getProfileSettingsInterface();
 
   ControllerSettingWidgetBinder::BindWidgetToInputProfileBool(sif, m_ui.enableSDLPS5PlayerLED, "InputSources", "SDLPS5PlayerLED", false);
+  ControllerSettingWidgetBinder::BindWidgetToInputProfileBool(sif, m_ui.analogModeLED, "InputSources", "SDLAnalogModeLED", true);
   connect(m_ui.buttonBox->button(QDialogButtonBox::Close), &QPushButton::clicked, this, &QDialog::accept);
 }
 

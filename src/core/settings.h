@@ -162,6 +162,7 @@ struct Settings
   bool display_optimal_frame_pacing : 1 = false;
   bool display_pre_frame_sleep : 1 = false;
   bool display_skip_presenting_duplicate_frames : 1 = false;
+  bool display_frame_skip : 1 = true;
   bool display_black_frame_insertion : 1 = false;
   bool display_vsync : 1 = false;
   bool display_disable_mailbox_presentation : 1 = true;

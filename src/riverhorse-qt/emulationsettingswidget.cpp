@@ -23,6 +23,7 @@ EmulationSettingsWidget::EmulationSettingsWidget(SettingsWindow* dialog, QWidget
   SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.preFrameSleep, "Display", "PreFrameSleep", false);
   SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.skipPresentingDuplicateFrames, "Display",
                                                "SkipPresentingDuplicateFrames", false);
+  SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.frameSkip, "Display", "FrameSkip", true);
   SettingWidgetBinder::BindWidgetToFloatSetting(sif, m_ui.preFrameSleepBuffer, "Display", "PreFrameSleepBuffer",
                                                 Settings::DEFAULT_DISPLAY_PRE_FRAME_SLEEP_BUFFER);
   SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.rewindEnable, "Main", "RewindEnable", false);
@@ -139,6 +140,10 @@ EmulationSettingsWidget::EmulationSettingsWidget(SettingsWindow* dialog, QWidget
        "generation to increase perceptible frame rate. Can result in worse frame pacing, and is not compatible with "
        "syncing to host refresh."));
   dialog->registerWidgetHelp(
+    m_ui.frameSkip, tr("Frameskip"), tr("Checked"),
+    tr("Leaves up to three frames in a row undisplayed when the system can't keep up, so the game and sound keep "
+       "their speed. Not used with Optimal Frame Pacing or syncing to host refresh."));
+  dialog->registerWidgetHelp(
     m_ui.rewindEnable, tr("Rewinding"), tr("Unchecked"),
     tr("<b>Enable Rewinding:</b> Saves state periodically so you can rewind any mistakes while playing.<br> "
        "<b>Rewind Save Frequency:</b> How often a rewind state will be created. Higher frequencies have greater system "
@@ -237,6 +242,7 @@ void EmulationSettingsWidget::updateHostSyncOptions()
   const bool vsync = m_dialog->getEffectiveBoolValue("Display", "VSync", false);
   const bool sync_to_host = m_dialog->getEffectiveBoolValue("Main", "SyncToHostRefreshRate", false) && vsync;
   m_ui.skipPresentingDuplicateFrames->setEnabled(!sync_to_host);
+  m_ui.frameSkip->setEnabled(!sync_to_host);
   m_ui.blackFrameInsertion->setEnabled(sync_to_host);
 }
 
