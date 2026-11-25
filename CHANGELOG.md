@@ -21,6 +21,10 @@ Changes since the DuckStation `v0.1-7371` base. Releases are tagged
   the console's refresh rate (such as 120 Hz for 60 Hz games), showing each
   frame that many times; Black Frame Insertion shows black instead of the
   repeats for sharper motion.
+- Texture filters: MMPX (Pixel Art), which keeps the look of pixel art while
+  smoothing its diagonals at higher resolutions, and Cubic, a sharper
+  alternative to bilinear that doesn't overshoot at edges. Also in the
+  libretro core's Texture Filtering option.
 - libretro core for Windows (x64), Android (arm64-v8a, x86_64), macOS (arm64,
   x86_64) and Linux arm64 on every release, built from the bundled
   dependencies. The core is also submitted to libretro's buildbot, so

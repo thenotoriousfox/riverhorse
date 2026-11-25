@@ -1215,7 +1215,7 @@ GPURenderer Settings::GetAutomaticRenderer()
 }
 
 static constexpr const std::array s_texture_filter_names = {
-  "Nearest", "Bilinear", "BilinearBinAlpha", "JINC2", "JINC2BinAlpha", "xBR", "xBRBinAlpha",
+  "Nearest", "Bilinear", "BilinearBinAlpha", "JINC2", "JINC2BinAlpha", "xBR", "xBRBinAlpha", "MMPX", "Cubic",
 };
 static constexpr const std::array s_texture_filter_display_names = {
   TRANSLATE_NOOP("GPUTextureFilter", "Nearest-Neighbor"),
@@ -1225,7 +1225,11 @@ static constexpr const std::array s_texture_filter_display_names = {
   TRANSLATE_NOOP("GPUTextureFilter", "JINC2 (Slow, No Edge Blending)"),
   TRANSLATE_NOOP("GPUTextureFilter", "xBR (Very Slow)"),
   TRANSLATE_NOOP("GPUTextureFilter", "xBR (Very Slow, No Edge Blending)"),
+  TRANSLATE_NOOP("GPUTextureFilter", "MMPX (Pixel Art)"),
+  TRANSLATE_NOOP("GPUTextureFilter", "Cubic"),
 };
+static_assert(s_texture_filter_names.size() == static_cast<size_t>(GPUTextureFilter::Count));
+static_assert(s_texture_filter_display_names.size() == static_cast<size_t>(GPUTextureFilter::Count));
 
 std::optional<GPUTextureFilter> Settings::ParseTextureFilterName(const char* str)
 {

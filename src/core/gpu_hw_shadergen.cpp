@@ -646,6 +646,185 @@ void FilteredSampleFromVRAM(TEXPAGE_VALUE texpage, float2 coords, float4 uv_limi
 
 )";
   }
+  else if (texture_filter == GPUTextureFilter::MMPX)
+  {
+    // MMPX by Morgan McGuire and Mara Gagiu, MIT licence (see thirdparty.html).
+    ss << R"(
+#define MMPX_TAP(dx, dy) SampleFromVRAM(texpage, clamp(base + float2(dx, dy), uv_limits.xy, uv_limits.zw))
+
+float MMPXLuma(float4 c)
+{
+  return dot(c.rgb, float3(0.2126, 0.7152, 0.0722));
+}
+
+bool MMPXAllEq2(float4 b, float4 a0, float4 a1) { return VECTOR_EQ(b, a0) && VECTOR_EQ(b, a1); }
+bool MMPXAllEq3(float4 b, float4 a0, float4 a1, float4 a2) { return VECTOR_EQ(b, a0) && VECTOR_EQ(b, a1) && VECTOR_EQ(b, a2); }
+bool MMPXAllEq4(float4 b, float4 a0, float4 a1, float4 a2, float4 a3) { return MMPXAllEq3(b, a0, a1, a2) && VECTOR_EQ(b, a3); }
+bool MMPXAnyEq3(float4 b, float4 a0, float4 a1, float4 a2) { return VECTOR_EQ(b, a0) || VECTOR_EQ(b, a1) || VECTOR_EQ(b, a2); }
+bool MMPXNoneEq2(float4 b, float4 a0, float4 a1) { return VECTOR_NEQ(b, a0) && VECTOR_NEQ(b, a1); }
+bool MMPXNoneEq4(float4 b, float4 a0, float4 a1, float4 a2, float4 a3) { return MMPXNoneEq2(b, a0, a1) && VECTOR_NEQ(b, a2) && VECTOR_NEQ(b, a3); }
+
+void FilteredSampleFromVRAM(TEXPAGE_VALUE texpage, float2 coords, float4 uv_limits,
+                            out float4 texcol, out float ialpha)
+{
+  float2 base = floor(coords) + float2(0.5, 0.5);
+  float2 sub = frac(coords);
+
+  float4 A = MMPX_TAP(-1.0, -1.0), B = MMPX_TAP(0.0, -1.0), C = MMPX_TAP(1.0, -1.0);
+  float4 D = MMPX_TAP(-1.0, 0.0), E = MMPX_TAP(0.0, 0.0), F = MMPX_TAP(1.0, 0.0);
+  float4 G = MMPX_TAP(-1.0, 1.0), H = MMPX_TAP(0.0, 1.0), I = MMPX_TAP(1.0, 1.0);
+  float4 P = MMPX_TAP(0.0, -2.0), Q = MMPX_TAP(-2.0, 0.0), R = MMPX_TAP(2.0, 0.0), S = MMPX_TAP(0.0, 2.0);
+
+  float Bl = MMPXLuma(B), Dl = MMPXLuma(D), El = MMPXLuma(E), Fl = MMPXLuma(F), Hl = MMPXLuma(H);
+
+  float4 J = E, K = E, L = E, M = E;
+
+  // 1:1 slope rules
+  if (VECTOR_EQ(D, B) && VECTOR_NEQ(D, H) && VECTOR_NEQ(D, F) && (El >= Dl || VECTOR_EQ(E, A)) &&
+      MMPXAnyEq3(E, A, C, G) && (El < Dl || VECTOR_NEQ(A, D) || VECTOR_NEQ(E, P) || VECTOR_NEQ(E, Q)))
+    J = D;
+  if (VECTOR_EQ(B, F) && VECTOR_NEQ(B, D) && VECTOR_NEQ(B, H) && (El >= Bl || VECTOR_EQ(E, C)) &&
+      MMPXAnyEq3(E, A, C, I) && (El < Bl || VECTOR_NEQ(C, B) || VECTOR_NEQ(E, P) || VECTOR_NEQ(E, R)))
+    K = B;
+  if (VECTOR_EQ(H, D) && VECTOR_NEQ(H, F) && VECTOR_NEQ(H, B) && (El >= Hl || VECTOR_EQ(E, G)) &&
+      MMPXAnyEq3(E, A, G, I) && (El < Hl || VECTOR_NEQ(G, H) || VECTOR_NEQ(E, S) || VECTOR_NEQ(E, Q)))
+    L = H;
+  if (VECTOR_EQ(F, H) && VECTOR_NEQ(F, B) && VECTOR_NEQ(F, D) && (El >= Fl || VECTOR_EQ(E, I)) &&
+      MMPXAnyEq3(E, C, G, I) && (El < Fl || VECTOR_NEQ(I, H) || VECTOR_NEQ(E, R) || VECTOR_NEQ(E, S)))
+    M = F;
+
+  // Intersection rules
+  if (VECTOR_NEQ(E, F) && MMPXAllEq4(E, C, I, D, Q) && MMPXAllEq2(F, B, H) && VECTOR_NEQ(F, MMPX_TAP(3.0, 0.0)))
+  {
+    K = F;
+    M = F;
+  }
+  if (VECTOR_NEQ(E, D) && MMPXAllEq4(E, A, G, F, R) && MMPXAllEq2(D, B, H) && VECTOR_NEQ(D, MMPX_TAP(-3.0, 0.0)))
+  {
+    J = D;
+    L = D;
+  }
+  if (VECTOR_NEQ(E, H) && MMPXAllEq4(E, G, I, B, P) && MMPXAllEq2(H, D, F) && VECTOR_NEQ(H, MMPX_TAP(0.0, 3.0)))
+  {
+    L = H;
+    M = H;
+  }
+  if (VECTOR_NEQ(E, B) && MMPXAllEq4(E, A, C, H, S) && MMPXAllEq2(B, D, F) && VECTOR_NEQ(B, MMPX_TAP(0.0, -3.0)))
+  {
+    J = B;
+    K = B;
+  }
+
+  if (Bl < El && MMPXAllEq4(E, G, H, I, S) && MMPXNoneEq4(E, A, D, C, F))
+  {
+    J = B;
+    K = B;
+  }
+  if (Hl < El && MMPXAllEq4(E, A, B, C, P) && MMPXNoneEq4(E, D, G, I, F))
+  {
+    L = H;
+    M = H;
+  }
+  if (Fl < El && MMPXAllEq4(E, A, D, G, Q) && MMPXNoneEq4(E, B, C, I, H))
+  {
+    K = F;
+    M = F;
+  }
+  if (Dl < El && MMPXAllEq4(E, C, F, I, R) && MMPXNoneEq4(E, B, A, G, H))
+  {
+    J = D;
+    L = D;
+  }
+
+  // 2:1 slope rules
+  if (VECTOR_NEQ(H, B))
+  {
+    if (VECTOR_NEQ(H, A) && VECTOR_NEQ(H, E) && VECTOR_NEQ(H, C))
+    {
+      if (MMPXAllEq3(H, G, F, R) && MMPXNoneEq2(H, D, MMPX_TAP(2.0, -1.0)))
+        L = M;
+      if (MMPXAllEq3(H, I, D, Q) && MMPXNoneEq2(H, F, MMPX_TAP(-2.0, -1.0)))
+        M = L;
+    }
+    if (VECTOR_NEQ(B, I) && VECTOR_NEQ(B, G) && VECTOR_NEQ(B, E))
+    {
+      if (MMPXAllEq3(B, A, F, R) && MMPXNoneEq2(B, D, MMPX_TAP(2.0, 1.0)))
+        J = K;
+      if (MMPXAllEq3(B, C, D, Q) && MMPXNoneEq2(B, F, MMPX_TAP(-2.0, 1.0)))
+        K = J;
+    }
+  }
+  if (VECTOR_NEQ(F, D))
+  {
+    if (VECTOR_NEQ(D, I) && VECTOR_NEQ(D, E) && VECTOR_NEQ(D, C))
+    {
+      if (MMPXAllEq3(D, A, H, S) && MMPXNoneEq2(D, B, MMPX_TAP(1.0, 2.0)))
+        J = L;
+      if (MMPXAllEq3(D, G, B, P) && MMPXNoneEq2(D, H, MMPX_TAP(1.0, -2.0)))
+        L = J;
+    }
+    if (VECTOR_NEQ(F, E) && VECTOR_NEQ(F, A) && VECTOR_NEQ(F, G))
+    {
+      if (MMPXAllEq3(F, C, H, S) && MMPXNoneEq2(F, B, MMPX_TAP(-1.0, 2.0)))
+        K = M;
+      if (MMPXAllEq3(F, I, B, P) && MMPXNoneEq2(F, H, MMPX_TAP(-1.0, -2.0)))
+        M = K;
+    }
+  }
+
+  texcol = (sub.y < 0.5) ? ((sub.x < 0.5) ? J : K) : ((sub.x < 0.5) ? L : M);
+  ialpha = float(VECTOR_NEQ(texcol, TRANSPARENT_PIXEL_COLOR));
+}
+
+#undef MMPX_TAP
+)";
+  }
+  else if (texture_filter == GPUTextureFilter::Cubic)
+  {
+    ss << R"(
+float4 CubicWeights(float t)
+{
+  return float4(t * (-0.5 + t * (1.0 - 0.5 * t)), 1.0 + t * t * (-2.5 + 1.5 * t), t * (0.5 + t * (2.0 - 1.5 * t)),
+                t * t * (-0.5 + 0.5 * t));
+}
+
+void FilteredSampleFromVRAM(TEXPAGE_VALUE texpage, float2 coords, float4 uv_limits,
+                            out float4 texcol, out float ialpha)
+{
+  float2 pos = coords - float2(0.5, 0.5);
+  float2 base = floor(pos) + float2(0.5, 0.5);
+  float2 t = frac(pos);
+  float4 wx = CubicWeights(t.x);
+  float4 wy = CubicWeights(t.y);
+
+  texcol = float4(0.0, 0.0, 0.0, 0.0);
+  ialpha = 0.0;
+  float3 inner_min = float3(1.0, 1.0, 1.0);
+  float3 inner_max = float3(0.0, 0.0, 0.0);
+  for (int y = 0; y < 4; y++)
+  {
+    for (int x = 0; x < 4; x++)
+    {
+      float4 s = SampleFromVRAM(texpage, clamp(base + float2(float(x - 1), float(y - 1)), uv_limits.xy, uv_limits.zw));
+      float a = float(VECTOR_NEQ(s, TRANSPARENT_PIXEL_COLOR));
+      float w = wx[x] * wy[y];
+      texcol += s * w;
+      ialpha += a * w;
+      if (x >= 1 && x <= 2 && y >= 1 && y <= 2 && a > 0.0)
+      {
+        inner_min = min(inner_min, s.rgb);
+        inner_max = max(inner_max, s.rgb);
+      }
+    }
+  }
+
+  ialpha = clamp(ialpha, 0.0, 1.0);
+  if (ialpha > 0.0)
+    texcol.rgb = clamp(texcol.rgb / float3(ialpha, ialpha, ialpha), inner_min, max(inner_min, inner_max));
+  texcol.a = clamp(texcol.a, 0.0, 1.0);
+}
+)";
+  }
 }
 
 std::string GPU_HW_ShaderGen::GenerateBatchFragmentShader(GPU_HW_Backend::BatchRenderMode render_mode,
