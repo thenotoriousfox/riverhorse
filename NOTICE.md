@@ -86,3 +86,50 @@ core) compiles from source: git submodules pinned to the versions the dependency
 | `cpuinfo` | stenzek/cpuinfo | 7524ad50 | BSD-2-Clause |
 | `shaderc` | stenzek/shaderc, with glslang, SPIRV-Tools and SPIRV-Headers | feb2460b | Apache-2.0 (glslang: BSD-3-Clause and others) |
 | `spirv_cross` | KhronosGroup/SPIRV-Cross | vulkan-sdk-1.3.290.0 | Apache-2.0 |
+
+Libraries kept directly under `dep/`:
+
+| Directory | Project | Licence |
+|---|---|---|
+| `biscuit` | [lioncash/biscuit](https://github.com/lioncash/biscuit) | MIT |
+| `cubeb` | [mozilla/cubeb](https://github.com/mozilla/cubeb) | ISC |
+| `d3d12ma` | [GPUOpen D3D12 Memory Allocator](https://github.com/GPUOpen-LibrariesAndSDKs/D3D12MemoryAllocator) | MIT |
+| `enet` | [lsalzman/enet](https://github.com/lsalzman/enet) | MIT |
+| `fast_float` | [fastfloat/fast_float](https://github.com/fastfloat/fast_float) | Apache-2.0, MIT or BSL-1.0 |
+| `ffmpeg` | [FFmpeg](https://ffmpeg.org) headers | LGPL-2.1-or-later |
+| `fmt` | [fmtlib/fmt](https://github.com/fmtlib/fmt) | MIT |
+| `freesurround` | FreeSurround (Christian Kothe) | GPL-2.0-or-later |
+| `ggpo-x` | [ggpo-x](https://github.com/nykwil/ggpo-x) | MIT |
+| `glad` | [Dav1dde/glad](https://github.com/Dav1dde/glad) generated loader | Apache-2.0 |
+| `imgui` | [ocornut/imgui](https://github.com/ocornut/imgui) | MIT |
+| `kissfft` | [mborgerding/kissfft](https://github.com/mborgerding/kissfft) | BSD-3-Clause |
+| `libchdr` | [rtissera/libchdr](https://github.com/rtissera/libchdr) | BSD-3-Clause |
+| `libretro` | [libretro-common](https://github.com/libretro/libretro-common) API headers | MIT |
+| `lzma` | [LZMA SDK](https://www.7-zip.org/sdk.html) | Public domain |
+| `minizip` | [MiniZip](https://www.winimage.com/zLibDll/minizip.html) | Zlib |
+| `psx_gpu` | [pcsx_rearmed](https://github.com/libretro/pcsx_rearmed) | GPL-2.0-or-later |
+| `rainterface` | [RetroAchievements RAInterface](https://github.com/RetroAchievements/RAInterface) | MIT |
+| `rapidyaml` | [biojppm/rapidyaml](https://github.com/biojppm/rapidyaml) | MIT |
+| `rcheevos` | [RetroAchievements/rcheevos](https://github.com/RetroAchievements/rcheevos) | MIT |
+| `reshadefx` | [crosire/reshade](https://github.com/crosire/reshade) FX compiler | BSD-3-Clause |
+| `riscv-disas` | [michaeljclark/riscv-disassembler](https://github.com/michaeljclark/riscv-disassembler) | MIT |
+| `simpleini` | [brofield/simpleini](https://github.com/brofield/simpleini) | MIT |
+| `vixl` | [Linaro/vixl](https://github.com/Linaro/vixl) | BSD-3-Clause |
+| `vulkan` | [Khronos Vulkan headers](https://github.com/KhronosGroup/Vulkan-Headers) | Apache-2.0 |
+| `winpixeventruntime` | [Microsoft WinPixEventRuntime](https://devblogs.microsoft.com/pix/winpixeventruntime/) (Windows builds) | MIT |
+| `xbyak` | [herumi/xbyak](https://github.com/herumi/xbyak) | BSD-3-Clause |
+| `xxhash` | [Cyan4973/xxHash](https://github.com/Cyan4973/xxHash) | BSD-2-Clause |
+| `zydis` | [zyantific/zydis](https://github.com/zyantific/zydis) | MIT |
+
+The application builds (AppImage, Flatpak, Windows and macOS) also ship these
+libraries, built by `scripts/deps/`:
+
+| Library | Version | Licence |
+|---|---|---|
+| [Qt](https://www.qt.io) (qtbase, qtimageformats, qtsvg, qttools, qttranslations, qtwayland) | 6.7.2 | LGPL-3.0 |
+| [SDL2](https://www.libsdl.org) | 2.30.6 | Zlib |
+| [discord-rpc](https://github.com/discord/discord-rpc) | 144f3a3f | MIT |
+| [libbacktrace](https://github.com/ianlancetaylor/libbacktrace) | ad106d5f | BSD-3-Clause |
+
+The AppImage also contains system libraries from Ubuntu 22.04, each under its
+own licence, with sources from Ubuntu.

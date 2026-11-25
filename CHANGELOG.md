@@ -3,6 +3,15 @@
 Changes since the DuckStation `v0.1-7371` base. Releases are tagged
 `vMAJOR.MINOR.PATCH`.
 
+## Unreleased
+
+### Changed
+- Riverhorse identifies itself to web services as `Riverhorse/<version> (<OS> <CPU>)`,
+  the form RetroAchievements asks emulators to use.
+- The default netplay relay is `relay.riverhorse.app`.
+- New website at https://riverhorse.app, with downloads, documentation, the
+  privacy policy and the licences of everything Riverhorse ships.
+
 ## 1.3.0 (2026-11-25)
 
 ### New
