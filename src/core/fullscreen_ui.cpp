@@ -6396,6 +6396,15 @@ void FullscreenUI::DrawPauseMenu()
 
     header_bottom = std::max(cover_min.y + cover_size, text_pos.y);
 
+    if (const std::optional<u16> session_code = Netplay::GetHostedSessionCode())
+    {
+      buffer.format(FSUI_FSTR("{} Session code {}"), ICON_FA_GLOBE, session_code.value());
+      const ImVec2 code_pos(padding, header_bottom + LayoutScale(6.0f));
+      dl->AddText(g_large_font, g_large_font->FontSize, code_pos, ImGui::GetColorU32(UISecondaryColor), buffer.c_str(),
+                  buffer.end_ptr());
+      header_bottom = code_pos.y + g_large_font->FontSize;
+    }
+
     const auto lock = Achievements::GetLock();
     const std::string& rp = Achievements::IsActive() ? Achievements::GetRichPresenceString() : std::string();
     if (!rp.empty())
@@ -9134,6 +9143,7 @@ TRANSLATE_NOOP("FullscreenUI", "shut down");
 TRANSLATE_NOOP("FullscreenUI", "{:%H:%M}");
 TRANSLATE_NOOP("FullscreenUI", "{:%Y-%m-%d %H:%M:%S}");
 TRANSLATE_NOOP("FullscreenUI", "{} Frames");
+TRANSLATE_NOOP("FullscreenUI", "{} Session code {}");
 TRANSLATE_NOOP("FullscreenUI", "{} deleted.");
 TRANSLATE_NOOP("FullscreenUI", "{} does not exist.");
 TRANSLATE_NOOP("FullscreenUI", "{} is not a valid disc image.");

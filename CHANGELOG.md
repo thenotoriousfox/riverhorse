@@ -15,6 +15,8 @@ Changes since the DuckStation `v0.1-7371` base. Releases are tagged
   Resume, covers lift when selected over a background tinted by the selected
   game, and the top bar shows battery charge and connected controllers. The
   game list grid uses the same title cards.
+- While hosting netplay, Big Picture's pause menu shows the session code
+  players join with.
 
 ### Fixed
 - Hovering over settings in the desktop Settings window could crash Riverhorse

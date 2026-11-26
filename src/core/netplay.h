@@ -51,6 +51,9 @@ bool JoinSession(std::string nickname, const std::string& hostname, s32 port, st
 
 bool IsActive();
 
+/// The code other players join this session with, while hosting through the relay server.
+std::optional<u16> GetHostedSessionCode();
+
 /// Lists hosted sessions on the relay whatever the ListSessions setting says.
 void SetListSession(bool enabled);
 

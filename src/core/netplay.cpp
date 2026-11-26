@@ -1057,6 +1057,14 @@ void Netplay::PollEnet(Common::Timer::Value until_time)
   }
 }
 
+std::optional<u16> Netplay::GetHostedSessionCode()
+{
+  if (!IsActive() || !IsHost())
+    return std::nullopt;
+
+  return NetplayRelay::GetVirtualPort();
+}
+
 bool Netplay::IsHost()
 {
   return s_player_id == s_host_player_id;
