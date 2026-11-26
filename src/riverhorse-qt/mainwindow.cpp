@@ -2997,7 +2997,7 @@ MainWindow::SystemLock MainWindow::pauseAndLockSystem()
 #else
   const bool was_fullscreen = false;
 #endif
-  const bool was_paused = !s_system_valid || s_system_paused;
+  const bool was_paused = !s_system_valid || s_system_paused || m_netplay_active;
 
   // We need to switch out of exclusive fullscreen before we can display our popup.
   // However, we do not want to switch back to render-to-main, the window might have generated this event.

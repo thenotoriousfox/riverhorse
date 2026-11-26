@@ -128,7 +128,7 @@ static bool ImageMatchesGame(const std::string& path, std::string_view serial, u
 static void SetSettings(std::string_view host_settings);
 
 static void CloseSessionWithError(const std::string_view& message);
-static void RequestCloseSession(CloseSessionMessage::Reason reason);
+static void RequestCloseSession(CloseSessionMessage::Reason reason, bool show_progress);
 
 // ENet
 static bool InitializeEnet();
@@ -548,7 +548,7 @@ bool Netplay::Start(bool is_hosting, std::string nickname, const std::string& re
 void Netplay::SystemDestroyed()
 {
   // something tried to shut us down..
-  RequestCloseSession(CloseSessionMessage::Reason::HostShutdown);
+  RequestCloseSession(CloseSessionMessage::Reason::HostShutdown, false);
   // TODO: CloseSession() ???
 }
 
@@ -632,7 +632,7 @@ void Netplay::CloseSessionWithError(const std::string_view& message)
     enet_peer_disconnect_now(s_peers[s_host_player_id].peer, 0);
 }
 
-void Netplay::RequestCloseSession(CloseSessionMessage::Reason reason)
+void Netplay::RequestCloseSession(CloseSessionMessage::Reason reason, bool show_progress)
 {
   if (IsHost())
   {
@@ -644,7 +644,10 @@ void Netplay::RequestCloseSession(CloseSessionMessage::Reason reason)
     for (s32 i = 0; i < MAX_SPECTATORS; i++)
     {
       if (s_spectators[i].peer)
+      {
         enet_peer_disconnect_now(s_spectators[i].peer, 0);
+        s_spectators[i].peer = nullptr;
+      }
     }
   }
 
@@ -655,9 +658,14 @@ void Netplay::RequestCloseSession(CloseSessionMessage::Reason reason)
     if (s_peers[i].peer)
     {
       if (IsHost())
+      {
         enet_peer_disconnect_later(s_peers[i].peer, 0);
+      }
       else
+      {
         enet_peer_disconnect_now(s_peers[i].peer, 0);
+        s_peers[i].peer = nullptr;
+      }
     }
   }
 
@@ -709,7 +717,8 @@ void Netplay::RequestCloseSession(CloseSessionMessage::Reason reason)
     if (std::none_of(s_peers.begin(), s_peers.end(), [](const Peer& p) { return p.peer != nullptr; }))
       return;
 
-    Host::DisplayLoadingScreen("Closing session");
+    if (show_progress)
+      Host::DisplayLoadingScreen("Closing session");
     Host::PumpMessagesOnCPUThread();
   }
 }
@@ -2211,7 +2220,7 @@ void Netplay::HandleCloseSessionMessage(s32 player_id, const ENetPacket* pkt)
     return;
 
   Host::ReportErrorAsync(TRANSLATE_SV("Netplay", "Netplay Session Ended"), msg->ReasonToString());
-  RequestCloseSession(msg->reason);
+  RequestCloseSession(msg->reason, true);
   // TODO: CloseSession() ???
 }
 

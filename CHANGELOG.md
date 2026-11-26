@@ -21,6 +21,11 @@ Changes since the DuckStation `v0.1-7371` base. Releases are tagged
 ### Fixed
 - Hovering over settings in the desktop Settings window could crash Riverhorse
   (1.3.0).
+- Power Off (and other confirmations) during netplay froze the desktop window:
+  it waited for the game to pause, which netplay never does.
+- Leaving a netplay session as a joined player waited 3 seconds for
+  connections that were already closed, and on Wayland the loading screen it
+  drew while waiting could crash Riverhorse.
 
 ### Changed
 - Riverhorse identifies itself to web services as `Riverhorse/<version> (<OS> <CPU>)`,
