@@ -53,6 +53,7 @@ The current release is 1.4.0; downloads are on [riverhorse.app](https://riverhor
 
 - Rollback netplay for up to four players and four spectators, direct or through a relay server, with a lobby of public sessions
 - Save sync: memory cards, save states and game settings kept the same on every device through a synced folder or a WebDAV server, so a game closed on one device resumes on another
+- Checkpoints: a save state after every in-game save, last 10 kept per game
 - Patch database with widescreen, 60 FPS and fix patches per game, plus your own patches per game
 - About 66,000 cheats for 1,900+ games, including libretro-database
 - Cheats that replace instructions without writing RAM, for games that check their own code

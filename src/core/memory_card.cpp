@@ -22,8 +22,7 @@ Log_SetChannel(MemoryCard);
 MemoryCard::MemoryCard()
   : m_save_event(
       "Memory Card Host Flush", GetSaveDelayInTicks(), GetSaveDelayInTicks(),
-      [](void* param, TickCount ticks, TickCount ticks_late) { static_cast<MemoryCard*>(param)->SaveIfChanged(true); },
-      this)
+      [](void* param, TickCount ticks, TickCount ticks_late) { static_cast<MemoryCard*>(param)->OnSaveEvent(); }, this)
 {
   m_FLAG.no_write_yet = true;
 }
@@ -383,6 +382,14 @@ bool MemoryCard::SaveIfChanged(bool display_osd_message)
   });
 
   return true;
+}
+
+void MemoryCard::OnSaveEvent()
+{
+  const bool game_saved = (m_changed && !m_filename.empty());
+  SaveIfChanged(true);
+  if (game_saved)
+    System::OnGameSavedToMemoryCard();
 }
 
 void MemoryCard::QueueFileSave()

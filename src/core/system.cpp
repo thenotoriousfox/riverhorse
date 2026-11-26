@@ -194,6 +194,7 @@ static bool LoadStateBufferFromFile(SaveStateBuffer* buffer, std::FILE* fp, Erro
 static bool ReadAndDecompressStateData(std::FILE* fp, std::span<u8> dst, u32 file_offset, u32 compressed_size,
                                        SAVE_STATE_HEADER::CompressionType method, Error* error);
 static bool SaveStateToBuffer(SaveStateBuffer* buffer, Error* error, u32 screenshot_size = 256);
+static bool SaveStateToFile(const char* path, Error* error, bool backup_existing_save);
 static bool SaveStateBufferToFile(const SaveStateBuffer& buffer, std::FILE* fp, Error* error,
                                   SaveStateCompressionMode compression_mode);
 static u32 CompressAndWriteStateData(std::FILE* fp, std::span<const u8> src, SaveStateCompressionMode method,
@@ -3142,6 +3143,17 @@ bool System::ReadAndDecompressStateData(std::FILE* fp, std::span<u8> dst, u32 fi
 
 bool System::SaveState(const char* path, Error* error, bool backup_existing_save)
 {
+  if (!SaveStateToFile(path, error, backup_existing_save))
+    return false;
+
+  Host::AddIconOSDMessage("save_state", ICON_FA_SAVE,
+                          fmt::format(TRANSLATE_FS("OSDMessage", "State saved to '{}'."), Path::GetFileName(path)),
+                          5.0f);
+  return true;
+}
+
+bool System::SaveStateToFile(const char* path, Error* error, bool backup_existing_save)
+{
   if (IsSavingMemoryCards())
   {
     Error::SetStringView(error, TRANSLATE_SV("System", "Cannot save state while memory card is being saved."));
@@ -3182,12 +3194,75 @@ bool System::SaveState(const char* path, Error* error, bool backup_existing_save
     return false;
   }
 
-  Host::AddIconOSDMessage("save_state", ICON_FA_SAVE,
-                          fmt::format(TRANSLATE_FS("OSDMessage", "State saved to '{}'."), Path::GetFileName(path)),
-                          5.0f);
-
   VERBOSE_LOG("Saving state took {:.2f} msec", save_timer.GetTimeMilliseconds());
   return true;
+}
+
+void System::OnGameSavedToMemoryCard()
+{
+  if (!g_settings.save_checkpoints || s_running_game_serial.empty() || Netplay::IsActive() ||
+      Achievements::IsHardcoreModeActive())
+  {
+    return;
+  }
+
+  Host::RunOnCPUThread([serial = s_running_game_serial]() {
+    if (!IsValid() || s_running_game_serial != serial)
+      return;
+
+    s32 index = 1;
+    std::time_t oldest_time = std::numeric_limits<std::time_t>::max();
+    for (s32 i = 1; i <= CHECKPOINT_SLOTS; i++)
+    {
+      FILESYSTEM_STAT_DATA sd;
+      if (!FileSystem::StatFile(GetGameCheckpointFileName(serial, i).c_str(), &sd))
+      {
+        index = i;
+        break;
+      }
+      if (sd.ModificationTime < oldest_time)
+      {
+        oldest_time = sd.ModificationTime;
+        index = i;
+      }
+    }
+
+    const std::string path = GetGameCheckpointFileName(serial, index);
+    Error error;
+    if (!SaveStateToFile(path.c_str(), &error, false))
+    {
+      ERROR_LOG("Failed to save checkpoint '{}': {}", Path::GetFileName(path), error.GetDescription());
+      return;
+    }
+
+    Host::AddIconOSDMessage("save_checkpoint", ICON_FA_FLAG,
+                            TRANSLATE_STR("OSDMessage", "Checkpoint saved after your in-game save."),
+                            Host::OSD_QUICK_DURATION);
+  });
+}
+
+std::string System::GetGameCheckpointFileName(std::string_view serial, s32 index)
+{
+  return Path::Combine(EmuFolders::SaveStates, fmt::format("{}_checkpoint_{}.sav", serial, index));
+}
+
+std::vector<SaveStateInfo> System::GetCheckpoints(std::string_view serial)
+{
+  std::vector<SaveStateInfo> checkpoints;
+  if (serial.empty())
+    return checkpoints;
+
+  for (s32 i = 1; i <= CHECKPOINT_SLOTS; i++)
+  {
+    std::string path = GetGameCheckpointFileName(serial, i);
+    FILESYSTEM_STAT_DATA sd;
+    if (FileSystem::StatFile(path.c_str(), &sd))
+      checkpoints.push_back(SaveStateInfo{std::move(path), sd.ModificationTime, i, false});
+  }
+
+  std::sort(checkpoints.begin(), checkpoints.end(),
+            [](const SaveStateInfo& a, const SaveStateInfo& b) { return a.timestamp > b.timestamp; });
+  return checkpoints;
 }
 
 bool System::SaveStateToBuffer(SaveStateBuffer* buffer, Error* error, u32 screenshot_size /* = 256 */)

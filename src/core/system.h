@@ -85,7 +85,8 @@ namespace System {
 enum : s32
 {
   PER_GAME_SAVE_STATE_SLOTS = 10,
-  GLOBAL_SAVE_STATE_SLOTS = 10
+  GLOBAL_SAVE_STATE_SLOTS = 10,
+  CHECKPOINT_SLOTS = 10
 };
 
 enum : TickCount
@@ -263,6 +264,10 @@ void ResetSystem();
 /// Loads state from the specified path.
 bool LoadState(const char* path, Error* error, bool save_undo_state);
 bool SaveState(const char* path, Error* error, bool backup_existing_save);
+
+void OnGameSavedToMemoryCard();
+std::string GetGameCheckpointFileName(std::string_view serial, s32 index);
+std::vector<SaveStateInfo> GetCheckpoints(std::string_view serial);
 bool SaveResumeState(Error* error);
 
 /// Runs the VM until the CPU execution is canceled.

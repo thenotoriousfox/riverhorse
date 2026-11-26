@@ -85,6 +85,7 @@ struct Settings
   bool pause_on_focus_loss : 1 = false;
   bool pause_on_controller_disconnection : 1 = false;
   bool save_state_on_exit : 1 = true;
+  bool save_checkpoints : 1 = true;
   bool create_save_state_backups : 1 = DEFAULT_SAVE_STATE_BACKUPS;
   bool confim_power_off : 1 = true;
   bool load_devices_from_save_states : 1 = false;

@@ -153,6 +153,7 @@ void Settings::Load(SettingsInterface& si)
   pause_on_focus_loss = si.GetBoolValue("Main", "PauseOnFocusLoss", false);
   pause_on_controller_disconnection = si.GetBoolValue("Main", "PauseOnControllerDisconnection", false);
   save_state_on_exit = si.GetBoolValue("Main", "SaveStateOnExit", true);
+  save_checkpoints = si.GetBoolValue("Main", "SaveCheckpoints", true);
   create_save_state_backups = si.GetBoolValue("Main", "CreateSaveStateBackups", DEFAULT_SAVE_STATE_BACKUPS);
   confim_power_off = si.GetBoolValue("Main", "ConfirmPowerOff", true);
   load_devices_from_save_states = si.GetBoolValue("Main", "LoadDevicesFromSaveStates", false);
@@ -489,6 +490,7 @@ void Settings::Save(SettingsInterface& si, bool ignore_base) const
     si.SetBoolValue("Main", "PauseOnFocusLoss", pause_on_focus_loss);
     si.SetBoolValue("Main", "PauseOnControllerDisconnection", pause_on_controller_disconnection);
     si.SetBoolValue("Main", "SaveStateOnExit", save_state_on_exit);
+    si.SetBoolValue("Main", "SaveCheckpoints", save_checkpoints);
     si.SetBoolValue("Main", "CreateSaveStateBackups", create_save_state_backups);
     si.SetStringValue("Main", "SaveStateCompression", GetSaveStateCompressionModeName(save_state_compression));
     si.SetBoolValue("Main", "ConfirmPowerOff", confim_power_off);

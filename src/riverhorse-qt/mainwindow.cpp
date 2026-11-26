@@ -824,6 +824,22 @@ void MainWindow::populateGameListContextMenu(const GameList::Entry* entry, QWidg
         connect(action, &QAction::triggered,
                 [this, entry, path = std::move(ssi.path)]() { startFile(entry->path, std::move(path), std::nullopt); });
       }
+
+      std::vector<SaveStateInfo> checkpoints(System::GetCheckpoints(entry->serial));
+      if (!checkpoints.empty())
+      {
+        load_state_menu->setEnabled(true);
+        load_state_menu->addSeparator();
+        for (SaveStateInfo& checkpoint : checkpoints)
+        {
+          const QDateTime timestamp(QDateTime::fromSecsSinceEpoch(static_cast<qint64>(checkpoint.timestamp)));
+          QAction* action = load_state_menu->addAction(tr("Checkpoint (%1)").arg(timestamp.toString(timestamp_format)));
+          action->setDisabled(challenge_mode);
+          connect(action, &QAction::triggered, [this, entry, path = std::move(checkpoint.path)]() {
+            startFile(entry->path, std::move(path), std::nullopt);
+          });
+        }
+      }
     }
   }
 
@@ -907,6 +923,23 @@ void MainWindow::populateLoadStateMenu(const char* game_serial, QMenu* menu)
 
   for (u32 slot = 1; slot <= System::GLOBAL_SAVE_STATE_SLOTS; slot++)
     add_slot(tr("Global Save %1 (%2)"), tr("Global Save %1 (Empty)"), true, static_cast<s32>(slot));
+
+  if (game_serial)
+  {
+    const std::vector<SaveStateInfo> checkpoints(System::GetCheckpoints(game_serial));
+    if (!checkpoints.empty())
+    {
+      menu->addSeparator();
+      QMenu* const checkpoint_menu = menu->addMenu(tr("Checkpoints"));
+      for (const SaveStateInfo& checkpoint : checkpoints)
+      {
+        const QString path(QString::fromStdString(checkpoint.path));
+        connect(checkpoint_menu->addAction(
+                  tr("After in-game save (%1)").arg(FormatTimestampForSaveStateMenu(checkpoint.timestamp))),
+                &QAction::triggered, this, [path]() { g_emu_thread->loadState(path); });
+      }
+    }
+  }
 }
 
 void MainWindow::populateSaveStateMenu(const char* game_serial, QMenu* menu)

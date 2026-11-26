@@ -60,6 +60,7 @@ InterfaceSettingsWidget::InterfaceSettingsWidget(SettingsWindow* dialog, QWidget
                                                "PauseOnControllerDisconnection", false);
   SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.pauseOnStart, "Main", "StartPaused", false);
   SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.saveStateOnExit, "Main", "SaveStateOnExit", true);
+  SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.saveCheckpoints, "Main", "SaveCheckpoints", true);
   SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.confirmPowerOff, "Main", "ConfirmPowerOff", true);
 
   if (!m_dialog->isPerGameSettings())
@@ -89,6 +90,10 @@ InterfaceSettingsWidget::InterfaceSettingsWidget(SettingsWindow* dialog, QWidget
   dialog->registerWidgetHelp(m_ui.saveStateOnExit, tr("Save State On Exit"), tr("Checked"),
                              tr("Automatically saves the emulator state when powering down or exiting. You can then "
                                 "resume directly from where you left off next time."));
+  dialog->registerWidgetHelp(
+    m_ui.saveCheckpoints, tr("Save Checkpoints After In-Game Saves"), tr("Checked"),
+    tr("Saves a checkpoint state a few seconds after a game writes to its memory card, keeping the last 10 per game. "
+       "Load them from the Checkpoints list in Load State. Loading one keeps your current memory card."));
   dialog->registerWidgetHelp(m_ui.startFullscreen, tr("Start Fullscreen"), tr("Unchecked"),
                              tr("Automatically switches to fullscreen mode when a game is started."));
   dialog->registerWidgetHelp(m_ui.hideMouseCursor, tr("Hide Cursor In Fullscreen"), tr("Checked"),

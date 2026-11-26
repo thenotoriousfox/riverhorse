@@ -29,6 +29,13 @@
       <string>Behaviour</string>
      </property>
      <layout class="QGridLayout" name="formLayout_4">
+      <item row="4" column="0">
+       <widget class="QCheckBox" name="saveCheckpoints">
+        <property name="text">
+         <string>Save Checkpoints After In-Game Saves</string>
+        </property>
+       </widget>
+      </item>
       <item row="3" column="0">
        <widget class="QCheckBox" name="createSaveStateBackups">
         <property name="text">

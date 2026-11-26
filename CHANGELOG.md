@@ -3,6 +3,16 @@
 Changes since the DuckStation `v0.1-7371` base. Releases are tagged
 `vMAJOR.MINOR.PATCH`.
 
+## Unreleased
+
+### New
+- Checkpoints: a few seconds after a game saves to its memory card, Riverhorse
+  makes a save state too, keeping the last 10 per game. They are listed under
+  Checkpoints in Load State (desktop and Big Picture) and in the game list's
+  Load State menu. Loading one keeps your current memory card, so later
+  in-game saves are never lost. Settings → Interface (Save Checkpoints After
+  In-Game Saves), on by default.
+
 ## 1.4.0 (2026-11-26)
 
 ### New

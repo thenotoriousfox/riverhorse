@@ -4344,6 +4344,11 @@ void FullscreenUI::DrawInterfaceSettingsPage()
                     FSUI_CSTR("Automatically saves the emulator state when powering down or exiting. You can then "
                               "resume directly from where you left off next time."),
                     "Main", "SaveStateOnExit", true);
+  DrawToggleSetting(bsi, FSUI_ICONSTR(ICON_FA_FLAG, "Save Checkpoints After In-Game Saves"),
+                    FSUI_CSTR("Saves a checkpoint a few seconds after a game writes to its memory card, keeping the "
+                              "last 10 per game. Load them from Load State. Loading one keeps your current memory "
+                              "card."),
+                    "Main", "SaveCheckpoints", true);
   DrawToggleSetting(bsi, FSUI_ICONSTR(ICON_FA_WINDOW_MAXIMIZE, "Start Fullscreen"),
                     FSUI_CSTR("Automatically switches to fullscreen mode when the program is started."), "Main",
                     "StartFullscreen", false);
@@ -7092,6 +7097,17 @@ u32 FullscreenUI::PopulateSaveStateListEntries(const std::string& title, const s
         li.preview_texture = CreateTextureFromImage(ssi->screenshot);
       s_save_state_selector_slots.push_back(std::move(li));
     }
+
+    for (SaveStateInfo& checkpoint : System::GetCheckpoints(serial))
+    {
+      SaveStateListEntry li;
+      if (!InitializeSaveStateListEntryFromPath(&li, std::move(checkpoint.path), checkpoint.slot, false))
+        continue;
+
+      li.title = fmt::format(FSUI_FSTR("{0} Checkpoint##checkpoint_{1}"), ICON_FA_FLAG, checkpoint.slot);
+      li.summary = fmt::format(FSUI_FSTR("After an in-game save, {:%d %b %H:%M}"), fmt::localtime(li.timestamp));
+      s_save_state_selector_slots.push_back(std::move(li));
+    }
   }
 
   if (!serial.empty())
@@ -8769,6 +8785,7 @@ TRANSLATE_NOOP("FullscreenUI", "Adds additional precision to PGXP data post-proj
 TRANSLATE_NOOP("FullscreenUI", "Adjusts the emulation speed so the console's refresh rate matches the host when VSync is enabled. Also works at two, three or four times the console's rate, such as 120 Hz.");
 TRANSLATE_NOOP("FullscreenUI", "Advanced");
 TRANSLATE_NOOP("FullscreenUI", "Advanced Settings");
+TRANSLATE_NOOP("FullscreenUI", "After an in-game save, {:%d %b %H:%M}");
 TRANSLATE_NOOP("FullscreenUI", "All Games ({})");
 TRANSLATE_NOOP("FullscreenUI", "All Time: {}");
 TRANSLATE_NOOP("FullscreenUI", "Allow Booting Without SBI File");
@@ -9274,6 +9291,7 @@ TRANSLATE_NOOP("FullscreenUI", "Runs the software renderer in parallel for VRAM 
 TRANSLATE_NOOP("FullscreenUI", "SDL DualSense Player LED");
 TRANSLATE_NOOP("FullscreenUI", "SDL DualShock 4 / DualSense Enhanced Mode");
 TRANSLATE_NOOP("FullscreenUI", "Save");
+TRANSLATE_NOOP("FullscreenUI", "Save Checkpoints After In-Game Saves");
 TRANSLATE_NOOP("FullscreenUI", "Save Profile");
 TRANSLATE_NOOP("FullscreenUI", "Save Screenshot");
 TRANSLATE_NOOP("FullscreenUI", "Save State");
@@ -9281,6 +9299,7 @@ TRANSLATE_NOOP("FullscreenUI", "Save State Compression");
 TRANSLATE_NOOP("FullscreenUI", "Save State On Exit");
 TRANSLATE_NOOP("FullscreenUI", "Save Sync");
 TRANSLATE_NOOP("FullscreenUI", "Saved {:%c}");
+TRANSLATE_NOOP("FullscreenUI", "Saves a checkpoint a few seconds after a game writes to its memory card, keeping the last 10 per game. Load them from Load State. Loading one keeps your current memory card.");
 TRANSLATE_NOOP("FullscreenUI", "Saves changes the cartridge makes to its flash memory back to the image file. This overwrites your dump, so keep a backup.");
 TRANSLATE_NOOP("FullscreenUI", "Saves state periodically so you can rewind any mistakes while playing.");
 TRANSLATE_NOOP("FullscreenUI", "Scaled Dithering");
@@ -9486,6 +9505,7 @@ TRANSLATE_NOOP("FullscreenUI", "change disc");
 TRANSLATE_NOOP("FullscreenUI", "host or host:port");
 TRANSLATE_NOOP("FullscreenUI", "reset");
 TRANSLATE_NOOP("FullscreenUI", "shut down");
+TRANSLATE_NOOP("FullscreenUI", "{0} Checkpoint##checkpoint_{1}");
 TRANSLATE_NOOP("FullscreenUI", "{:%H:%M}");
 TRANSLATE_NOOP("FullscreenUI", "{:%Y-%m-%d %H:%M:%S}");
 TRANSLATE_NOOP("FullscreenUI", "{} Frames");
