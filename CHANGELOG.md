@@ -3,7 +3,7 @@
 Changes since the DuckStation `v0.1-7371` base. Releases are tagged
 `vMAJOR.MINOR.PATCH`.
 
-## Unreleased
+## 1.4.0 (2026-11-26)
 
 ### New
 - Rewind timeline: a strip of rewind snapshots with thumbnails over the paused

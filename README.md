@@ -28,7 +28,7 @@ It is based on [DuckStation](https://github.com/stenzek/duckstation) `v0.1-7371`
 
 ## 🚧 Status
 
-The current release is 1.3.0; downloads are on [riverhorse.app](https://riverhorse.app) and the [Releases](https://github.com/thenotoriousfox/riverhorse/releases) page. Releases are tagged `vMAJOR.MINOR.PATCH`; the upstream tag `v0.1-7371` marks the base. Settings files use the same format and keys as the base. See [CHANGELOG.md](CHANGELOG.md) for everything changed since.
+The current release is 1.4.0; downloads are on [riverhorse.app](https://riverhorse.app) and the [Releases](https://github.com/thenotoriousfox/riverhorse/releases) page. Releases are tagged `vMAJOR.MINOR.PATCH`; the upstream tag `v0.1-7371` marks the base. Settings files use the same format and keys as the base. See [CHANGELOG.md](CHANGELOG.md) for everything changed since.
 
 | Platform | Build |
 |---|---|
