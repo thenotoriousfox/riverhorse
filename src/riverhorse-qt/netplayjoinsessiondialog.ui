@@ -12,74 +12,11 @@
    <item>
     <widget class="QLabel" name="description">
      <property name="text">
-      <string>Connects to a session hosted by another player. You need the same game and the same BIOS as the host; the game is found in your game list.</string>
+      <string>Connects to a session hosted by another player, with the session code the host is shown or the host's address. You need the same game and the same BIOS as the host; the game is found in your game list. Listed sessions are in the Netplay Lobby.</string>
      </property>
      <property name="wordWrap">
       <bool>true</bool>
      </property>
-    </widget>
-   </item>
-   <item>
-    <widget class="QGroupBox" name="sessionsGroup">
-     <property name="title">
-      <string>Open Sessions</string>
-     </property>
-     <layout class="QVBoxLayout" name="sessionsLayout">
-      <item>
-       <widget class="QTreeWidget" name="sessionList">
-        <property name="minimumSize">
-         <size>
-          <width>520</width>
-          <height>160</height>
-         </size>
-        </property>
-        <property name="rootIsDecorated">
-         <bool>false</bool>
-        </property>
-        <property name="uniformRowHeights">
-         <bool>true</bool>
-        </property>
-        <column>
-         <property name="text">
-          <string>Game</string>
-         </property>
-        </column>
-        <column>
-         <property name="text">
-          <string>Host</string>
-         </property>
-        </column>
-        <column>
-         <property name="text">
-          <string>Players</string>
-         </property>
-        </column>
-        <column>
-         <property name="text">
-          <string>Code</string>
-         </property>
-        </column>
-       </widget>
-      </item>
-      <item>
-       <layout class="QHBoxLayout" name="sessionsStatusLayout">
-        <item>
-         <widget class="QLabel" name="sessionsStatus">
-          <property name="wordWrap">
-           <bool>true</bool>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="QPushButton" name="refreshSessions">
-          <property name="text">
-           <string>Refresh</string>
-          </property>
-         </widget>
-        </item>
-       </layout>
-      </item>
-     </layout>
     </widget>
    </item>
    <item>

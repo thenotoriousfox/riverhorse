@@ -13,6 +13,7 @@
 #include "gpu.h"
 #include "host.h"
 #include "netplay.h"
+#include "netplay_lobby.h"
 #include "rewind_timeline.h"
 #include "save_sync.h"
 #include "settings.h"
@@ -180,6 +181,7 @@ enum class MainWindowType
   PauseMenu,
   Achievements,
   Leaderboards,
+  NetplayLobby,
 };
 
 enum class PauseSubMenu
@@ -275,9 +277,15 @@ static void DoResume();
 static void DoStartFile();
 static void DoStartBIOS();
 static void DoHostNetplaySession();
-static void DoJoinNetplaySession();
 static void DoJoinNetplayByAddress();
-static void JoinNetplayAddress(std::string address);
+static void JoinNetplayAddress(std::string address, std::string password = {}, std::string game_path = {});
+static void OpenNetplayLobby();
+static void CloseNetplayLobby();
+static void DrawNetplayLobbyWindow();
+static bool DrawLobbySessionCard(const NetplayLobby::Session& session, const ImVec2& size);
+static void JoinLobbySession(const NetplayLobby::Session& session);
+static void DoHostLobbyGame();
+static void OpenLobbySettings();
 static void DoStartDisc(std::string path);
 static void DoStartDisc();
 static void DoToggleFastForward();
@@ -316,6 +324,8 @@ static constexpr float HOME_BACKDROP_ART_ALPHA = 0.22f;
 static constexpr float HOME_BACKDROP_ART_CROP_LEFT = 0.15f;
 static constexpr float HOME_BACKDROP_FADE_SECONDS = 0.35f;
 static constexpr float HOME_STATUS_REFRESH_SECONDS = 5.0f;
+static constexpr float LOBBY_CARD_WIDTH = 520.0f;
+static constexpr float LOBBY_CARD_HEIGHT = 120.0f;
 static constexpr float PAUSE_PANEL_WIDTH = 460.0f;
 static constexpr float LOGO_INTRO_SECONDS = 0.6f;
 static constexpr u32 QUICK_GRAPHICS_MAX_RESOLUTION_SCALE = 8;
@@ -707,6 +717,8 @@ void FullscreenUI::OnSystemStarted()
   if (!IsInitialized())
     return;
 
+  NetplayLobby::Close();
+
   s_current_main_window = MainWindowType::None;
   QueueResetFocus(FocusResetType::WindowChanged);
 }
@@ -912,6 +924,9 @@ void FullscreenUI::Render()
       break;
     case MainWindowType::Leaderboards:
       Achievements::DrawLeaderboardsWindow();
+      break;
+    case MainWindowType::NetplayLobby:
+      DrawNetplayLobbyWindow();
       break;
     default:
       break;
@@ -1508,14 +1523,15 @@ void FullscreenUI::DrawLandingWindow()
 
     ResetFocusHere();
 
-    static constexpr std::array<std::pair<const char*, const char*>, 4> actions = {{
+    static constexpr std::array<std::pair<const char*, const char*>, 5> actions = {{
       {ICON_FA_LIST, FSUI_NSTR("Library")},
       {ICON_FA_COMPACT_DISC, FSUI_NSTR("Start Game")},
+      {ICON_FA_GLOBE, FSUI_NSTR("Netplay")},
       {ICON_FA_SLIDERS_H, FSUI_NSTR("Settings")},
       {ICON_FA_POWER_OFF, FSUI_NSTR("Exit")},
     }};
     const s32 action = DrawHomeActions(actions);
-    switch ((action < 0 && !AreAnyDialogsOpen() && WantsToCloseMenu()) ? 3 : action)
+    switch ((action < 0 && !AreAnyDialogsOpen() && WantsToCloseMenu()) ? 4 : action)
     {
       case 0:
         SwitchToGameList();
@@ -1525,9 +1541,12 @@ void FullscreenUI::DrawLandingWindow()
         QueueResetFocus(FocusResetType::WindowChanged);
         break;
       case 2:
-        SwitchToSettings();
+        OpenNetplayLobby();
         break;
       case 3:
+        SwitchToSettings();
+        break;
+      case 4:
         s_current_main_window = MainWindowType::Exit;
         QueueResetFocus(FocusResetType::WindowChanged);
         break;
@@ -2011,7 +2030,7 @@ void FullscreenUI::DrawStartGameWindow()
     if (HorizontalMenuItem(GetCachedTexture("fullscreenui/netplay.png"), FSUI_CSTR("Join Netplay"),
                            FSUI_CSTR("Play a game hosted by another player over the network.")))
     {
-      DoJoinNetplaySession();
+      OpenNetplayLobby();
     }
 
     // https://www.iconpacks.net/free-icon/arrow-back-3783.html
@@ -3639,47 +3658,12 @@ void FullscreenUI::DoHostNetplaySession()
   Host::RunOnCPUThread([nickname, port, input_delay]() {
     if (!Netplay::CreateSession(nickname, port, Netplay::MAX_PLAYERS, std::string(), input_delay))
       ShowToast(std::string(), FSUI_STR("Failed to create netplay session. The log may contain more information."));
+    else if (const std::optional<u16> session_code = Netplay::GetHostedSessionCode())
+      ShowToast(std::string(),
+                fmt::format(FSUI_FSTR("Hosting netplay. Players join with session code {}."), session_code.value()));
     else
       ShowToast(std::string(), fmt::format(FSUI_FSTR("Hosting netplay on port {}."), port));
   });
-}
-
-void FullscreenUI::DoJoinNetplaySession()
-{
-  ShowToast(std::string(), FSUI_STR("Looking for open sessions..."));
-  std::thread([]() {
-    Error error;
-    std::optional<std::vector<Netplay::SessionListing>> sessions = Netplay::GetSessionList(&error);
-    Host::RunOnCPUThread([sessions = std::move(sessions), error = std::move(error)]() {
-      if (!sessions.has_value())
-      {
-        ShowToast(std::string(), fmt::format(FSUI_FSTR("Could not get the session list: {}"), error.GetDescription()));
-        DoJoinNetplayByAddress();
-        return;
-      }
-
-      ImGuiFullscreen::ChoiceDialogOptions options;
-      options.emplace_back(FSUI_STR("Enter a Session Code or Address"), false);
-      std::vector<u16> codes;
-      for (const Netplay::SessionListing& session : sessions.value())
-      {
-        options.emplace_back(fmt::format("{} - {} ({}/{}){}", session.game_title, session.host_nickname,
-                                         session.players, session.max_players,
-                                         session.has_password ? FSUI_STR(", password") : std::string()),
-                             false);
-        codes.push_back(session.session_code);
-      }
-
-      OpenChoiceDialog(FSUI_ICONSTR(ICON_FA_GLOBE, "Join Netplay"), false, std::move(options),
-                       [codes = std::move(codes)](s32 index, const std::string& title, bool checked) {
-                         CloseChoiceDialog();
-                         if (index == 0)
-                           DoJoinNetplayByAddress();
-                         else if (index > 0)
-                           JoinNetplayAddress(std::to_string(codes[static_cast<size_t>(index - 1)]));
-                       });
-    });
-  }).detach();
 }
 
 void FullscreenUI::DoJoinNetplayByAddress()
@@ -3691,7 +3675,7 @@ void FullscreenUI::DoJoinNetplayByAddress()
     Host::GetBaseStringSettingValue("Netplay", "LastHost", ""));
 }
 
-void FullscreenUI::JoinNetplayAddress(std::string address)
+void FullscreenUI::JoinNetplayAddress(std::string address, std::string password, std::string game_path)
 {
   address = StringUtil::StripWhitespace(address);
   if (address.empty())
@@ -3710,10 +3694,344 @@ void FullscreenUI::JoinNetplayAddress(std::string address)
 
   const std::string nickname = Host::GetBaseStringSettingValue("Netplay", "Nickname", Netplay::DEFAULT_NICKNAME);
   const s32 input_delay = Host::GetBaseIntSettingValue("Netplay", "InputDelay", 0);
-  Host::RunOnCPUThread([nickname, address, port, input_delay]() {
-    if (!Netplay::JoinSession(nickname, address, port, std::string(), false, input_delay))
-      ShowToast(std::string(), FSUI_STR("Failed to join netplay session. The log may contain more information."));
-  });
+  Host::RunOnCPUThread(
+    [nickname, address, port, input_delay, password = std::move(password), game_path = std::move(game_path)]() {
+      if (!Netplay::JoinSession(nickname, address, port, password, false, input_delay, game_path))
+        ShowToast(std::string(), FSUI_STR("Failed to join netplay session. The log may contain more information."));
+    });
+}
+
+void FullscreenUI::OpenNetplayLobby()
+{
+  NetplayLobby::Open();
+  s_current_main_window = MainWindowType::NetplayLobby;
+  QueueResetFocus(FocusResetType::WindowChanged);
+}
+
+void FullscreenUI::CloseNetplayLobby()
+{
+  NetplayLobby::Close();
+  s_current_main_window = MainWindowType::Landing;
+  QueueResetFocus(FocusResetType::WindowChanged);
+}
+
+void FullscreenUI::DrawNetplayLobbyWindow()
+{
+  NetplayLobby::Update();
+
+  ImVec2 menu_pos, menu_size;
+  DrawLandingTemplate(&menu_pos, &menu_size);
+
+  ImGui::PushStyleColor(ImGuiCol_Text, UIBackgroundTextColor);
+
+  if (BeginFullscreenWindow(menu_pos, menu_size, "netplay_lobby", UIBackgroundColor, 0.0f,
+                            LayoutScale(LAYOUT_MENU_BUTTON_X_PADDING * 2.0f, LAYOUT_MENU_BUTTON_Y_PADDING * 2.0f)))
+  {
+    ResetFocusHere();
+
+    static constexpr std::array<std::pair<const char*, const char*>, 5> actions = {{
+      {ICON_FA_PLAY, FSUI_NSTR("Host a Game")},
+      {ICON_FA_KEYBOARD, FSUI_NSTR("Join by Code")},
+      {ICON_FA_SYNC, FSUI_NSTR("Refresh")},
+      {ICON_FA_SLIDERS_H, FSUI_NSTR("Lobby Settings")},
+      {ICON_FA_BACKWARD, FSUI_NSTR("Back")},
+    }};
+    const s32 action = DrawHomeActions(actions);
+    switch ((action < 0 && !AreAnyDialogsOpen() && WantsToCloseMenu()) ? 4 : action)
+    {
+      case 0:
+        DoHostLobbyGame();
+        break;
+      case 1:
+        DoJoinNetplayByAddress();
+        break;
+      case 2:
+        NetplayLobby::Refresh();
+        break;
+      case 3:
+        OpenLobbySettings();
+        break;
+      case 4:
+        CloseNetplayLobby();
+        break;
+      default:
+        break;
+    }
+
+    const std::vector<NetplayLobby::Session>& sessions = NetplayLobby::GetSessions();
+    ImGui::PushFont(g_large_font);
+    ImGui::TextUnformatted(FSUI_CSTR("Open Sessions"));
+    ImGui::PopFont();
+    ImGui::SameLine(0.0f, LayoutScale(LAYOUT_MENU_BUTTON_X_PADDING));
+    ImGui::SetCursorPosY(ImGui::GetCursorPosY() + g_large_font->FontSize - g_medium_font->FontSize);
+    ImGui::PushFont(g_medium_font);
+    ImGui::PushStyleColor(ImGuiCol_Text, UIDisabledColor);
+    if (NetplayLobby::IsRefreshing())
+      ImGui::TextUnformatted(FSUI_CSTR("Updating..."));
+    else
+      ImGui::Text("%zu", sessions.size());
+    ImGui::TextUnformatted(
+      SmallString::from_format(FSUI_FSTR("Playing as {}"),
+                               Host::GetBaseStringSettingValue("Netplay", "Nickname", Netplay::DEFAULT_NICKNAME))
+        .c_str());
+    ImGui::PopStyleColor();
+    ImGui::Dummy(ImVec2(0.0f, LayoutScale(LAYOUT_MENU_BUTTON_Y_PADDING)));
+
+    if (!NetplayLobby::GetError().empty())
+    {
+      ImGui::TextWrapped(
+        "%s", fmt::format(FSUI_FSTR("Could not get the session list: {}"), NetplayLobby::GetError()).c_str());
+    }
+    else if (!NetplayLobby::HasSessionList())
+    {
+      ImGui::TextUnformatted(FSUI_CSTR("Looking for open sessions..."));
+    }
+    else if (sessions.empty())
+    {
+      ImGui::TextWrapped("%s", FSUI_CSTR("No open sessions right now. Host a game with List My Session turned on in "
+                                         "Lobby Settings so other players can find it, or join a friend's session "
+                                         "with its code."));
+    }
+    ImGui::PopFont();
+
+    if (!sessions.empty())
+    {
+      ImGui::BeginChild("lobby_sessions", ImVec2(0.0f, 0.0f), false,
+                        ImGuiWindowFlags_NavFlattened | ImGuiWindowFlags_NoBackground);
+      const float spacing = LayoutScale(HOME_COVER_SPACING);
+      const float available = ImGui::GetContentRegionAvail().x;
+      const u32 columns =
+        std::max(1u, static_cast<u32>((available + spacing) / (LayoutScale(LOBBY_CARD_WIDTH) + spacing)));
+      const ImVec2 card_size((available - spacing * static_cast<float>(columns - 1)) / static_cast<float>(columns),
+                             LayoutScale(LOBBY_CARD_HEIGHT));
+
+      const auto lock = GameList::GetLock();
+      for (size_t i = 0; i < sessions.size(); i++)
+      {
+        if (i % columns != 0)
+          ImGui::SameLine(0.0f, spacing);
+        else if (i > 0)
+          ImGui::Dummy(ImVec2(0.0f, spacing - ImGui::GetStyle().ItemSpacing.y * 2.0f));
+
+        if (DrawLobbySessionCard(sessions[i], card_size))
+          JoinLobbySession(sessions[i]);
+      }
+
+      if (ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem))
+        ImGui::SetScrollY(ImGui::GetScrollY() - GetSwipeDelta().y);
+      ImGui::EndChild();
+    }
+  }
+  EndFullscreenWindow();
+
+  ImGui::PopStyleColor();
+
+  if (!AreAnyDialogsOpen() &&
+      (ImGui::IsKeyPressed(ImGuiKey_NavGamepadInput, false) || ImGui::IsKeyPressed(ImGuiKey_F5, false)))
+  {
+    NetplayLobby::Refresh();
+  }
+
+  if (IsGamepadInputSource())
+  {
+    SetFullscreenFooterText(std::array{
+      std::make_pair(ICON_PF_XBOX_DPAD, FSUI_VSTR("Navigate")), std::make_pair(ICON_PF_BUTTON_X, FSUI_VSTR("Refresh")),
+      std::make_pair(ICON_PF_BUTTON_A, FSUI_VSTR("Select")), std::make_pair(ICON_PF_BUTTON_B, FSUI_VSTR("Back"))});
+  }
+  else
+  {
+    SetFullscreenFooterText(std::array{
+      std::make_pair(ICON_PF_ARROW_UP ICON_PF_ARROW_DOWN ICON_PF_ARROW_LEFT ICON_PF_ARROW_RIGHT, FSUI_VSTR("Navigate")),
+      std::make_pair(ICON_PF_F5, FSUI_VSTR("Refresh")), std::make_pair(ICON_PF_ENTER, FSUI_VSTR("Select")),
+      std::make_pair(ICON_PF_ESC, FSUI_VSTR("Back"))});
+  }
+}
+
+bool FullscreenUI::DrawLobbySessionCard(const NetplayLobby::Session& session, const ImVec2& size)
+{
+  ImGuiWindow* const window = ImGui::GetCurrentWindow();
+  const ImVec2 pos = window->DC.CursorPos;
+  const ImRect bb(pos, pos + size);
+  const ImGuiID id = window->GetID(static_cast<int>(session.listing.session_code));
+  ImGui::ItemSize(size);
+  if (!ImGui::ItemAdd(bb, id))
+    return false;
+
+  bool hovered, held;
+  const bool pressed = ImGui::ButtonBehavior(bb, id, &hovered, &held, 0) && !WasSwipe();
+
+  ImDrawList* const dl = ImGui::GetWindowDrawList();
+  const float rounding = LayoutScale(HOME_COVER_ROUNDING);
+  const float padding = LayoutScale(LAYOUT_MENU_BUTTON_X_PADDING);
+  const Netplay::SessionListing& listing = session.listing;
+  const GameList::Entry* const entry =
+    session.game_path.empty() ? nullptr : GameList::GetEntryForPath(session.game_path);
+
+  DrawCoverShadow(dl, bb, 0.0f);
+  dl->AddRectFilled(bb.Min, bb.Max, ImGui::GetColorU32(UIPrimaryColor), rounding);
+
+  const ImRect cover_rect(bb.Min, ImVec2(bb.Min.x + bb.GetHeight(), bb.Max.y));
+  if (entry)
+  {
+    DrawGameCover(dl, cover_rect, entry);
+  }
+  else
+  {
+    dl->AddRectFilled(cover_rect.Min, cover_rect.Max, ImGui::GetColorU32(UIPrimaryDarkColor), rounding);
+    const ImVec2 icon_size = g_large_font->CalcTextSizeA(g_large_font->FontSize, FLT_MAX, 0.0f, ICON_FA_QUESTION);
+    dl->AddText(g_large_font, g_large_font->FontSize, cover_rect.GetCenter() - icon_size * 0.5f,
+                ImGui::GetColorU32(UIDisabledColor), ICON_FA_QUESTION);
+  }
+
+  const float text_x = cover_rect.Max.x + padding;
+  const float text_width = bb.Max.x - padding - text_x;
+  const ImVec4 text_clip(text_x, bb.Min.y, bb.Max.x - padding, bb.Max.y);
+  const std::string_view title = GameCard::GetDisplayTitle(listing.game_title);
+  ImVec2 text_pos(text_x, bb.Min.y + padding);
+  dl->AddText(g_large_font, g_large_font->FontSize, text_pos, ImGui::GetColorU32(UIPrimaryTextColor), title.data(),
+              title.data() + title.length(), 0.0f, &text_clip);
+  text_pos.y += g_large_font->FontSize + LayoutScale(4.0f);
+
+  SmallString line;
+  line.format(FSUI_FSTR("Hosted by {}"), listing.host_nickname);
+  dl->AddText(g_medium_font, g_medium_font->FontSize, text_pos, ImGui::GetColorU32(UIPrimaryTextColor), line.c_str(),
+              line.end_ptr(), 0.0f, &text_clip);
+  text_pos.y += g_medium_font->FontSize + LayoutScale(4.0f);
+
+  line.format("{} {}/{}", ICON_FA_USERS, listing.players, listing.max_players);
+  if (listing.has_password)
+    line.append_format("    {} {}", ICON_FA_LOCK, FSUI_VSTR("Password"));
+  dl->AddText(g_medium_font, g_medium_font->FontSize, text_pos, ImGui::GetColorU32(UIPrimaryTextColor), line.c_str(),
+              line.end_ptr(), 0.0f, &text_clip);
+
+  if (!entry)
+  {
+    line.format("{} {}", ICON_FA_EXCLAMATION_TRIANGLE, FSUI_VSTR("Not in your library"));
+    dl->AddText(g_medium_font, g_medium_font->FontSize, ImVec2(text_x, bb.Max.y - padding - g_medium_font->FontSize),
+                ImGui::GetColorU32(UIDisabledColor), line.c_str(), line.end_ptr(), 0.0f, &text_clip);
+  }
+
+  if (hovered)
+    dl->AddRect(bb.Min, bb.Max, ImGui::GetColorU32(UISecondaryStrongColor), rounding, 0, LayoutScale(3.0f));
+
+  return pressed;
+}
+
+void FullscreenUI::JoinLobbySession(const NetplayLobby::Session& session)
+{
+  if (session.game_path.empty())
+  {
+    ShowToast(std::string(), fmt::format(FSUI_FSTR("{} is not in your game list, so you can't join this session."),
+                                         session.listing.game_title));
+    return;
+  }
+
+  std::string code = std::to_string(session.listing.session_code);
+  if (!session.listing.has_password)
+  {
+    JoinNetplayAddress(std::move(code), std::string(), session.game_path);
+    return;
+  }
+
+  OpenInputStringDialog(
+    FSUI_ICONSTR(ICON_FA_LOCK, "Password"), FSUI_STR("This session needs a password. Ask the host for it."),
+    std::string(), FSUI_STR("Join"), [code = std::move(code), game_path = session.game_path](std::string password) {
+      JoinNetplayAddress(code, std::move(password), game_path);
+    });
+}
+
+void FullscreenUI::DoHostLobbyGame()
+{
+  ImGuiFullscreen::ChoiceDialogOptions options;
+  std::vector<std::string> paths;
+  {
+    const auto lock = GameList::GetLock();
+    std::vector<const GameList::Entry*> entries;
+    for (u32 i = 0; i < GameList::GetEntryCount(); i++)
+    {
+      const GameList::Entry* entry = GameList::GetEntryByIndex(i);
+      if (GameList::IsEntryListed(entry, true))
+        entries.push_back(entry);
+    }
+    std::sort(entries.begin(), entries.end(), [](const GameList::Entry* a, const GameList::Entry* b) {
+      return StringUtil::Strcasecmp(a->title.c_str(), b->title.c_str()) < 0;
+    });
+
+    for (const GameList::Entry* entry : entries)
+    {
+      const GameList::Entry* boot_entry = entry->IsDiscSet() ? GameList::GetFirstDiscSetMember(entry->path) : entry;
+      if (!boot_entry)
+        continue;
+
+      options.emplace_back(std::string(GameCard::GetDisplayTitle(entry->title)), false);
+      paths.push_back(boot_entry->path);
+    }
+  }
+
+  if (options.empty())
+  {
+    ShowToast(std::string(), FSUI_STR("No games found. Add a folder with your games in Settings > Game List."));
+    return;
+  }
+
+  OpenChoiceDialog(FSUI_ICONSTR(ICON_FA_PLAY, "Host a Game"), false, std::move(options),
+                   [paths = std::move(paths)](s32 index, const std::string& title, bool checked) {
+                     CloseChoiceDialog();
+                     if (index < 0)
+                       return;
+
+                     DoStartPath(paths[static_cast<size_t>(index)]);
+                     DoHostNetplaySession();
+                   });
+}
+
+void FullscreenUI::OpenLobbySettings()
+{
+  const bool list_sessions = Host::GetBaseBoolSettingValue("Netplay", "ListSessions", false);
+  const bool confirm_joins = Host::GetBaseBoolSettingValue("Netplay", "ConfirmJoins", false);
+  const std::string nickname = Host::GetBaseStringSettingValue("Netplay", "Nickname", Netplay::DEFAULT_NICKNAME);
+
+  ImGuiFullscreen::ChoiceDialogOptions options;
+  options.emplace_back(
+    fmt::format(FSUI_FSTR("List My Session: {}"), list_sessions ? FSUI_VSTR("On") : FSUI_VSTR("Off")), false);
+  options.emplace_back(
+    fmt::format(FSUI_FSTR("Ask Before Players Join: {}"), confirm_joins ? FSUI_VSTR("On") : FSUI_VSTR("Off")), false);
+  options.emplace_back(fmt::format(FSUI_FSTR("Nickname: {}"), nickname), false);
+
+  OpenChoiceDialog(FSUI_ICONSTR(ICON_FA_SLIDERS_H, "Lobby Settings"), false, std::move(options),
+                   [list_sessions, confirm_joins, nickname](s32 index, const std::string& title, bool checked) {
+                     CloseChoiceDialog();
+                     switch (index)
+                     {
+                       case 0:
+                         Host::SetBaseBoolSettingValue("Netplay", "ListSessions", !list_sessions);
+                         Host::CommitBaseSettingChanges();
+                         OpenLobbySettings();
+                         break;
+                       case 1:
+                         Host::SetBaseBoolSettingValue("Netplay", "ConfirmJoins", !confirm_joins);
+                         Host::CommitBaseSettingChanges();
+                         OpenLobbySettings();
+                         break;
+                       case 2:
+                         OpenInputStringDialog(
+                           FSUI_ICONSTR(ICON_FA_USER, "Nickname"), FSUI_STR("Name shown to the other players."),
+                           std::string(), FSUI_STR("Save"),
+                           [](std::string value) {
+                             value = StringUtil::StripWhitespace(value);
+                             if (!value.empty())
+                             {
+                               Host::SetBaseStringSettingValue("Netplay", "Nickname", value.c_str());
+                               Host::CommitBaseSettingChanges();
+                             }
+                             OpenLobbySettings();
+                           },
+                           nickname);
+                         break;
+                       default:
+                         break;
+                     }
+                   });
 }
 
 void FullscreenUI::SetQuickGraphicsSetting(const char* key, s32 value)
@@ -8368,7 +8686,6 @@ TRANSLATE_NOOP("FullscreenUI", "%d Frames");
 TRANSLATE_NOOP("FullscreenUI", "%d frames");
 TRANSLATE_NOOP("FullscreenUI", "%d ms");
 TRANSLATE_NOOP("FullscreenUI", "%d sectors");
-TRANSLATE_NOOP("FullscreenUI", ", password");
 TRANSLATE_NOOP("FullscreenUI", "-");
 TRANSLATE_NOOP("FullscreenUI", "1 Frame");
 TRANSLATE_NOOP("FullscreenUI", "10 Frames");
@@ -8464,6 +8781,7 @@ TRANSLATE_NOOP("FullscreenUI", "Applies modern dithering techniques to further s
 TRANSLATE_NOOP("FullscreenUI", "Apply Image Patches");
 TRANSLATE_NOOP("FullscreenUI", "Are you sure you want to clear the current post-processing chain? All configuration will be lost.");
 TRANSLATE_NOOP("FullscreenUI", "Ask Before Players Join");
+TRANSLATE_NOOP("FullscreenUI", "Ask Before Players Join: {}");
 TRANSLATE_NOOP("FullscreenUI", "Aspect Ratio");
 TRANSLATE_NOOP("FullscreenUI", "Attempts to detect one pixel high/wide lines that rely on non-upscaled rasterization behavior, filling in gaps introduced by upscaling.");
 TRANSLATE_NOOP("FullscreenUI", "Attempts to map the selected port to a chosen controller.");
@@ -8645,7 +8963,6 @@ TRANSLATE_NOOP("FullscreenUI", "Enables the replacement of background textures i
 TRANSLATE_NOOP("FullscreenUI", "Encore Mode");
 TRANSLATE_NOOP("FullscreenUI", "Ensures every frame generated is displayed for optimal pacing. Enable for variable refresh displays, such as GSync/FreeSync. Disable if you are having speed or sound issues.");
 TRANSLATE_NOOP("FullscreenUI", "Enter Value");
-TRANSLATE_NOOP("FullscreenUI", "Enter a Session Code or Address");
 TRANSLATE_NOOP("FullscreenUI", "Enter the name of the input profile you wish to create.");
 TRANSLATE_NOOP("FullscreenUI", "Enter the session code, or the host's address (name or IP, optionally :port).");
 TRANSLATE_NOOP("FullscreenUI", "Error");
@@ -8719,7 +9036,10 @@ TRANSLATE_NOOP("FullscreenUI", "Hardcore mode will be enabled on next game resta
 TRANSLATE_NOOP("FullscreenUI", "Hide Cursor In Fullscreen");
 TRANSLATE_NOOP("FullscreenUI", "Hides the mouse pointer/cursor when the emulator is in fullscreen mode.");
 TRANSLATE_NOOP("FullscreenUI", "Host Netplay Session");
+TRANSLATE_NOOP("FullscreenUI", "Host a Game");
+TRANSLATE_NOOP("FullscreenUI", "Hosted by {}");
 TRANSLATE_NOOP("FullscreenUI", "Hosting netplay on port {}.");
+TRANSLATE_NOOP("FullscreenUI", "Hosting netplay. Players join with session code {}.");
 TRANSLATE_NOOP("FullscreenUI", "Hotkey Settings");
 TRANSLATE_NOOP("FullscreenUI", "How many saves will be kept for rewinding. Higher values have greater memory requirements.");
 TRANSLATE_NOOP("FullscreenUI", "How often a rewind state will be created. Higher frequencies have greater system requirements.");
@@ -8742,6 +9062,7 @@ TRANSLATE_NOOP("FullscreenUI", "Interface Size");
 TRANSLATE_NOOP("FullscreenUI", "Internal Resolution");
 TRANSLATE_NOOP("FullscreenUI", "Join");
 TRANSLATE_NOOP("FullscreenUI", "Join Netplay");
+TRANSLATE_NOOP("FullscreenUI", "Join by Code");
 TRANSLATE_NOOP("FullscreenUI", "Keeps memory cards, save states and game settings the same on all your devices, through a folder another program syncs or a WebDAV server.");
 TRANSLATE_NOOP("FullscreenUI", "Large");
 TRANSLATE_NOOP("FullscreenUI", "Last Played");
@@ -8758,6 +9079,7 @@ TRANSLATE_NOOP("FullscreenUI", "Lets a frame that misses the refresh be shown st
 TRANSLATE_NOOP("FullscreenUI", "Library");
 TRANSLATE_NOOP("FullscreenUI", "Line Detection");
 TRANSLATE_NOOP("FullscreenUI", "List Hosted Sessions");
+TRANSLATE_NOOP("FullscreenUI", "List My Session: {}");
 TRANSLATE_NOOP("FullscreenUI", "List Settings");
 TRANSLATE_NOOP("FullscreenUI", "Load Devices From Save States");
 TRANSLATE_NOOP("FullscreenUI", "Load Global State");
@@ -8766,6 +9088,7 @@ TRANSLATE_NOOP("FullscreenUI", "Load Resume State");
 TRANSLATE_NOOP("FullscreenUI", "Load State");
 TRANSLATE_NOOP("FullscreenUI", "Loads all replacement texture to RAM, reducing stuttering at runtime.");
 TRANSLATE_NOOP("FullscreenUI", "Loads the game image into RAM. Useful for network paths that may become unreliable during gameplay.");
+TRANSLATE_NOOP("FullscreenUI", "Lobby Settings");
 TRANSLATE_NOOP("FullscreenUI", "Log Level");
 TRANSLATE_NOOP("FullscreenUI", "Log To Debug Console");
 TRANSLATE_NOOP("FullscreenUI", "Log To File");
@@ -8810,12 +9133,14 @@ TRANSLATE_NOOP("FullscreenUI", "Navigate");
 TRANSLATE_NOOP("FullscreenUI", "Netplay");
 TRANSLATE_NOOP("FullscreenUI", "Netplay: the game keeps running while this menu is open.");
 TRANSLATE_NOOP("FullscreenUI", "Nickname");
+TRANSLATE_NOOP("FullscreenUI", "Nickname: {}");
 TRANSLATE_NOOP("FullscreenUI", "No Binding");
 TRANSLATE_NOOP("FullscreenUI", "No Game Selected");
 TRANSLATE_NOOP("FullscreenUI", "No Read Speedup During Videos");
 TRANSLATE_NOOP("FullscreenUI", "No cheats found for {}.");
 TRANSLATE_NOOP("FullscreenUI", "No games found. Add a folder with your games in Settings > Game List.");
 TRANSLATE_NOOP("FullscreenUI", "No input profiles available.");
+TRANSLATE_NOOP("FullscreenUI", "No open sessions right now. Host a game with List My Session turned on in Lobby Settings so other players can find it, or join a friend's session with its code.");
 TRANSLATE_NOOP("FullscreenUI", "No resume save state found.");
 TRANSLATE_NOOP("FullscreenUI", "No rewind snapshots have been saved yet.");
 TRANSLATE_NOOP("FullscreenUI", "No save present in this slot.");
@@ -8829,6 +9154,7 @@ TRANSLATE_NOOP("FullscreenUI", "Normalize Depth Scale");
 TRANSLATE_NOOP("FullscreenUI", "Not Logged In");
 TRANSLATE_NOOP("FullscreenUI", "Not Scanning Subdirectories");
 TRANSLATE_NOOP("FullscreenUI", "Not Set");
+TRANSLATE_NOOP("FullscreenUI", "Not in your library");
 TRANSLATE_NOOP("FullscreenUI", "Not played yet");
 TRANSLATE_NOOP("FullscreenUI", "OK");
 TRANSLATE_NOOP("FullscreenUI", "OSD Scale");
@@ -8836,6 +9162,7 @@ TRANSLATE_NOOP("FullscreenUI", "Off");
 TRANSLATE_NOOP("FullscreenUI", "On");
 TRANSLATE_NOOP("FullscreenUI", "On-Screen Display");
 TRANSLATE_NOOP("FullscreenUI", "Open Containing Directory");
+TRANSLATE_NOOP("FullscreenUI", "Open Sessions");
 TRANSLATE_NOOP("FullscreenUI", "Open in File Browser");
 TRANSLATE_NOOP("FullscreenUI", "Operations");
 TRANSLATE_NOOP("FullscreenUI", "Optimal Frame Pacing");
@@ -8867,6 +9194,7 @@ TRANSLATE_NOOP("FullscreenUI", "Perspective Correct Textures");
 TRANSLATE_NOOP("FullscreenUI", "Play a game hosted by another player over the network.");
 TRANSLATE_NOOP("FullscreenUI", "Played {} · last on {:%d %b}");
 TRANSLATE_NOOP("FullscreenUI", "Players join with a session code and connect even when their routers block direct connections. Off: players join with the host's address and port.");
+TRANSLATE_NOOP("FullscreenUI", "Playing as {}");
 TRANSLATE_NOOP("FullscreenUI", "Plays sound effects for events such as achievement unlocks and leaderboard submissions.");
 TRANSLATE_NOOP("FullscreenUI", "Plugs a device into the console's parallel port. The Xplorer/Xploder cheat cartridge needs a dump of its flash memory.");
 TRANSLATE_NOOP("FullscreenUI", "Port");
@@ -8896,6 +9224,7 @@ TRANSLATE_NOOP("FullscreenUI", "Reduces hitches in emulation by reading/decompre
 TRANSLATE_NOOP("FullscreenUI", "Reduces input latency by delaying the start of frame until closer to the presentation time.");
 TRANSLATE_NOOP("FullscreenUI", "Reduces polygon Z-fighting through depth testing. Low compatibility with games.");
 TRANSLATE_NOOP("FullscreenUI", "Reduces the size of save states by compressing the data before saving.");
+TRANSLATE_NOOP("FullscreenUI", "Refresh");
 TRANSLATE_NOOP("FullscreenUI", "Region");
 TRANSLATE_NOOP("FullscreenUI", "Region: ");
 TRANSLATE_NOOP("FullscreenUI", "Relaxed VSync");
@@ -8944,6 +9273,7 @@ TRANSLATE_NOOP("FullscreenUI", "Runs the hardware renderer, presentation and the
 TRANSLATE_NOOP("FullscreenUI", "Runs the software renderer in parallel for VRAM readbacks. On some systems, this may result in greater performance.");
 TRANSLATE_NOOP("FullscreenUI", "SDL DualSense Player LED");
 TRANSLATE_NOOP("FullscreenUI", "SDL DualShock 4 / DualSense Enhanced Mode");
+TRANSLATE_NOOP("FullscreenUI", "Save");
 TRANSLATE_NOOP("FullscreenUI", "Save Profile");
 TRANSLATE_NOOP("FullscreenUI", "Save Screenshot");
 TRANSLATE_NOOP("FullscreenUI", "Save State");
@@ -9086,6 +9416,7 @@ TRANSLATE_NOOP("FullscreenUI", "The selected memory card image will be used in s
 TRANSLATE_NOOP("FullscreenUI", "Theme");
 TRANSLATE_NOOP("FullscreenUI", "This game has no achievements.");
 TRANSLATE_NOOP("FullscreenUI", "This game has no leaderboards.");
+TRANSLATE_NOOP("FullscreenUI", "This session needs a password. Ask the host for it.");
 TRANSLATE_NOOP("FullscreenUI", "Threaded Hardware Rendering");
 TRANSLATE_NOOP("FullscreenUI", "Threaded Presentation");
 TRANSLATE_NOOP("FullscreenUI", "Threaded Rendering");
@@ -9109,6 +9440,7 @@ TRANSLATE_NOOP("FullscreenUI", "Undo Load State");
 TRANSLATE_NOOP("FullscreenUI", "Unknown");
 TRANSLATE_NOOP("FullscreenUI", "Unknown File Size");
 TRANSLATE_NOOP("FullscreenUI", "Unlimited");
+TRANSLATE_NOOP("FullscreenUI", "Updating...");
 TRANSLATE_NOOP("FullscreenUI", "Use Blit Swap Chain");
 TRANSLATE_NOOP("FullscreenUI", "Use Debug GPU Device");
 TRANSLATE_NOOP("FullscreenUI", "Use Global Setting");
@@ -9161,5 +9493,6 @@ TRANSLATE_NOOP("FullscreenUI", "{} Session code {}");
 TRANSLATE_NOOP("FullscreenUI", "{} deleted.");
 TRANSLATE_NOOP("FullscreenUI", "{} does not exist.");
 TRANSLATE_NOOP("FullscreenUI", "{} is not a valid disc image.");
+TRANSLATE_NOOP("FullscreenUI", "{} is not in your game list, so you can't join this session.");
 // TRANSLATION-STRING-AREA-END
 #endif

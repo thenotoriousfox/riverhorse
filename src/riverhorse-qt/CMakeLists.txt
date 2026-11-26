@@ -128,6 +128,7 @@ set(SRCS
   netplaydialogs.cpp
   netplaydialogs.h
   netplayjoinsessiondialog.ui
+  netplaylobbywindow.ui
   postprocessingsettingswidget.cpp
   postprocessingsettingswidget.h
   postprocessingchainconfigwidget.ui

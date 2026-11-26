@@ -51,7 +51,7 @@ The current release is 1.3.0; downloads are on [riverhorse.app](https://riverhor
 
 ### Play
 
-- Rollback netplay for up to four players and four spectators, direct or through a relay server, with a public session list
+- Rollback netplay for up to four players and four spectators, direct or through a relay server, with a lobby of public sessions
 - Save sync: memory cards, save states and game settings kept the same on every device through a synced folder or a WebDAV server, so a game closed on one device resumes on another
 - Patch database with widescreen, 60 FPS and fix patches per game, plus your own patches per game
 - About 66,000 cheats for 1,900+ games, including libretro-database
@@ -169,10 +169,12 @@ core.
 
 Up to four players can play over the network with rollback: the host starts
 a game and picks System > Host Netplay Session (or Host Netplay Session in
-the in-game panel); the others pick System > Join Netplay Session (or Start
-Game > Join Netplay) and choose the session from the list of open sessions,
-or enter the session code the host is shown. The host can list the session
-or keep it to people with the code, and can ask to accept each player.
+the in-game panel); the others open the Netplay Lobby (Netplay in the
+toolbar, System > Netplay Lobby, or Netplay on the Big Picture home screen)
+and pick a session from the list of open sessions, or use Join by Code with
+the session code the host is shown. The lobby can also host a game from the
+game list. The host can list the session or keep it to people with the code,
+and can ask to accept each player.
 Everyone needs the same game in their game list, a BIOS with the same hash
 and the same Riverhorse version. For three or four players, the host turns
 on a multitap first (Settings > Controllers > Global Settings > Multitap Mode, port 1 for most

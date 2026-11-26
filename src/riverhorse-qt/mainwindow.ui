@@ -92,6 +92,7 @@
     <addaction name="actionScreenshot"/>
     <addaction name="actionRewindTimeline"/>
     <addaction name="separator"/>
+    <addaction name="actionNetplayLobby"/>
     <addaction name="actionCreateNetplaySession"/>
     <addaction name="actionJoinNetplaySession"/>
     <addaction name="separator"/>
@@ -271,6 +272,7 @@
    <addaction name="actionStartFile"/>
    <addaction name="actionStartBios"/>
    <addaction name="actionStartFullscreenUI2"/>
+   <addaction name="actionNetplayLobby"/>
    <addaction name="separator"/>
    <addaction name="actionResumeLastState"/>
    <addaction name="actionReset"/>
@@ -301,6 +303,17 @@
    </property>
    <property name="text">
     <string>Start &amp;Disc...</string>
+   </property>
+  </action>
+  <action name="actionNetplayLobby">
+   <property name="icon">
+    <iconset theme="global-line"/>
+   </property>
+   <property name="text">
+    <string>Netplay &amp;Lobby...</string>
+   </property>
+   <property name="iconText">
+    <string>Netplay</string>
    </property>
   </action>
   <action name="actionCreateNetplaySession">

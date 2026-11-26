@@ -12,6 +12,7 @@
 
 #include "util/window_info.h"
 
+#include <QtCore/QPointer>
 #include <QtCore/QThread>
 #include <QtWidgets/QLabel>
 #include <QtWidgets/QMainWindow>
@@ -31,6 +32,7 @@ class AutoUpdaterDialog;
 class MemoryCardEditorWindow;
 class CheatManagerWindow;
 class DebuggerWindow;
+class NetplayLobbyWindow;
 class MemoryScannerWindow;
 
 struct SystemBootParameters;
@@ -140,6 +142,7 @@ private Q_SLOTS:
   void onNetplaySessionClosed();
   void onCreateNetplaySessionClicked();
   void onJoinNetplaySessionClicked();
+  void onNetplayLobbyClicked();
   void onSystemResumed();
   void onRunningGameChanged(const QString& filename, const QString& game_serial, const QString& game_title);
   void onMediaCaptureStarted();
@@ -308,6 +311,7 @@ private:
 
   bool m_was_paused_by_focus_loss = false;
   bool m_netplay_active = false;
+  QPointer<NetplayLobbyWindow> m_netplay_lobby;
   bool m_open_debugger_on_start = false;
   bool m_relative_mouse_mode = false;
   bool m_hide_mouse_cursor = false;

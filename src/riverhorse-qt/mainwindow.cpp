@@ -1826,6 +1826,26 @@ void MainWindow::onJoinNetplaySessionClicked()
   dialog.exec();
 }
 
+void MainWindow::onNetplayLobbyClicked()
+{
+  if (m_netplay_lobby)
+  {
+    m_netplay_lobby->raise();
+    m_netplay_lobby->activateWindow();
+    return;
+  }
+
+  m_netplay_lobby = new NetplayLobbyWindow(this);
+  connect(m_netplay_lobby, &NetplayLobbyWindow::hostGameRequested, this, [this](const QString& path) {
+    startFile(path.toStdString(), std::nullopt, std::nullopt);
+    g_emu_thread->createNetplaySession(
+      QString::fromStdString(Host::GetBaseStringSettingValue("Netplay", "Nickname", Netplay::DEFAULT_NICKNAME)),
+      Host::GetBaseIntSettingValue("Netplay", "Port", Netplay::DEFAULT_PORT), Netplay::MAX_PLAYERS, QString(),
+      Host::GetBaseIntSettingValue("Netplay", "InputDelay", 0));
+  });
+  m_netplay_lobby->show();
+}
+
 void MainWindow::updateEmulationActions(bool starting, bool running, bool cheevos_challenge_mode)
 {
   const bool netplay = m_netplay_active;
@@ -1859,6 +1879,7 @@ void MainWindow::updateEmulationActions(bool starting, bool running, bool cheevo
   m_ui.menuLoadState->setDisabled(netplay);
   m_ui.actionCreateNetplaySession->setDisabled(starting || !running || cheevos_challenge_mode || netplay);
   m_ui.actionJoinNetplaySession->setDisabled(starting || cheevos_challenge_mode || netplay);
+  m_ui.actionNetplayLobby->setDisabled(starting || running || cheevos_challenge_mode || netplay);
   m_ui.menuWindowSize->setDisabled(starting || !running);
 
   m_ui.actionViewGameProperties->setDisabled(starting || !running);
@@ -2178,6 +2199,7 @@ void MainWindow::connectSignals()
   connect(g_emu_thread, &EmuThread::netplaySessionClosed, this, &MainWindow::onNetplaySessionClosed);
   connect(m_ui.actionCreateNetplaySession, &QAction::triggered, this, &MainWindow::onCreateNetplaySessionClicked);
   connect(m_ui.actionJoinNetplaySession, &QAction::triggered, this, &MainWindow::onJoinNetplaySessionClicked);
+  connect(m_ui.actionNetplayLobby, &QAction::triggered, this, &MainWindow::onNetplayLobbyClicked);
   connect(g_emu_thread, &EmuThread::systemResumed, this, &MainWindow::onSystemResumed);
   connect(g_emu_thread, &EmuThread::runningGameChanged, this, &MainWindow::onRunningGameChanged);
   connect(g_emu_thread, &EmuThread::mediaCaptureStarted, this, &MainWindow::onMediaCaptureStarted);

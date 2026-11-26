@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>NetplayLobbyWindow</class>
+ <widget class="QDialog" name="NetplayLobbyWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>720</width>
+    <height>480</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Netplay Lobby</string>
+  </property>
+  <layout class="QVBoxLayout" name="verticalLayout">
+   <item>
+    <widget class="QLabel" name="description">
+     <property name="text">
+      <string>Sessions other players have listed. Pick one to join, or host a game from your game list. You need the same game and the same BIOS as the host.</string>
+     </property>
+     <property name="wordWrap">
+      <bool>true</bool>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QTreeWidget" name="sessionList">
+     <property name="rootIsDecorated">
+      <bool>false</bool>
+     </property>
+     <property name="uniformRowHeights">
+      <bool>true</bool>
+     </property>
+     <column>
+      <property name="text">
+       <string>Game</string>
+      </property>
+     </column>
+     <column>
+      <property name="text">
+       <string>Host</string>
+      </property>
+     </column>
+     <column>
+      <property name="text">
+       <string>Players</string>
+      </property>
+     </column>
+     <column>
+      <property name="text">
+       <string>Password</string>
+      </property>
+     </column>
+     <column>
+      <property name="text">
+       <string>In Your Game List</string>
+      </property>
+     </column>
+    </widget>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="statusLayout">
+     <item>
+      <widget class="QLabel" name="sessionsStatus">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+         <horstretch>0</horstretch>
+         <verstretch>0</verstretch>
+        </sizepolicy>
+       </property>
+       <property name="wordWrap">
+        <bool>true</bool>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="refreshSessions">
+       <property name="text">
+        <string>Refresh</string>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+   <item>
+    <widget class="QGroupBox" name="settingsGroup">
+     <property name="title">
+      <string>Your Settings</string>
+     </property>
+     <layout class="QFormLayout" name="settingsLayout">
+      <item row="0" column="0">
+       <widget class="QLabel" name="nicknameLabel">
+        <property name="text">
+         <string>Nickname:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="1">
+       <widget class="QLineEdit" name="nickname">
+        <property name="maxLength">
+         <number>32</number>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="0" colspan="2">
+       <widget class="QCheckBox" name="listSessions">
+        <property name="text">
+         <string>List sessions I host in the lobby</string>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="0" colspan="2">
+       <widget class="QCheckBox" name="confirmJoins">
+        <property name="text">
+         <string>Ask before players join my sessions</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="buttonLayout">
+     <item>
+      <widget class="QPushButton" name="hostGame">
+       <property name="text">
+        <string>Host a Game...</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="joinByCode">
+       <property name="text">
+        <string>Join by Code...</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <spacer name="buttonSpacer">
+       <property name="orientation">
+        <enum>Qt::Horizontal</enum>
+       </property>
+      </spacer>
+     </item>
+     <item>
+      <widget class="QPushButton" name="join">
+       <property name="text">
+        <string>Join</string>
+       </property>
+       <property name="default">
+        <bool>true</bool>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="close">
+       <property name="text">
+        <string>Close</string>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

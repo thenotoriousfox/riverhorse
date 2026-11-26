@@ -17,6 +17,14 @@ Changes since the DuckStation `v0.1-7371` base. Releases are tagged
   game list grid uses the same title cards.
 - While hosting netplay, Big Picture's pause menu shows the session code
   players join with.
+- Netplay lobby, on the desktop (Netplay in the toolbar, System → Netplay
+  Lobby) and in Big Picture (Netplay on the home screen, or Start Game → Join
+  Netplay): listed sessions with the game's cover, host, players and password,
+  refreshed every 10 seconds; sessions for games you don't have are marked.
+  Join with one press (a password is asked for when needed), host a game from
+  your library, join by code, and set listing, join approval and your
+  nickname. The desktop Join Netplay Session dialog now takes a session code
+  or address; the session list moved to the lobby.
 - During netplay, the pause menu says the game keeps running while it is open.
 
 ### Fixed
