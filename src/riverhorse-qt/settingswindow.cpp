@@ -200,6 +200,7 @@ void SettingsWindow::reloadPages()
     m_ui.settingsContainer->removeWidget(widget);
     delete widget;
   }
+  m_category_help_text.resize(min_count);
 
   addPages();
 }
@@ -225,7 +226,7 @@ void SettingsWindow::connectUi()
   m_ui.settingsCategory->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Minimum);
   m_ui.settingsCategory->setCurrentRow(0);
   m_ui.settingsContainer->setCurrentIndex(0);
-  m_ui.helpText->setText(m_category_help_text[0]);
+  m_ui.helpText->setText(getCategoryHelpText(0));
   connect(m_ui.settingsCategory, &QListWidget::currentRowChanged, this, &SettingsWindow::onCategoryCurrentRowChanged);
   connect(m_ui.close, &QPushButton::clicked, this, &SettingsWindow::close);
   if (m_ui.restoreDefaults)
@@ -238,8 +239,6 @@ void SettingsWindow::connectUi()
 
 void SettingsWindow::addWidget(QWidget* widget, QString title, QString icon, QString help_text)
 {
-  const int index = m_ui.settingsCategory->count();
-
   QListWidgetItem* item = new QListWidgetItem(m_ui.settingsCategory);
   item->setText(title);
   if (!icon.isEmpty())
@@ -247,7 +246,7 @@ void SettingsWindow::addWidget(QWidget* widget, QString title, QString icon, QSt
 
   m_ui.settingsContainer->addWidget(widget);
 
-  m_category_help_text[index] = std::move(help_text);
+  m_category_help_text.push_back(std::move(help_text));
 }
 
 void SettingsWindow::setCategory(const char* category)
@@ -270,7 +269,7 @@ void SettingsWindow::onCategoryCurrentRowChanged(int row)
 {
   DebugAssert(row < static_cast<int>(MAX_SETTINGS_WIDGETS));
   m_ui.settingsContainer->setCurrentIndex(row);
-  m_ui.helpText->setText(m_category_help_text[row]);
+  m_ui.helpText->setText(getCategoryHelpText(row));
 }
 
 void SettingsWindow::onRestoreDefaultsClicked()
@@ -366,7 +365,7 @@ bool SettingsWindow::eventFilter(QObject* object, QEvent* event)
     if (m_current_help_widget)
     {
       m_current_help_widget = nullptr;
-      m_ui.helpText->setText(m_category_help_text[m_ui.settingsCategory->currentRow()]);
+      m_ui.helpText->setText(getCategoryHelpText(m_ui.settingsCategory->currentRow()));
     }
   }
   else if (event->type() == QEvent::Wheel)
@@ -376,6 +375,11 @@ bool SettingsWindow::eventFilter(QObject* object, QEvent* event)
   }
 
   return QWidget::eventFilter(object, event);
+}
+
+QString SettingsWindow::getCategoryHelpText(int row) const
+{
+  return (row >= 0 && static_cast<size_t>(row) < m_category_help_text.size()) ? m_category_help_text[row] : QString();
 }
 
 bool SettingsWindow::handleWheelEvent(QWheelEvent* event)

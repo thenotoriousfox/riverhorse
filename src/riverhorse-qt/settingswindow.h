@@ -11,7 +11,7 @@
 #include <QtCore/QMap>
 #include <QtCore/QString>
 #include <QtWidgets/QDialog>
-#include <array>
+#include <vector>
 
 class QWheelEvent;
 
@@ -111,17 +111,13 @@ protected:
   void wheelEvent(QWheelEvent* event) override;
 
 private:
-  enum : u32
-  {
-    MAX_SETTINGS_WIDGETS = 12
-  };
-
   void connectUi();
   void addPages();
   void reloadPages();
 
   void addWidget(QWidget* widget, QString title, QString icon, QString help_text);
   bool handleWheelEvent(QWheelEvent* event);
+  QString getCategoryHelpText(int row) const;
 
   Ui::SettingsWindow m_ui;
 
@@ -141,7 +137,7 @@ private:
   FolderSettingsWidget* m_folder_settings = nullptr;
   AdvancedSettingsWidget* m_advanced_settings = nullptr;
 
-  std::array<QString, MAX_SETTINGS_WIDGETS> m_category_help_text;
+  std::vector<QString> m_category_help_text;
 
   QObject* m_current_help_widget = nullptr;
   QMap<QObject*, QString> m_widget_help_text_map;
