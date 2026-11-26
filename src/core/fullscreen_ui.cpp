@@ -6405,6 +6405,19 @@ void FullscreenUI::DrawPauseMenu()
       header_bottom = code_pos.y + g_large_font->FontSize;
     }
 
+    if (Netplay::IsActive())
+    {
+      const std::string_view notice = FSUI_VSTR("Netplay: the game keeps running while this menu is open.");
+      const float notice_width = panel_width - padding * 2.0f;
+      const ImVec2 notice_pos(padding, header_bottom + LayoutScale(4.0f));
+      dl->AddText(g_medium_font, g_medium_font->FontSize, notice_pos, ImGui::GetColorU32(UIDisabledColor),
+                  notice.data(), notice.data() + notice.length(), notice_width);
+      header_bottom = notice_pos.y + g_medium_font
+                                       ->CalcTextSizeA(g_medium_font->FontSize, FLT_MAX, notice_width, notice.data(),
+                                                       notice.data() + notice.length())
+                                       .y;
+    }
+
     const auto lock = Achievements::GetLock();
     const std::string& rp = Achievements::IsActive() ? Achievements::GetRichPresenceString() : std::string();
     if (!rp.empty())
@@ -8795,6 +8808,7 @@ TRANSLATE_NOOP("FullscreenUI", "Mute CD Audio");
 TRANSLATE_NOOP("FullscreenUI", "Name shown to the other players.");
 TRANSLATE_NOOP("FullscreenUI", "Navigate");
 TRANSLATE_NOOP("FullscreenUI", "Netplay");
+TRANSLATE_NOOP("FullscreenUI", "Netplay: the game keeps running while this menu is open.");
 TRANSLATE_NOOP("FullscreenUI", "Nickname");
 TRANSLATE_NOOP("FullscreenUI", "No Binding");
 TRANSLATE_NOOP("FullscreenUI", "No Game Selected");

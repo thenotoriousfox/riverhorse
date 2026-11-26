@@ -17,6 +17,7 @@ Changes since the DuckStation `v0.1-7371` base. Releases are tagged
   game list grid uses the same title cards.
 - While hosting netplay, Big Picture's pause menu shows the session code
   players join with.
+- During netplay, the pause menu says the game keeps running while it is open.
 
 ### Fixed
 - Hovering over settings in the desktop Settings window could crash Riverhorse
