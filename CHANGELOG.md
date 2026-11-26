@@ -12,6 +12,12 @@ Changes since the DuckStation `v0.1-7371` base. Releases are tagged
   Load State menu. Loading one keeps your current memory card, so later
   in-game saves are never lost. Settings → Interface (Save Checkpoints After
   In-Game Saves), on by default.
+- Automatic controller setup: when a game needs a light gun or analog sticks
+  and port 1 has a controller it can't use, port 1 becomes a GunCon (the left
+  stick or the mouse aims) or a DualShock while the game runs, with a message
+  saying how to play. Saved controller settings are not changed, and games
+  with their own controller settings or input profile are left alone.
+  Settings → Controllers (Global Settings), on by default.
 
 ## 1.4.0 (2026-11-26)
 

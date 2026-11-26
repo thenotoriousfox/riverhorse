@@ -50,6 +50,8 @@ ControllerGlobalSettingsWidget::ControllerGlobalSettingsWidget(QWidget* parent, 
 
   ControllerSettingWidgetBinder::BindWidgetToInputProfileBool(sif, m_ui.enableMouseMapping, "UI", "EnableMouseMapping",
                                                               false);
+  SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.automaticControllerSetup, "ControllerPorts",
+                                               "AutomaticControllerSetup", true);
   SettingWidgetBinder::BindWidgetToEnumSetting(sif, m_ui.multitapMode, "ControllerPorts", "MultitapMode",
                                                &Settings::ParseMultitapModeName, &Settings::GetMultitapModeName,
                                                Settings::DEFAULT_MULTITAP_MODE);

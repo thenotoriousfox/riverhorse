@@ -10,6 +10,7 @@
 #include "cdrom.h"
 #include "cheats.h"
 #include "controller.h"
+#include "controller_auto_setup.h"
 #include "cpu_code_cache.h"
 #include "cpu_core.h"
 #include "cpu_pgxp.h"
@@ -237,8 +238,10 @@ static constexpr u32 BLACK_FRAME_INSERTION_MULTIPLE = 2;
 static constexpr u32 REWIND_THUMBNAIL_SIZE = 256;
 
 static std::unique_ptr<INISettingsInterface> s_game_settings_interface;
-static std::unique_ptr<INISettingsInterface> s_input_settings_interface;
+static std::unique_ptr<SettingsInterface> s_input_settings_interface;
 static std::string s_input_profile_name;
+static bool s_input_profile_is_automatic = false;
+static std::string s_automatic_input_profile_serial;
 
 static System::State s_state = System::State::Shutdown;
 static std::atomic_bool s_startup_cancelled{false};
@@ -1410,31 +1413,58 @@ bool System::UpdateGameSettingsLayer()
   }
 
   std::string input_profile_name;
-  if (new_interface)
-  {
-    if (!new_interface->GetBoolValue("ControllerPorts", "UseGameSettingsForController", false))
-      new_interface->GetStringValue("ControllerPorts", "InputProfileName", &input_profile_name);
-  }
-
-  if (!s_game_settings_interface && !new_interface && s_input_profile_name == input_profile_name)
-    return false;
+  const bool game_controller_settings =
+    new_interface && new_interface->GetBoolValue("ControllerPorts", "UseGameSettingsForController", false);
+  if (new_interface && !game_controller_settings)
+    new_interface->GetStringValue("ControllerPorts", "InputProfileName", &input_profile_name);
 
   auto lock = Host::GetSettingsLock();
+
+  std::unique_ptr<SettingsInterface> input_interface;
+  std::string automatic_input_message;
+  const GameDatabase::Entry* dbentry =
+    s_running_game_serial.empty() ? nullptr : GameDatabase::GetEntryForSerial(s_running_game_serial);
+  SettingsInterface* const base_si = Host::Internal::GetBaseSettingsLayer();
+  if (input_profile_name.empty() && !game_controller_settings && dbentry &&
+      base_si->GetBoolValue("ControllerPorts", "AutomaticControllerSetup", true))
+  {
+    input_interface =
+      ControllerAutoSetup::CreateInputProfile(*base_si, dbentry->supported_controllers, &automatic_input_message);
+  }
+
+  if (!s_game_settings_interface && !new_interface && s_input_profile_name == input_profile_name && !input_interface &&
+      !s_input_profile_is_automatic)
+  {
+    return false;
+  }
+
   Host::Internal::SetGameSettingsLayer(new_interface.get(), lock);
   s_game_settings_interface = std::move(new_interface);
 
-  std::unique_ptr<INISettingsInterface> input_interface;
-  if (!input_profile_name.empty())
+  s_input_profile_is_automatic = static_cast<bool>(input_interface);
+  if (input_interface && s_automatic_input_profile_serial != s_running_game_serial)
+  {
+    INFO_LOG("Automatic controller setup: {}", automatic_input_message);
+    Host::AddIconOSDMessage("automatic_controller_setup", ICON_FA_GAMEPAD, std::move(automatic_input_message),
+                            Host::OSD_INFO_DURATION);
+  }
+  s_automatic_input_profile_serial = input_interface ? s_running_game_serial : std::string();
+
+  if (!input_interface && !input_profile_name.empty())
   {
     std::string filename = GetInputProfilePath(input_profile_name);
     if (FileSystem::FileExists(filename.c_str()))
     {
       INFO_LOG("Loading input profile from '{}'...", Path::GetFileName(filename));
-      input_interface = std::make_unique<INISettingsInterface>(std::move(filename));
-      if (!input_interface->Load())
+      std::unique_ptr<INISettingsInterface> profile_interface =
+        std::make_unique<INISettingsInterface>(std::move(filename));
+      if (profile_interface->Load())
       {
-        ERROR_LOG("Failed to parse input profile ini '{}'", Path::GetFileName(input_interface->GetFileName()));
-        input_interface.reset();
+        input_interface = std::move(profile_interface);
+      }
+      else
+      {
+        ERROR_LOG("Failed to parse input profile ini '{}'", Path::GetFileName(profile_interface->GetFileName()));
         input_profile_name = {};
       }
     }

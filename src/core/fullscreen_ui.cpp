@@ -5048,6 +5048,15 @@ void FullscreenUI::DrawControllerSettingsPage()
                     "InputSources", "XInput", false);
 #endif
 
+  if (!IsEditingGameSettings(bsi))
+  {
+    DrawToggleSetting(bsi, FSUI_ICONSTR(ICON_FA_GAMEPAD, "Automatic Controller Setup"),
+                      FSUI_CSTR("When a game needs a light gun or analog sticks and port 1 has a controller it can't "
+                                "use, port 1 is set up for that game while it runs. Your controller settings are not "
+                                "changed."),
+                      "ControllerPorts", "AutomaticControllerSetup", true);
+  }
+
   MenuHeading(FSUI_CSTR("Multitap"));
   DrawEnumSetting(bsi, FSUI_ICONSTR(ICON_FA_PLUS_SQUARE, "Multitap Mode"),
                   FSUI_CSTR("Enables an additional three controller slots on each port. Not supported in all games."),
@@ -8806,6 +8815,7 @@ TRANSLATE_NOOP("FullscreenUI", "Audio Backend");
 TRANSLATE_NOOP("FullscreenUI", "Audio Control");
 TRANSLATE_NOOP("FullscreenUI", "Audio Settings");
 TRANSLATE_NOOP("FullscreenUI", "Auto-Detect");
+TRANSLATE_NOOP("FullscreenUI", "Automatic Controller Setup");
 TRANSLATE_NOOP("FullscreenUI", "Automatic Mapping");
 TRANSLATE_NOOP("FullscreenUI", "Automatic based on window size");
 TRANSLATE_NOOP("FullscreenUI", "Automatic mapping completed for {}.");
@@ -9485,6 +9495,7 @@ TRANSLATE_NOOP("FullscreenUI", "Vertical Sync (VSync)");
 TRANSLATE_NOOP("FullscreenUI", "WARNING: Your game is still saving to the memory card. Continuing to {0} may IRREVERSIBLY DESTROY YOUR MEMORY CARD. We recommend resuming your game and waiting 5 seconds for it to finish saving.\n\nDo you want to {0} anyway?");
 TRANSLATE_NOOP("FullscreenUI", "WebDAV address of a folder for Riverhorse's saves.");
 TRANSLATE_NOOP("FullscreenUI", "Website");
+TRANSLATE_NOOP("FullscreenUI", "When a game needs a light gun or analog sticks and port 1 has a controller it can't use, port 1 is set up for that game while it runs. Your controller settings are not changed.");
 TRANSLATE_NOOP("FullscreenUI", "When enabled and logged in, Riverhorse will scan for achievements on startup.");
 TRANSLATE_NOOP("FullscreenUI", "When enabled, Riverhorse will assume all achievements are locked and not send any unlock notifications to the server.");
 TRANSLATE_NOOP("FullscreenUI", "When enabled, Riverhorse will list achievements from unofficial sets. These achievements are not tracked by RetroAchievements.");

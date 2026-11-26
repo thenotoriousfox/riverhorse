@@ -191,6 +191,9 @@ void MemorySettingsInterface::SetKeyValueList(const char* section,
                                               const std::vector<std::pair<std::string, std::string>>& items)
 {
   auto sit = m_sections.find(section);
+  if (sit == m_sections.end())
+    sit = m_sections.emplace(std::make_pair(std::string(section), KeyMap())).first;
+
   sit->second.clear();
   for (const auto& [key, value] : items)
     sit->second.emplace(key, value);

@@ -124,6 +124,22 @@
      </layout>
     </widget>
    </item>
+   <item>
+    <widget class="QGroupBox" name="automaticControllerSetupGroup">
+     <property name="title">
+      <string>Games That Need Another Controller</string>
+     </property>
+     <layout class="QVBoxLayout" name="automaticControllerSetupLayout">
+      <item>
+       <widget class="QCheckBox" name="automaticControllerSetup">
+        <property name="text">
+         <string>Set up port 1 automatically for light gun and analog-only games</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
    <item row="0" column="0">
     <widget class="QGroupBox" name="sdlGroup">
      <property name="title">

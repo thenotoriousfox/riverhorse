@@ -20,6 +20,8 @@ add_library(core
   cheats.h
   controller.cpp
   controller.h
+  controller_auto_setup.cpp
+  controller_auto_setup.h
   cpu_code_cache.cpp
   cpu_code_cache.h
   cpu_code_cache_private.h
