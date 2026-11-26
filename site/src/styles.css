@@ -186,6 +186,34 @@ footer p { margin: 0.4rem 0; }
   background: #000;
 }
 .shots figcaption { margin-top: 0.5rem; color: var(--muted); font-size: 0.92rem; }
+.shots a { cursor: zoom-in; }
+
+.shot-viewer {
+  max-width: none;
+  max-height: none;
+  width: 100vw;
+  height: 100vh;
+  margin: 0;
+  padding: 1.5rem;
+  border: 0;
+  background: transparent;
+  cursor: zoom-out;
+}
+.shot-viewer[open] {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+}
+.shot-viewer::backdrop { background: rgb(0 0 0 / 0.88); }
+.shot-viewer img {
+  max-width: 100%;
+  max-height: calc(100vh - 6rem);
+  border-radius: 12px;
+  object-fit: contain;
+}
+.shot-viewer p { margin: 0; color: #ddd; text-align: center; }
 
 .platform.detected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 
