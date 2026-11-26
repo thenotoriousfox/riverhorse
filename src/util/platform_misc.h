@@ -3,6 +3,8 @@
 
 #include "window_info.h"
 
+#include "common/types.h"
+
 #include <optional>
 
 class Error;
@@ -18,6 +20,15 @@ size_t GetRuntimePageSize();
 /// Abstracts platform-specific code for asynchronously playing a sound.
 /// On Windows, this will use PlaySound(). On Linux, it will shell out to aplay. On MacOS, it uses NSSound.
 bool PlaySoundAsync(const char* path);
+
+struct BatteryStatus
+{
+  u32 percent;
+  bool charging;
+};
+
+/// Returns the charge of the device's internal battery, or nothing when it has none.
+std::optional<BatteryStatus> GetBatteryStatus();
 } // namespace PlatformMisc
 
 namespace Host {
@@ -29,4 +40,4 @@ std::optional<WindowInfo> GetTopLevelWindowInfo();
 namespace CocoaTools {
 /// Returns the refresh rate of the display the window is placed on.
 std::optional<float> GetViewRefreshRate(const WindowInfo& wi);
-}
+} // namespace CocoaTools

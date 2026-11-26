@@ -3,7 +3,10 @@
 
 // Normally, system includes come last. But apparently some of our macro names are redefined...
 #include <Cocoa/Cocoa.h>
+#include <IOKit/ps/IOPSKeys.h>
+#include <IOKit/ps/IOPowerSources.h>
 #include <IOKit/pwr_mgt/IOPMLib.h>
+#include <algorithm>
 #include <QuartzCore/QuartzCore.h>
 #include <cinttypes>
 #include <optional>
@@ -102,6 +105,42 @@ bool PlatformMisc::PlaySoundAsync(const char* path)
   [sound release];
   [nspath release];
   return result;
+}
+
+std::optional<PlatformMisc::BatteryStatus> PlatformMisc::GetBatteryStatus()
+{
+  std::optional<BatteryStatus> ret;
+  CFTypeRef info = IOPSCopyPowerSourcesInfo();
+  if (!info)
+    return ret;
+
+  CFArrayRef sources = IOPSCopyPowerSourcesList(info);
+  for (CFIndex i = 0; sources && i < CFArrayGetCount(sources) && !ret.has_value(); i++)
+  {
+    CFDictionaryRef desc = IOPSGetPowerSourceDescription(info, CFArrayGetValueAtIndex(sources, i));
+    if (!desc)
+      continue;
+
+    CFStringRef type = static_cast<CFStringRef>(CFDictionaryGetValue(desc, CFSTR(kIOPSTypeKey)));
+    CFNumberRef current = static_cast<CFNumberRef>(CFDictionaryGetValue(desc, CFSTR(kIOPSCurrentCapacityKey)));
+    CFNumberRef max = static_cast<CFNumberRef>(CFDictionaryGetValue(desc, CFSTR(kIOPSMaxCapacityKey)));
+    CFBooleanRef charging = static_cast<CFBooleanRef>(CFDictionaryGetValue(desc, CFSTR(kIOPSIsChargingKey)));
+    int current_value = 0, max_value = 0;
+    if (!type || CFStringCompare(type, CFSTR(kIOPSInternalBatteryType), 0) != kCFCompareEqualTo || !current ||
+        !max || !CFNumberGetValue(current, kCFNumberIntType, &current_value) ||
+        !CFNumberGetValue(max, kCFNumberIntType, &max_value) || max_value <= 0)
+    {
+      continue;
+    }
+
+    ret = BatteryStatus{static_cast<u32>(std::clamp(current_value * 100 / max_value, 0, 100)),
+                        charging && CFBooleanGetValue(charging)};
+  }
+
+  if (sources)
+    CFRelease(sources);
+  CFRelease(info);
+  return ret;
 }
 
 bool CocoaTools::CreateMetalLayer(WindowInfo* wi)

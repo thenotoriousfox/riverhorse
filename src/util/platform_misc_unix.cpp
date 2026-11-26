@@ -5,11 +5,14 @@
 #include "platform_misc.h"
 
 #include "common/error.h"
+#include "common/file_system.h"
 #include "common/log.h"
 #include "common/path.h"
 #include "common/scoped_guard.h"
 #include "common/small_string.h"
+#include "common/string_util.h"
 
+#include <algorithm>
 #include <cinttypes>
 #ifdef ENABLE_DESKTOP_INTEGRATION
 #include <dbus/dbus.h>
@@ -186,4 +189,35 @@ bool PlatformMisc::PlaySoundAsync(const char* path)
 #else
   return false;
 #endif
+}
+
+std::optional<PlatformMisc::BatteryStatus> PlatformMisc::GetBatteryStatus()
+{
+  static constexpr const char* POWER_SUPPLY_DIR = "/sys/class/power_supply";
+
+  FileSystem::FindResultsArray results;
+  if (!FileSystem::FindFiles(POWER_SUPPLY_DIR, "*",
+                             FILESYSTEM_FIND_FILES | FILESYSTEM_FIND_FOLDERS | FILESYSTEM_FIND_RELATIVE_PATHS,
+                             &results))
+    return std::nullopt;
+
+  for (const FILESYSTEM_FIND_DATA& fd : results)
+  {
+    const std::string dir = Path::Combine(POWER_SUPPLY_DIR, fd.FileName);
+    const std::optional<std::string> type = FileSystem::ReadFileToString(Path::Combine(dir, "type").c_str());
+    if (!type.has_value() || StringUtil::StripWhitespace(type.value()) != "Battery")
+      continue;
+
+    const std::optional<std::string> capacity = FileSystem::ReadFileToString(Path::Combine(dir, "capacity").c_str());
+    const std::optional<u32> percent =
+      capacity.has_value() ? StringUtil::FromChars<u32>(StringUtil::StripWhitespace(capacity.value())) : std::nullopt;
+    if (!percent.has_value())
+      continue;
+
+    const std::optional<std::string> status = FileSystem::ReadFileToString(Path::Combine(dir, "status").c_str());
+    const bool charging = status.has_value() && StringUtil::StripWhitespace(status.value()) == "Charging";
+    return BatteryStatus{std::min(percent.value(), 100u), charging};
+  }
+
+  return std::nullopt;
 }

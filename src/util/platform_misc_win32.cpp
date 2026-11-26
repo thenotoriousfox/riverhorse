@@ -90,3 +90,12 @@ bool PlatformMisc::PlaySoundAsync(const char* path)
   const std::wstring wpath(FileSystem::GetWin32Path(path));
   return PlaySoundW(wpath.c_str(), NULL, SND_ASYNC | SND_NODEFAULT);
 }
+
+std::optional<PlatformMisc::BatteryStatus> PlatformMisc::GetBatteryStatus()
+{
+  SYSTEM_POWER_STATUS status;
+  if (!GetSystemPowerStatus(&status) || (status.BatteryFlag & 128) || status.BatteryLifePercent > 100)
+    return std::nullopt;
+
+  return BatteryStatus{status.BatteryLifePercent, status.ACLineStatus == 1};
+}

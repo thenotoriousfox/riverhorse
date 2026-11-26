@@ -10,6 +10,15 @@ Changes since the DuckStation `v0.1-7371` base. Releases are tagged
   game. Scrub with left and right to see each moment, then continue from it or
   cancel back to where you were. Pause menu → Rewind Timeline, System → Rewind
   Timeline, or the Open Rewind Timeline hotkey; needs rewind turned on.
+- Big Picture home screen: games without cover art get a title card in their
+  own colour, the last played game gets a large card with play time and
+  Resume, covers lift when selected over a background tinted by the selected
+  game, and the top bar shows battery charge and connected controllers. The
+  game list grid uses the same title cards.
+
+### Fixed
+- Hovering over settings in the desktop Settings window could crash Riverhorse
+  (1.3.0).
 
 ### Changed
 - Riverhorse identifies itself to web services as `Riverhorse/<version> (<OS> <CPU>)`,
