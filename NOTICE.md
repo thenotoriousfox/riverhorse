@@ -67,6 +67,13 @@ Google Fonts repository (`ofl/notosansjp`, `ofl/notosanskr`, `ofl/notosanssc`),
 under the SIL Open Font License 1.1. They are the variable fonts fixed at
 weight 400 with `fonttools varLib.instancer wght=400 --update-name-table`.
 
+## Controller database
+
+`data/resources/gamecontrollerdb.txt` is SDL_GameControllerDB
+(https://github.com/mdqinc/SDL_GameControllerDB, commit 01af257a), the community
+list of SDL controller mappings, under the zlib licence; the licence is in
+`data/resources/gamecontrollerdb-LICENSE.txt`.
+
 ## Third-party libraries
 
 Libraries bundled under `dep/` keep the licences given in their directories.

@@ -19,6 +19,10 @@ Changes since the DuckStation `v0.1-7371` base. Releases are tagged
   with their own controller settings or input profile are left alone.
   Settings → Controllers (Global Settings), on by default.
 
+### Changed
+- The controller database is updated to the current SDL_GameControllerDB, so
+  more controllers work without setup (766 mappings on Linux, up from 641).
+
 ## 1.4.0 (2026-11-26)
 
 ### New
