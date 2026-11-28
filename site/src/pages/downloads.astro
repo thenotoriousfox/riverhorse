@@ -1,0 +1,31 @@
+---
+import Page from '../layouts/Page.astro';
+import {fetchDownloadSummary, renderDownloads} from '../lib/downloads';
+
+const summary = await fetchDownloadSummary();
+---
+<Page title="Download statistics" description="How many times each Riverhorse release has been downloaded from GitHub, by platform." wide>
+	<div class="prose wide-tables">
+		<h1>Download statistics</h1>
+		<p>Downloads of each release file from <a href="https://github.com/thenotoriousfox/riverhorse/releases">GitHub Releases</a>, counted by GitHub. They include the built-in updater fetching new versions, so they are not a count of people. Debug symbol files are left out, and so are installs from RetroArch's core downloader, Flatpak repositories or source builds.</p>
+		<div id="downloads" aria-live="polite">
+			{summary ? <Fragment set:html={renderDownloads(summary)} /> : <p>Loading download counts…</p>}
+		</div>
+		<p id="updated" class="version"></p>
+	</div>
+</Page>
+
+<script>
+	import {fetchDownloadSummary, renderDownloads} from '../lib/downloads';
+
+	const container = document.getElementById('downloads')!;
+	const updated = document.getElementById('updated')!;
+	fetchDownloadSummary().then(summary => {
+		if (summary) {
+			container.innerHTML = renderDownloads(summary);
+			updated.textContent = `Live from GitHub, ${new Date().toLocaleString()}.`;
+		} else if (!container.querySelector('table')) {
+			container.innerHTML = '<p>GitHub did not answer. Try again in a few minutes.</p>';
+		}
+	});
+</script>

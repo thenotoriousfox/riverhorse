@@ -320,3 +320,25 @@ footer p { margin: 0.4rem 0; }
   #games td:first-child { font-weight: 600; }
   #games tr[hidden] { display: none; }
 }
+
+.stat-total { font-size: 1.15rem; color: var(--muted); }
+.stat-total strong { font-size: 2.4rem; color: var(--text); margin-right: 0.4rem; }
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+.stats { display: flex; justify-content: center; gap: 0.75rem; margin-top: 2rem; }
+.stat {
+  display: flex; flex-direction: column; align-items: center; gap: 0.15rem;
+  min-width: 11rem; padding: 0.9rem 1.4rem;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+  color: var(--muted); text-decoration: none; font-size: 0.9rem;
+  transition: border-color 0.15s, background 0.15s;
+}
+.stat strong { color: var(--text); font-size: 1.9rem; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.stat:hover { border-color: var(--accent); background: var(--surface-light); color: var(--text); }
+.stat[hidden] { display: none; }
+#download-stat strong { color: var(--accent-text); }
+@media (max-width: 600px) {
+  .stats { gap: 0.4rem; }
+  .stat { min-width: 0; flex: 1 1 0; padding: 0.6rem 0.4rem; font-size: 0.72rem; text-align: center; }
+  .stat strong { font-size: 1.3rem; }
+}

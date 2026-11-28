@@ -1,5 +1,6 @@
 ---
 import Page from '../layouts/Page.astro';
+import {fetchDownloadSummary} from '../lib/downloads';
 import {readRepoFile} from '../lib/repo-markdown';
 
 const RELEASE = 'https://github.com/thenotoriousfox/riverhorse/releases/latest/download/';
@@ -29,6 +30,7 @@ const shots = [
 
 const changelog = await readRepoFile('CHANGELOG.md');
 const latest = changelog.match(/^## (\d+\.\d+\.\d+) \((\d{4}-\d{2}-\d{2})\)/m);
+const downloads = await fetchDownloadSummary();
 const released = latest && new Date(`${latest[2]}T00:00:00Z`).toLocaleDateString('en-GB', {day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC'});
 ---
 <Page wide>
@@ -41,7 +43,22 @@ const released = latest && new Date(`${latest[2]}T00:00:00Z`).toLocaleDateString
 		<a id="download-main" class="button primary" href="#download">Download</a>
 		<a class="button" href="/docs/getting-started">Get started</a>
 	</p>
-	{latest && <p class="version">Version <a href={`/changelog#v${latest[1]}`}>{latest[1]}</a>, released {released}</p>}
+	<div class="stats">
+		{latest && (
+			<a class="stat" id="version-stat" href={`/changelog#v${latest[1]}`}>
+				<strong>{latest[1]}</strong>
+				<span>Latest version, <span data-released>{released}</span></span>
+			</a>
+		)}
+		<a class="stat" id="download-stat" href="/downloads" hidden={!downloads}>
+			<strong data-total={downloads?.total}>{downloads?.total.toLocaleString('en')}</strong>
+			<span>Downloads across <span data-releases>{downloads?.releases.length}</span> releases</span>
+		</a>
+		<a class="stat" href="https://github.com/thenotoriousfox/riverhorse">
+			<strong>GPLv3</strong>
+			<span>Free and open source</span>
+		</a>
+	</div>
 </section>
 
 <section class="shots" aria-label="Screenshots">
@@ -106,6 +123,8 @@ const released = latest && new Date(`${latest[2]}T00:00:00Z`).toLocaleDateString
 </Page>
 
 <script>
+	import {fetchDownloadSummary} from '../lib/downloads';
+
 	interface HighEntropyNavigator {
 		userAgentData?: {platform: string; getHighEntropyValues(hints: string[]): Promise<{architecture?: string}>};
 	}
@@ -149,6 +168,46 @@ const released = latest && new Date(`${latest[2]}T00:00:00Z`).toLocaleDateString
 	viewer.addEventListener('keydown', event => {
 		if (event.key === 'ArrowRight') showShot(shown + 1);
 		else if (event.key === 'ArrowLeft') showShot(shown - 1);
+	});
+
+	function countUp(element: HTMLElement, target: number) {
+		const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+		if (reduceMotion) {
+			element.textContent = target.toLocaleString('en');
+			return;
+		}
+		const start = performance.now();
+		const duration = 1200;
+		const step = (now: number) => {
+			const progress = Math.min((now - start) / duration, 1);
+			const eased = 1 - Math.pow(1 - progress, 3);
+			element.textContent = Math.round(target * eased).toLocaleString('en');
+			if (progress < 1) requestAnimationFrame(step);
+		};
+		requestAnimationFrame(step);
+	}
+
+	function showLatestRelease(release: {tag: string; date: string} | undefined) {
+		const versionStat = document.getElementById('version-stat') as HTMLAnchorElement | null;
+		if (!release || !versionStat) return;
+		const version = release.tag.replace(/^v/, '');
+		versionStat.href = `/changelog#v${version}`;
+		versionStat.querySelector('strong')!.textContent = version;
+		versionStat.querySelector('[data-released]')!.textContent = new Date(`${release.date}T00:00:00Z`)
+			.toLocaleDateString('en-GB', {day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC'});
+	}
+
+	const downloadStat = document.getElementById('download-stat')!;
+	const downloadTotal = downloadStat.querySelector<HTMLElement>('[data-total]')!;
+	fetchDownloadSummary().then(summary => {
+		const total = summary?.total ?? Number(downloadTotal.dataset.total);
+		if (!total) return;
+		if (summary) {
+			downloadStat.querySelector('[data-releases]')!.textContent = String(summary.releases.length);
+			showLatestRelease(summary.releases[0]);
+		}
+		downloadStat.hidden = false;
+		countUp(downloadTotal, total);
 	});
 
 	detect().then(found => {
